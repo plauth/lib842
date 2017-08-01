@@ -16,13 +16,15 @@
  * See 842.h for details of the 842 compressed format.
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-#define MODULE_NAME "842_compress"
-
-#include <linux/hashtable.h>
-
+#include <unordered_map>
+#include <cstdint>
+#include <climits>
 #include "842.h"
-#include "842_debugfs.h"
+#include "le_struct.h"
+#include "types.h"
+#include <errno.h>
+#include <boost/endian/conversion.hpp>
+#include <boost/crc.hpp>
 
 #define SW842_HASHTABLE8_BITS	(10)
 #define SW842_HASHTABLE4_BITS	(11)
@@ -41,10 +43,9 @@
  * decompressor.  Unless you have a specific need for that, leave this disabled
  * so that any length buffer can be compressed.
  */
-static bool sw842_strict;
-module_param_named(strict, sw842_strict, bool, 0644);
+#define SW842_STRICT 1
 
-static u8 comp_ops[OPS_MAX][5] = { /* params size in bits */
+static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 	{ I8, N0, N0, N0, 0x19 }, /* 8 */
 	{ I4, I4, N0, N0, 0x18 }, /* 18 */
 	{ I4, I2, I2, N0, 0x17 }, /* 25 */
@@ -74,93 +75,168 @@ static u8 comp_ops[OPS_MAX][5] = { /* params size in bits */
 };
 
 struct sw842_hlist_node8 {
-	struct hlist_node node;
-	u64 data;
-	u8 index;
+	uint64_t data;
+	uint8_t index;
 };
 
 struct sw842_hlist_node4 {
-	struct hlist_node node;
-	u32 data;
-	u16 index;
+	uint32_t data;
+	uint16_t index;
 };
 
 struct sw842_hlist_node2 {
-	struct hlist_node node;
-	u16 data;
-	u8 index;
+	uint16_t data;
+	uint8_t index;
 };
 
 #define INDEX_NOT_FOUND		(-1)
 #define INDEX_NOT_CHECKED	(-2)
 
-struct sw842_param {
-	u8 *in;
-	u8 *instart;
-	u64 ilen;
-	u8 *out;
-	u64 olen;
-	u8 bit;
-	u64 data8[1];
-	u32 data4[2];
-	u16 data2[4];
-	int index8[1];
-	int index4[2];
-	int index2[4];
-	DECLARE_HASHTABLE(htable8, SW842_HASHTABLE8_BITS);
-	DECLARE_HASHTABLE(htable4, SW842_HASHTABLE4_BITS);
-	DECLARE_HASHTABLE(htable2, SW842_HASHTABLE2_BITS);
-	struct sw842_hlist_node8 node8[1 << I8_BITS];
-	struct sw842_hlist_node4 node4[1 << I4_BITS];
-	struct sw842_hlist_node2 node2[1 << I2_BITS];
-};
-
 #define get_input_data(p, o, b)						\
-	be##b##_to_cpu(get_unaligned((__be##b *)((p)->in + (o))))
+	be##b##_to_cpu(get_unaligned_le##b((__be##b *)((p)->in + (o))))
 
 #define init_hashtable_nodes(p, b)	do {			\
-	int _i;							\
-	hash_init((p)->htable##b);				\
+	int _i;							\			\
 	for (_i = 0; _i < ARRAY_SIZE((p)->node##b); _i++) {	\
 		(p)->node##b[_i].index = _i;			\
 		(p)->node##b[_i].data = 0;			\
-		INIT_HLIST_NODE(&(p)->node##b[_i].node);	\
 	}							\
 } while (0)
 
-#define find_index(p, b, n)	({					\
-	struct sw842_hlist_node##b *_n;					\
-	p->index##b[n] = INDEX_NOT_FOUND;				\
-	hash_for_each_possible(p->htable##b, _n, node, p->data##b[n]) {	\
-		if (p->data##b[n] == _n->data) {			\
-			p->index##b[n] = _n->index;			\
-			break;						\
-		}							\
-	}								\
-	p->index##b[n] >= 0;						\
-})
 
-#define check_index(p, b, n)			\
-	((p)->index##b[n] == INDEX_NOT_CHECKED	\
-	 ? find_index(p, b, n)			\
-	 : (p)->index##b[n] >= 0)
+static inline int find_index(struct sw842_param *p, int b, int n) {
+	switch(b) {
+		case 2: {
+			p->index2[n] = INDEX_NOT_FOUND;
+			auto range = (p)->htable2.equal_range(p->data2[n]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				p->index2[n] = it->second;
+				break;
+			}
+			return p->index2[n] >= 0;
+		}
+		case 4: {
+			p->index4[n] = INDEX_NOT_FOUND;
+			auto range = (p)->htable4.equal_range(p->data4[n]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				p->index4[n] = it->second;
+				break;
+			}
+			return p->index4[n] >= 0;
+		}
+		case 8: {
+			p->index8[n] = INDEX_NOT_FOUND;
+			auto range = (p)->htable8.equal_range(p->data8[n]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				p->index8[n] = it->second;
+				break;
+			}
+			return p->index8[n] >= 0;		
+		}
+	}
+	return 0;
+}	
 
-#define replace_hash(p, b, i, d)	do {				\
-	struct sw842_hlist_node##b *_n = &(p)->node##b[(i)+(d)];	\
-	hash_del(&_n->node);						\
-	_n->data = (p)->data##b[d];					\
-	pr_debug("add hash index%x %x pos %x data %lx\n", b,		\
-		 (unsigned int)_n->index,				\
-		 (unsigned int)((p)->in - (p)->instart),		\
-		 (unsigned long)_n->data);				\
-	hash_add((p)->htable##b, &_n->node, _n->data);			\
-} while (0)
+static inline int check_index(struct sw842_param *p, int b, int n) {
+	switch(b) {
+		case 2: {
+			return p->index2[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : p->index2[n] >= 0;
+		}
+		case 4: {
+			return p->index4[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : p->index4[n] >= 0;
+		}
+		case 8: {
+			return p->index8[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : p->index8[n] >= 0;
+		}
+	}
+	return 0;
+}
+					 
+static inline void replace_hash(struct sw842_param *p, int b, uint16_t i, int d) {
+	int node_index = i+d;
+	switch(b) {
+		case 2: {
+			uint16_t *_n2 = p->node2 + node_index;
+			auto range = p->htable2.equal_range(p->node2[node_index]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				if(it->second == node_index) {
+					it = p->htable2.erase(it);
+					break;
+				}
+			}
+			_n2 = p->data2 + d;
+			p->htable2.insert(std::pair<uint16_t,int>(*_n2, node_index));
+			break;
+		}
+		case 4: {
+			uint32_t *_n4 = p->node4 + node_index;
+			auto range = p->htable4.equal_range(p->node4[node_index]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				if(it->second == node_index) {
+					it = p->htable4.erase(it);
+					break;
+				}
+			}
+			_n4 = p->data4 + d;
+			p->htable4.insert(std::pair<uint32_t,int>(*_n4, node_index));
+			break;
+		}
+		case 8: {
+			uint64_t *_n8 = p->node8 + node_index;
+			auto range = p->htable8.equal_range(p->node8[node_index]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				if(it->second == node_index) {
+					it = p->htable8.erase(it);
+					break;
+				}
+			}
+			_n8 = p->data8 + d;
+			p->htable8.insert(std::pair<uint64_t,int>(*_n8, node_index));
+			break;		
+		}
 
-static u8 bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
+	}
+}		 
+	
+static uint16_t cpu_to_be16(uint16_t input) {
+	uint16_t result =  boost::endian::native_to_big(input);
+	return result;
+}
 
-static int add_bits(struct sw842_param *p, u64 d, u8 n);
+static uint32_t cpu_to_be32(uint32_t input) {
+	uint32_t result =  boost::endian::native_to_big(input);
+	return result;
+}
 
-static int __split_add_bits(struct sw842_param *p, u64 d, u8 n, u8 s)
+static uint64_t cpu_to_be64(uint64_t input) {
+	uint64_t result =  boost::endian::native_to_big(input);
+	return result;
+}
+
+static uint16_t be16_to_cpu(uint16_t input) {
+	uint16_t result =  boost::endian::big_to_native(input);
+	return result;
+}
+
+static uint32_t be32_to_cpu(uint32_t input) {
+	uint32_t result =  boost::endian::big_to_native(input);
+	return result;
+}
+
+static uint64_t be64_to_cpu(uint64_t input) {
+	uint64_t result =  boost::endian::big_to_native(input);
+	return result;
+}
+
+static uint64_t get_unaligned(uint64_t *in){
+	return get_unaligned_le64(in);
+}
+
+static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
+
+static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n);
+
+static int __split_add_bits(struct sw842_param *p, uint64_t d, uint8_t n, uint8_t s)
 {
 	int ret;
 
@@ -173,11 +249,11 @@ static int __split_add_bits(struct sw842_param *p, u64 d, u8 n, u8 s)
 	return add_bits(p, d & GENMASK_ULL(s - 1, 0), s);
 }
 
-static int add_bits(struct sw842_param *p, u64 d, u8 n)
+static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 {
 	int b = p->bit, bits = b + n, s = round_up(bits, 8) - bits;
-	u64 o;
-	u8 *out = p->out;
+	uint64_t o;
+	uint8_t *out = p->out;
 
 	pr_debug("add %u bits %lx\n", (unsigned char)n, (unsigned long)d);
 
@@ -203,19 +279,19 @@ static int add_bits(struct sw842_param *p, u64 d, u8 n)
 	if (bits <= 8)
 		*out = o | d;
 	else if (bits <= 16)
-		put_unaligned(cpu_to_be16(o << 8 | d), (__be16 *)out);
+		put_unaligned_le16(cpu_to_be16(o << 8 | d), (__be16 *)out);
 	else if (bits <= 24)
-		put_unaligned(cpu_to_be32(o << 24 | d << 8), (__be32 *)out);
+		put_unaligned_le32(cpu_to_be32(o << 24 | d << 8), (__be32 *)out);
 	else if (bits <= 32)
-		put_unaligned(cpu_to_be32(o << 24 | d), (__be32 *)out);
+		put_unaligned_le32(cpu_to_be32(o << 24 | d), (__be32 *)out);
 	else if (bits <= 40)
-		put_unaligned(cpu_to_be64(o << 56 | d << 24), (__be64 *)out);
+		put_unaligned_le64(cpu_to_be64(o << 56 | d << 24), (__be64 *)out);
 	else if (bits <= 48)
-		put_unaligned(cpu_to_be64(o << 56 | d << 16), (__be64 *)out);
+		put_unaligned_le64(cpu_to_be64(o << 56 | d << 16), (__be64 *)out);
 	else if (bits <= 56)
-		put_unaligned(cpu_to_be64(o << 56 | d << 8), (__be64 *)out);
+		put_unaligned_le64(cpu_to_be64(o << 56 | d << 8), (__be64 *)out);
 	else
-		put_unaligned(cpu_to_be64(o << 56 | d), (__be64 *)out);
+		put_unaligned_le64(cpu_to_be64(o << 56 | d), (__be64 *)out);
 
 	p->bit += n;
 
@@ -228,10 +304,10 @@ static int add_bits(struct sw842_param *p, u64 d, u8 n)
 	return 0;
 }
 
-static int add_template(struct sw842_param *p, u8 c)
+static int add_template(struct sw842_param *p, uint8_t c)
 {
 	int ret, i, b = 0;
-	u8 *t = comp_ops[c];
+	uint8_t *t = comp_ops[c];
 	bool inv = false;
 
 	if (c >= OPS_MAX)
@@ -305,13 +381,11 @@ static int add_template(struct sw842_param *p, u8 c)
 		return -EINVAL;
 	}
 
-	if (sw842_template_counts)
-		atomic_inc(&template_count[t[4]]);
 
 	return 0;
 }
 
-static int add_repeat_template(struct sw842_param *p, u8 r)
+static int add_repeat_template(struct sw842_param *p, uint8_t r)
 {
 	int ret;
 
@@ -327,13 +401,10 @@ static int add_repeat_template(struct sw842_param *p, u8 r)
 	if (ret)
 		return ret;
 
-	if (sw842_template_counts)
-		atomic_inc(&template_repeat_count);
-
 	return 0;
 }
 
-static int add_short_data_template(struct sw842_param *p, u8 b)
+static int add_short_data_template(struct sw842_param *p, uint8_t b)
 {
 	int ret, i;
 
@@ -354,9 +425,6 @@ static int add_short_data_template(struct sw842_param *p, u8 b)
 			return ret;
 	}
 
-	if (sw842_template_counts)
-		atomic_inc(&template_short_data_count);
-
 	return 0;
 }
 
@@ -366,9 +434,6 @@ static int add_zeros_template(struct sw842_param *p)
 
 	if (ret)
 		return ret;
-
-	if (sw842_template_counts)
-		atomic_inc(&template_zeros_count);
 
 	return 0;
 }
@@ -380,15 +445,12 @@ static int add_end_template(struct sw842_param *p)
 	if (ret)
 		return ret;
 
-	if (sw842_template_counts)
-		atomic_inc(&template_end_count);
-
 	return 0;
 }
 
-static bool check_template(struct sw842_param *p, u8 c)
+static bool check_template(struct sw842_param *p, uint8_t c)
 {
-	u8 *t = comp_ops[c];
+	uint8_t *t = comp_ops[c];
 	int i, match, b = 0;
 
 	if (c >= OPS_MAX)
@@ -431,10 +493,10 @@ static void get_next_data(struct sw842_param *p)
  */
 static void update_hashtables(struct sw842_param *p)
 {
-	u64 pos = p->in - p->instart;
-	u64 n8 = (pos >> 3) % (1 << I8_BITS);
-	u64 n4 = (pos >> 2) % (1 << I4_BITS);
-	u64 n2 = (pos >> 1) % (1 << I2_BITS);
+	uint64_t pos = p->in - p->instart;
+	uint64_t n8 = (pos >> 3) % (1 << I8_BITS);
+	uint64_t n4 = (pos >> 2) % (1 << I4_BITS);
+	uint64_t n2 = (pos >> 1) % (1 << I2_BITS);
 
 	replace_hash(p, 8, n8, 0);
 	replace_hash(p, 4, n4, 0);
@@ -465,7 +527,6 @@ static int process_next(struct sw842_param *p)
 		if (check_template(p, i))
 			break;
 	}
-
 	ret = add_template(p, i);
 	if (ret)
 		return ret;
@@ -483,22 +544,15 @@ static int process_next(struct sw842_param *p)
  * will contain the number of output bytes written on success, or
  * 0 on error.
  */
-int sw842_compress(const u8 *in, unsigned int ilen,
-		   u8 *out, unsigned int *olen, void *wmem)
+int sw842_compress(const uint8_t *in, unsigned int ilen,
+		   uint8_t *out, unsigned int *olen, void *wmem)
 {
 	struct sw842_param *p = (struct sw842_param *)wmem;
 	int ret;
-	u64 last, next, pad, total;
-	u8 repeat_count = 0;
-	u32 crc;
+	uint64_t last, next, pad, total;
+	uint8_t repeat_count = 0;
 
-	BUILD_BUG_ON(sizeof(*p) > SW842_MEM_COMPRESS);
-
-	init_hashtable_nodes(p, 8);
-	init_hashtable_nodes(p, 4);
-	init_hashtable_nodes(p, 2);
-
-	p->in = (u8 *)in;
+	p->in = (uint8_t *)in;
 	p->instart = p->in;
 	p->ilen = ilen;
 	p->out = out;
@@ -510,7 +564,7 @@ int sw842_compress(const u8 *in, unsigned int ilen,
 	*olen = 0;
 
 	/* if using strict mode, we can only compress a multiple of 8 */
-	if (sw842_strict && (ilen % 8)) {
+	if (SW842_STRICT && (ilen % 8)) {
 		pr_err("Using strict mode, can't compress len %d\n", ilen);
 		return -EINVAL;
 	}
@@ -520,10 +574,10 @@ int sw842_compress(const u8 *in, unsigned int ilen,
 		goto skip_comp;
 
 	/* make initial 'last' different so we don't match the first time */
-	last = ~get_unaligned((u64 *)p->in);
+	last = ~get_unaligned((uint64_t *)p->in);
 
 	while (p->ilen > 7) {
-		next = get_unaligned((u64 *)p->in);
+		next = get_unaligned((uint64_t *)p->in);
 
 		/* must get the next data, as we need to update the hashtable
 		 * entries with the new data every time
@@ -578,8 +632,9 @@ skip_comp:
 	}
 
 	ret = add_end_template(p);
-	if (ret)
-		return ret;
+	if (ret){
+		printf("return after add_end_template()\n");
+		return ret;}
 
 	/*
 	 * crc(0:31) is appended to target data starting with the next
@@ -588,10 +643,13 @@ skip_comp:
 	 * same here so that sw842 decompression can be used for both
 	 * compressed data.
 	 */
-	crc = crc32_be(0, in, ilen);
-	ret = add_bits(p, crc, CRC_BITS);
-	if (ret)
-		return ret;
+	boost::crc_32_type  crc;
+	crc.process_bytes(in, ilen);
+	//crc = crc32_be(0, in, ilen);
+	ret = add_bits(p, crc.checksum(), CRC_BITS);
+	if (ret){
+		printf("return after crc\n");
+		return ret;}
 
 	if (p->bit) {
 		p->out++;
@@ -616,24 +674,3 @@ skip_comp:
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(sw842_compress);
-
-static int __init sw842_init(void)
-{
-	if (sw842_template_counts)
-		sw842_debugfs_create();
-
-	return 0;
-}
-module_init(sw842_init);
-
-static void __exit sw842_exit(void)
-{
-	if (sw842_template_counts)
-		sw842_debugfs_remove();
-}
-module_exit(sw842_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Software 842 Compressor");
-MODULE_AUTHOR("Dan Streetman <ddstreet@ieee.org>");

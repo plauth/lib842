@@ -73,13 +73,8 @@
  * code is detected.
  */
 
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/bitops.h>
-#include <linux/crc32.h>
-#include <asm/unaligned.h>
-
-#include <linux/sw842.h>
+#include <cstdint>
+#include <unordered_map>
 
 /* special templates */
 #define OP_REPEAT	(0x1B)
@@ -125,5 +120,29 @@
 
 /* the max of the regular templates - not including the special templates */
 #define OPS_MAX		(0x1a)
+
+struct sw842_param {
+	uint8_t *in;
+	uint8_t *instart;
+	uint64_t ilen;
+	uint8_t *out;
+	uint64_t olen;
+	uint8_t bit;
+	uint64_t data8[1];
+	uint32_t data4[2];
+	uint16_t data2[4];
+	int index8[1];
+	int index4[2];
+	int index2[4];
+	std::unordered_multimap<uint64_t, int> htable8;
+	std::unordered_multimap<uint32_t, int> htable4;
+	std::unordered_multimap<uint16_t, int> htable2;	
+	uint64_t node8[1 << I8_BITS];
+	uint32_t node4[1 << I4_BITS];
+	uint16_t node2[1 << I2_BITS];
+};
+
+int sw842_compress(const uint8_t *in, unsigned int ilen,
+		   uint8_t *out, unsigned int *olen, void *wmem);
 
 #endif
