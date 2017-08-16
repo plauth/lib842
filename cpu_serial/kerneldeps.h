@@ -1,8 +1,5 @@
-typedef uint16_t __le16;
 typedef uint16_t __be16;
-typedef uint32_t __le32;
 typedef uint32_t __be32;
-typedef uint64_t __le64;
 typedef uint64_t __be64;
 
 #define BITS_PER_LONG_LONG 64
@@ -14,9 +11,6 @@ typedef uint64_t __be64;
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 	
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-		
-#define pr_debug printf
-#define pr_err printf
 		
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)

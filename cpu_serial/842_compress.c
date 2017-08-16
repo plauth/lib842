@@ -16,13 +16,7 @@
  * See 842.h for details of the 842 compressed format.
  */
 
-#include <unordered_map>
-#include <cstdint>
-#include <climits>
-#include <errno.h>
 #include "842.h"
-#include "le_struct.h"
-#include "types.h"
 
 #define SW842_HASHTABLE8_BITS	(10)
 #define SW842_HASHTABLE4_BITS	(11)
@@ -91,7 +85,7 @@ struct sw842_hlist_node2 {
 #define INDEX_NOT_CHECKED	(-2)
 
 #define get_input_data(p, o, b)						\
-	swap_endianness##b(get_unaligned((__be##b *)((p)->in + (o))))
+	swap_endianness##b(get_unaligned##b((__be##b *)((p)->in + (o))))
 
 #define init_hashtable_nodes(p, b)	do {			\
 	int _i;							\			\
@@ -219,7 +213,9 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 	uint64_t o;
 	uint8_t *out = p->out;
 
-	pr_debug("add %u bits %lx\n", (unsigned char)n, (unsigned long)d);
+	#ifdef DEBUG
+	printf("add %u bits %lx\n", (unsigned char)n, (unsigned long)d);
+	#endif
 
 	if (n > 64)
 		return -EINVAL;
@@ -277,14 +273,18 @@ static int add_template(struct sw842_param *p, uint8_t c)
 	if (c >= OPS_MAX)
 		return -EINVAL;
 
-	pr_debug("template %x\n", t[4]);
+	#ifdef DEBUG
+	printf("template %x\n", t[4]);
+	#endif
 
 	ret = add_bits(p, t[4], OP_BITS);
 	if (ret)
 		return ret;
 
 	for (i = 0; i < 4; i++) {
-		pr_debug("op %x\n", t[i]);
+		#ifdef DEBUG
+		printf("op %x\n", t[i]);
+		#endif
 
 		switch (t[i] & OP_AMOUNT) {
 		case OP_AMOUNT_8:
@@ -331,7 +331,7 @@ static int add_template(struct sw842_param *p, uint8_t c)
 			return ret;
 
 		if (inv) {
-			pr_err("Invalid templ %x op %d : %x %x %x %x\n",
+			fprintf(stderr, "Invalid templ %x op %d : %x %x %x %x\n",
 			       c, i, t[0], t[1], t[2], t[3]);
 			return -EINVAL;
 		}
@@ -340,7 +340,7 @@ static int add_template(struct sw842_param *p, uint8_t c)
 	}
 
 	if (b != 8) {
-		pr_err("Invalid template %x len %x : %x %x %x %x\n",
+		fprintf(stderr, "Invalid template %x len %x : %x %x %x %x\n",
 		       c, b, t[0], t[1], t[2], t[3]);
 		return -EINVAL;
 	}
@@ -529,7 +529,7 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 
 	/* if using strict mode, we can only compress a multiple of 8 */
 	if (SW842_STRICT && (ilen % 8)) {
-		pr_err("Using strict mode, can't compress len %d\n", ilen);
+		fprintf(stderr, "Using strict mode, can't compress len %d\n", ilen);
 		return -EINVAL;
 	}
 
@@ -538,10 +538,10 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 		goto skip_comp;
 
 	/* make initial 'last' different so we don't match the first time */
-	last = ~get_unaligned((uint64_t *)p->in);
+	last = ~get_unaligned64((uint64_t *)p->in);
 
 	while (p->ilen > 7) {
-		next = get_unaligned((uint64_t *)p->in);
+		next = get_unaligned64((uint64_t *)p->in);
 
 		/* must get the next data, as we need to update the hashtable
 		 * entries with the new data every time

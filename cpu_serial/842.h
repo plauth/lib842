@@ -74,9 +74,15 @@
  */
 
 #include <cstdint>
+#include <climits>
 #include <unordered_map>
-#include "le_struct.h"
+#include <errno.h>
+
+#include "../generic/unaligned.h"
 #include "../generic/endianness.h"
+#include "kerneldeps.h"
+
+//#define DEBUG 1
 
 /* special templates */
 #define OP_REPEAT	(0x1B)
@@ -159,16 +165,17 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		     uint8_t *out, unsigned int *olen);
 
+/*
 static inline uint16_t get_unaligned(uint16_t *in){
-	return get_unaligned_le16(in);
+	return get_unaligned16(in);
 }
 
 static inline uint32_t get_unaligned(uint32_t *in){
-	return get_unaligned_le32(in);
+	return get_unaligned32(in);
 }
 
 static inline uint64_t get_unaligned(uint64_t *in){
-	return get_unaligned_le64(in);
-}
+	return get_unaligned64(in);
+}*/
 
 #endif
