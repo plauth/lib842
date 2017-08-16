@@ -23,7 +23,6 @@
 #include "le_struct.h"
 #include "types.h"
 #include <errno.h>
-#include <boost/endian/conversion.hpp>
 #include <boost/crc.hpp>
 
 #define SW842_HASHTABLE8_BITS	(10)
@@ -93,7 +92,7 @@ struct sw842_hlist_node2 {
 #define INDEX_NOT_CHECKED	(-2)
 
 #define get_input_data(p, o, b)						\
-	be##b##_to_cpu(get_unaligned_le##b((__be##b *)((p)->in + (o))))
+	be##b##_to_cpu(get_unaligned((__be##b *)((p)->in + (o))))
 
 #define init_hashtable_nodes(p, b)	do {			\
 	int _i;							\			\
@@ -197,40 +196,6 @@ static inline void replace_hash(struct sw842_param *p, int b, uint16_t i, int d)
 
 	}
 }		 
-	
-static uint16_t cpu_to_be16(uint16_t input) {
-	uint16_t result =  boost::endian::native_to_big(input);
-	return result;
-}
-
-static uint32_t cpu_to_be32(uint32_t input) {
-	uint32_t result =  boost::endian::native_to_big(input);
-	return result;
-}
-
-static uint64_t cpu_to_be64(uint64_t input) {
-	uint64_t result =  boost::endian::native_to_big(input);
-	return result;
-}
-
-static uint16_t be16_to_cpu(uint16_t input) {
-	uint16_t result =  boost::endian::big_to_native(input);
-	return result;
-}
-
-static uint32_t be32_to_cpu(uint32_t input) {
-	uint32_t result =  boost::endian::big_to_native(input);
-	return result;
-}
-
-static uint64_t be64_to_cpu(uint64_t input) {
-	uint64_t result =  boost::endian::big_to_native(input);
-	return result;
-}
-
-static uint64_t get_unaligned(uint64_t *in){
-	return get_unaligned_le64(in);
-}
 
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
 

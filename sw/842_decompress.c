@@ -16,18 +16,18 @@
  * See 842.h for details of the 842 compressed format.
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-#define MODULE_NAME "842_decompress"
-
 #include "842.h"
-#include "842_debugfs.h"
+#include "types.h"
+#include "le_struct.h"
+#include <errno.h>
+#include <climits>
 
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE	(2 * (1 << I2_BITS))
 #define I4_FIFO_SIZE	(4 * (1 << I4_BITS))
 #define I8_FIFO_SIZE	(8 * (1 << I8_BITS))
 
-static u8 decomp_ops[OPS_MAX][4] = {
+static uint8_t decomp_ops[OPS_MAX][4] = {
 	{ D8, N0, N0, N0 },
 	{ D4, D2, I2, N0 },
 	{ D4, I2, D2, N0 },
@@ -56,14 +56,7 @@ static u8 decomp_ops[OPS_MAX][4] = {
 	{ I8, N0, N0, N0 }
 };
 
-struct sw842_param {
-	u8 *in;
-	u8 bit;
-	u64 ilen;
-	u8 *out;
-	u8 *ostart;
-	u64 olen;
-};
+
 
 #define beN_to_cpu(d, s)					\
 	((s) == 2 ? be16_to_cpu(get_unaligned((__be16 *)d)) :	\
@@ -71,15 +64,15 @@ struct sw842_param {
 	 (s) == 8 ? be64_to_cpu(get_unaligned((__be64 *)d)) :	\
 	 0)
 
-static int next_bits(struct sw842_param *p, u64 *d, u8 n);
+static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n);
 
-static int __split_next_bits(struct sw842_param *p, u64 *d, u8 n, u8 s)
+static int __split_next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n, uint8_t s)
 {
-	u64 tmp = 0;
+	uint64_t tmp = 0;
 	int ret;
 
 	if (n <= s) {
-		pr_debug("split_next_bits invalid n %u s %u\n", n, s);
+		printf("split_next_bits invalid n %u s %u\n", n, s);
 		return -EINVAL;
 	}
 
@@ -93,12 +86,12 @@ static int __split_next_bits(struct sw842_param *p, u64 *d, u8 n, u8 s)
 	return 0;
 }
 
-static int next_bits(struct sw842_param *p, u64 *d, u8 n)
+static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n)
 {
-	u8 *in = p->in, b = p->bit, bits = b + n;
+	uint8_t *in = p->in, b = p->bit, bits = b + n;
 
 	if (n > 64) {
-		pr_debug("next_bits invalid n %u\n", n);
+		printf("next_bits invalid n %u\n", n);
 		return -EINVAL;
 	}
 
@@ -118,11 +111,11 @@ static int next_bits(struct sw842_param *p, u64 *d, u8 n)
 	if (bits <= 8)
 		*d = *in >> (8 - bits);
 	else if (bits <= 16)
-		*d = be16_to_cpu(get_unaligned((__be16 *)in)) >> (16 - bits);
+		*d = be16_to_cpu(get_unaligned_le16((__be16 *)in)) >> (16 - bits);
 	else if (bits <= 32)
-		*d = be32_to_cpu(get_unaligned((__be32 *)in)) >> (32 - bits);
+		*d = be32_to_cpu(get_unaligned_le32((__be32 *)in)) >> (32 - bits);
 	else
-		*d = be64_to_cpu(get_unaligned((__be64 *)in)) >> (64 - bits);
+		*d = be64_to_cpu(get_unaligned_le64((__be64 *)in)) >> (64 - bits);
 
 	*d &= GENMASK_ULL(n - 1, 0);
 
@@ -137,9 +130,9 @@ static int next_bits(struct sw842_param *p, u64 *d, u8 n)
 	return 0;
 }
 
-static int do_data(struct sw842_param *p, u8 n)
+static int do_data(struct sw842_param_decomp *p, uint8_t n)
 {
-	u64 v;
+	uint64_t v;
 	int ret;
 
 	if (n > p->olen)
@@ -151,13 +144,13 @@ static int do_data(struct sw842_param *p, u8 n)
 
 	switch (n) {
 	case 2:
-		put_unaligned(cpu_to_be16((u16)v), (__be16 *)p->out);
+		put_unaligned_le16(cpu_to_be16((uint16_t)v), (__be16 *)p->out);
 		break;
 	case 4:
-		put_unaligned(cpu_to_be32((u32)v), (__be32 *)p->out);
+		put_unaligned_le32(cpu_to_be32((uint32_t)v), (__be32 *)p->out);
 		break;
 	case 8:
-		put_unaligned(cpu_to_be64((u64)v), (__be64 *)p->out);
+		put_unaligned_le64(cpu_to_be64((uint64_t)v), (__be64 *)p->out);
 		break;
 	default:
 		return -EINVAL;
@@ -169,9 +162,9 @@ static int do_data(struct sw842_param *p, u8 n)
 	return 0;
 }
 
-static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
+static int __do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, uint64_t fsize)
 {
-	u64 index, offset, total = round_down(p->out - p->ostart, 8);
+	uint64_t index, offset, total = round_down(p->out - p->ostart, 8);
 	int ret;
 
 	ret = next_bits(p, &index, bits);
@@ -183,9 +176,9 @@ static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
 	/* a ring buffer of fsize is used; correct the offset */
 	if (total > fsize) {
 		/* this is where the current fifo is */
-		u64 section = round_down(total, fsize);
+		uint64_t section = round_down(total, fsize);
 		/* the current pos in the fifo */
-		u64 pos = total - section;
+		uint64_t pos = total - section;
 
 		/* if the offset is past/at the pos, we need to
 		 * go back to the last fifo section
@@ -197,15 +190,15 @@ static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
 	}
 
 	if (offset + size > total) {
-		pr_debug("index%x %lx points past end %lx\n", size,
+		printf("index%x %lx points past end %lx\n", size,
 			 (unsigned long)offset, (unsigned long)total);
 		return -EINVAL;
 	}
 
 	if (size != 2 && size != 4 && size != 8)
-		WARN(1, "__do_index invalid size %x\n", size);
+		printf("__do_index invalid size %x\n", size);
 	else
-		pr_debug("index%x to %lx off %lx adjoff %lx tot %lx data %lx\n",
+		printf("index%x to %lx off %lx adjoff %lx tot %lx data %lx\n",
 			 size, (unsigned long)index,
 			 (unsigned long)(index * size), (unsigned long)offset,
 			 (unsigned long)total,
@@ -218,7 +211,7 @@ static int __do_index(struct sw842_param *p, u8 size, u8 bits, u64 fsize)
 	return 0;
 }
 
-static int do_index(struct sw842_param *p, u8 n)
+static int do_index(struct sw842_param_decomp *p, uint8_t n)
 {
 	switch (n) {
 	case 2:
@@ -232,7 +225,7 @@ static int do_index(struct sw842_param *p, u8 n)
 	}
 }
 
-static int do_op(struct sw842_param *p, u8 o)
+static int do_op(struct sw842_param_decomp *p, uint8_t o)
 {
 	int i, ret = 0;
 
@@ -240,9 +233,9 @@ static int do_op(struct sw842_param *p, u8 o)
 		return -EINVAL;
 
 	for (i = 0; i < 4; i++) {
-		u8 op = decomp_ops[o][i];
+		uint8_t op = decomp_ops[o][i];
 
-		pr_debug("op is %x\n", op);
+		printf("op is %x\n", op);
 
 		switch (op & OP_ACTION) {
 		case OP_ACTION_DATA:
@@ -262,9 +255,6 @@ static int do_op(struct sw842_param *p, u8 o)
 			return ret;
 	}
 
-	if (sw842_template_counts)
-		atomic_inc(&template_count[o]);
-
 	return 0;
 }
 
@@ -283,15 +273,15 @@ static int do_op(struct sw842_param *p, u8 o)
  * will contain the number of output bytes written on success, or
  * 0 on error.
  */
-int sw842_decompress(const u8 *in, unsigned int ilen,
-		     u8 *out, unsigned int *olen)
+int sw842_decompress(const uint8_t *in, unsigned int ilen,
+		     uint8_t *out, unsigned int *olen)
 {
-	struct sw842_param p;
+	struct sw842_param_decomp p;
 	int ret;
-	u64 op, rep, tmp, bytes, total;
-	u64 crc;
+	uint64_t op, rep, tmp, bytes, total;
+	uint64_t crc;
 
-	p.in = (u8 *)in;
+	p.in = (uint8_t *)in;
 	p.bit = 0;
 	p.ilen = ilen;
 	p.out = out;
@@ -307,7 +297,7 @@ int sw842_decompress(const u8 *in, unsigned int ilen,
 		if (ret)
 			return ret;
 
-		pr_debug("template is %lx\n", (unsigned long)op);
+		printf("template is %lx\n", (unsigned long)op);
 
 		switch (op) {
 		case OP_REPEAT:
@@ -330,9 +320,6 @@ int sw842_decompress(const u8 *in, unsigned int ilen,
 				p.olen -= 8;
 			}
 
-			if (sw842_template_counts)
-				atomic_inc(&template_repeat_count);
-
 			break;
 		case OP_ZEROS:
 			if (8 > p.olen)
@@ -341,9 +328,6 @@ int sw842_decompress(const u8 *in, unsigned int ilen,
 			memset(p.out, 0, 8);
 			p.out += 8;
 			p.olen -= 8;
-
-			if (sw842_template_counts)
-				atomic_inc(&template_zeros_count);
 
 			break;
 		case OP_SHORT_DATA:
@@ -358,18 +342,13 @@ int sw842_decompress(const u8 *in, unsigned int ilen,
 				ret = next_bits(&p, &tmp, 8);
 				if (ret)
 					return ret;
-				*p.out = (u8)tmp;
+				*p.out = (uint8_t)tmp;
 				p.out++;
 				p.olen--;
 			}
 
-			if (sw842_template_counts)
-				atomic_inc(&template_short_data_count);
-
 			break;
 		case OP_END:
-			if (sw842_template_counts)
-				atomic_inc(&template_end_count);
 
 			break;
 		default: /* use template */
@@ -390,11 +369,11 @@ int sw842_decompress(const u8 *in, unsigned int ilen,
 
 	/*
 	 * Validate CRC saved in compressed data.
-	 */
-	if (crc != (u64)crc32_be(0, out, total - p.olen)) {
-		pr_debug("CRC mismatch for decompression\n");
+	 *
+	if (crc != (uint64_t)crc32_be(0, out, total - p.olen)) {
+		printf("CRC mismatch for decompression\n");
 		return -EINVAL;
-	}
+	}*/
 
 	if (unlikely((total - p.olen) > UINT_MAX))
 		return -ENOSPC;
@@ -403,24 +382,5 @@ int sw842_decompress(const u8 *in, unsigned int ilen,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(sw842_decompress);
 
-static int __init sw842_init(void)
-{
-	if (sw842_template_counts)
-		sw842_debugfs_create();
 
-	return 0;
-}
-module_init(sw842_init);
-
-static void __exit sw842_exit(void)
-{
-	if (sw842_template_counts)
-		sw842_debugfs_remove();
-}
-module_exit(sw842_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Software 842 Decompressor");
-MODULE_AUTHOR("Dan Streetman <ddstreet@ieee.org>");
