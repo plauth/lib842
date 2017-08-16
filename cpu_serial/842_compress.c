@@ -19,11 +19,10 @@
 #include <unordered_map>
 #include <cstdint>
 #include <climits>
+#include <errno.h>
 #include "842.h"
 #include "le_struct.h"
 #include "types.h"
-#include <errno.h>
-#include <boost/crc.hpp>
 
 #define SW842_HASHTABLE8_BITS	(10)
 #define SW842_HASHTABLE4_BITS	(11)
@@ -92,7 +91,7 @@ struct sw842_hlist_node2 {
 #define INDEX_NOT_CHECKED	(-2)
 
 #define get_input_data(p, o, b)						\
-	be##b##_to_cpu(get_unaligned((__be##b *)((p)->in + (o))))
+	swap_endianness##b(get_unaligned((__be##b *)((p)->in + (o))))
 
 #define init_hashtable_nodes(p, b)	do {			\
 	int _i;							\			\
@@ -244,19 +243,19 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 	if (bits <= 8)
 		*out = o | d;
 	else if (bits <= 16)
-		put_unaligned_le16(cpu_to_be16(o << 8 | d), (__be16 *)out);
+		put_unaligned_le16(swap_endianness16(o << 8 | d), (__be16 *)out);
 	else if (bits <= 24)
-		put_unaligned_le32(cpu_to_be32(o << 24 | d << 8), (__be32 *)out);
+		put_unaligned_le32(swap_endianness32(o << 24 | d << 8), (__be32 *)out);
 	else if (bits <= 32)
-		put_unaligned_le32(cpu_to_be32(o << 24 | d), (__be32 *)out);
+		put_unaligned_le32(swap_endianness32(o << 24 | d), (__be32 *)out);
 	else if (bits <= 40)
-		put_unaligned_le64(cpu_to_be64(o << 56 | d << 24), (__be64 *)out);
+		put_unaligned_le64(swap_endianness64(o << 56 | d << 24), (__be64 *)out);
 	else if (bits <= 48)
-		put_unaligned_le64(cpu_to_be64(o << 56 | d << 16), (__be64 *)out);
+		put_unaligned_le64(swap_endianness64(o << 56 | d << 16), (__be64 *)out);
 	else if (bits <= 56)
-		put_unaligned_le64(cpu_to_be64(o << 56 | d << 8), (__be64 *)out);
+		put_unaligned_le64(swap_endianness64(o << 56 | d << 8), (__be64 *)out);
 	else
-		put_unaligned_le64(cpu_to_be64(o << 56 | d), (__be64 *)out);
+		put_unaligned_le64(swap_endianness64(o << 56 | d), (__be64 *)out);
 
 	p->bit += n;
 
@@ -608,10 +607,10 @@ skip_comp:
 	 * same here so that sw842 decompression can be used for both
 	 * compressed data.
 	 */
-	boost::crc_32_type  crc;
-	crc.process_bytes(in, ilen);
+	//boost::crc_32_type  crc;
+	//crc.process_bytes(in, ilen);
 	//crc = crc32_be(0, in, ilen);
-	ret = add_bits(p, crc.checksum(), CRC_BITS);
+	//ret = add_bits(p, crc.checksum(), CRC_BITS);
 	if (ret){
 		printf("return after crc\n");
 		return ret;}

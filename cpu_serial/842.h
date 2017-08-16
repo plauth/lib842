@@ -75,8 +75,8 @@
 
 #include <cstdint>
 #include <unordered_map>
-#include <boost/endian/conversion.hpp>
 #include "le_struct.h"
+#include "../generic/endianness.h"
 
 /* special templates */
 #define OP_REPEAT	(0x1B)
@@ -158,36 +158,6 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 
 int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		     uint8_t *out, unsigned int *olen);
-
-static inline uint16_t cpu_to_be16(uint16_t input) {
-	uint16_t result =  boost::endian::native_to_big(input);
-	return result;
-}
-
-static inline uint32_t cpu_to_be32(uint32_t input) {
-	uint32_t result =  boost::endian::native_to_big(input);
-	return result;
-}
-
-static inline uint64_t cpu_to_be64(uint64_t input) {
-	uint64_t result =  boost::endian::native_to_big(input);
-	return result;
-}
-
-static inline uint16_t be16_to_cpu(uint16_t input) {
-	uint16_t result =  boost::endian::big_to_native(input);
-	return result;
-}
-
-static inline uint32_t be32_to_cpu(uint32_t input) {
-	uint32_t result =  boost::endian::big_to_native(input);
-	return result;
-}
-
-static inline uint64_t be64_to_cpu(uint64_t input) {
-	uint64_t result =  boost::endian::big_to_native(input);
-	return result;
-}
 
 static inline uint16_t get_unaligned(uint16_t *in){
 	return get_unaligned_le16(in);

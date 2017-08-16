@@ -4,7 +4,7 @@ LIB_DIRS :=
 LDFLAGS := 
 
 ifeq ($(shell uname),Darwin)
-	INC_DIRS := -I/usr/local/Cellar/boost/1.64.0_1/include/
+	INC_DIRS :=
 else
 	INC_DIRS :=
 endif
