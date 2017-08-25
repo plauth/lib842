@@ -501,12 +501,13 @@ static int process_next(struct sw842_param *p)
 	p->index2[1] = INDEX_NOT_CHECKED;
 	p->index2[2] = INDEX_NOT_CHECKED;
 	p->index2[3] = INDEX_NOT_CHECKED;
-
+	printf("process_next\n");;
 	/* check up to OPS_MAX - 1; last op is our fallback */
 	for (i = 0; i < OPS_MAX - 1; i++) {
 		if (check_template(p, i))
 			break;
 	}
+	printf("checked template\n");
 	ret = add_template(p, i);
 	if (ret)
 		return ret;
@@ -542,7 +543,7 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	total = p->olen;
 
 	*olen = 0;
-
+	printf("init stuff is done\n");
 	/* if using strict mode, we can only compress a multiple of 8 */
 	if (SW842_STRICT && (ilen % 8)) {
 		fprintf(stderr, "Using strict mode, can't compress len %d\n", ilen);
@@ -559,12 +560,12 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	while (p->ilen > 7) {
 		printf("p->ilen: %d\n", p->ilen);
 		next = get_unaligned64((uint64_t *)p->in);
-
+		printf("test1\n");
 		/* must get the next data, as we need to update the hashtable
 		 * entries with the new data every time
 		 */
 		get_next_data(p);
-
+		printf("test2\n");
 		/* we don't care about endianness in last or next;
 		 * we're just comparing 8 bytes to another 8 bytes,
 		 * they're both the same endianness
@@ -574,18 +575,22 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 			if (++repeat_count <= REPEAT_BITS_MAX)
 				goto repeat;
 		}
+		printf("test3\n");
 		if (repeat_count) {
 			ret = add_repeat_template(p, repeat_count);
 			repeat_count = 0;
 			if (next == last) /* reached max repeat bits */
 				goto repeat;
 		}
-
-		if (next == 0)
+		printf("test4\n");
+		if (next == 0){
+			printf("zeros\n");
 			ret = add_zeros_template(p);
-		else
+		} else {
+			printf("no zeros\n");
 			ret = process_next(p);
-
+		}
+		printf("test5\n");
 		if (ret)
 			return ret;
 

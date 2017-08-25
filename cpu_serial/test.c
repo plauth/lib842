@@ -65,7 +65,7 @@ int main( int argc, const char* argv[])
 
 	printf("In: %d bytes\n", ilen);
 	printf("Out: %d bytes\n", olen);
-	printf("Compression factor: %f\n", (float) olen / (float) ilen);
+	//printf("Compression factor: %f\n", (float) olen / (float) ilen);
 	
 	/*
 	for (int i = 0; i < OUT_LEN; i++)

@@ -77,6 +77,7 @@
 #include <climits>
 #include <unordered_map>
 #include <errno.h>
+#include <string.h>
 
 #include "../generic/unaligned.h"
 #include "../generic/endianness.h"

@@ -1,0 +1,3 @@
+[submodule "cpu_serial/uthash"]
+	path = cpu_serial/uthash
+	url = https://github.com/troydhanson/uthash.git
