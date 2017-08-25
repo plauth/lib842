@@ -193,12 +193,14 @@ static int __do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, 
 
 	if (size != 2 && size != 4 && size != 8)
 		printf("__do_index invalid size %x\n", size);
-	else
+	#ifdef DEBUG
+	else	
 		printf("index%x to %lx off %lx adjoff %lx tot %lx data %lx\n",
 			 size, (unsigned long)index,
 			 (unsigned long)(index * size), (unsigned long)offset,
 			 (unsigned long)total,
 			 (unsigned long)beN_to_cpu(&p->ostart[offset], size));
+	#endif
 
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;

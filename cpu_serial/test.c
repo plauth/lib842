@@ -47,45 +47,31 @@ int main( int argc, const char* argv[])
 		in = (uint8_t*) malloc(ilen);
 		out = (uint8_t*) malloc(olen);
 		decompressed = (uint8_t*) malloc(dlen);
-		fread(out, flen, 1, fp);
+		memset(in, 0, ilen);
+		memset(out, 0, olen);
+		memset(decompressed, 0, dlen);
+
+		fread(in, flen, 1, fp);
 		fclose(fp);
 	}
 
 	/*
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < ilen; i++)
 	{
 	    if (i > 0) printf(" ");
 	    printf("%02X", in[i]);
 	}
 	printf("\n");*/
-
-	printf("commencing Compression\n");
 	
 	sw842_compress(in, ilen, out, &olen, wmem_comp);
 
-	printf("In: %d bytes\n", ilen);
-	printf("Out: %d bytes\n", olen);
-	//printf("Compression factor: %f\n", (float) olen / (float) ilen);
-	
-	/*
-	for (int i = 0; i < OUT_LEN; i++)
-	{
-	    if (i > 0) printf(" ");
-	    printf("%02X", out[i]);
-	}
-	printf("\n");*/
+	printf("Input: %d bytes\n", ilen);
+	printf("Output: %d bytes\n", olen);
+	printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
 	sw842_decompress(out, olen, decompressed, &dlen);
 
-	/*
-	for (int i = 0; i < 8; i++)
-	{
-	    if (i > 0) printf(" ");
-	    printf("%02X", decompressed[i]);
-	}
-	printf("\n");*/
-
-	if (memcmp(in, decompressed, 8) == 0) {
+	if (memcmp(in, decompressed, ilen) == 0) {
 		printf("Compression- and decompression was successful!\n");
 	} else {
 		fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");

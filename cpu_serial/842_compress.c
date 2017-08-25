@@ -70,140 +70,56 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 #define get_input_data(p, o, b)						\
 	swap_endianness##b(get_unaligned##b((__be##b *)((p)->in + (o))))
 
-#define init_hashtable_nodes(p, b)	do {			\
-	int _i;							\			\
-	for (_i = 0; _i < ARRAY_SIZE((p)->node##b); _i++) {	\
-		(p)->node##b[_i].index = _i;			\
-		(p)->node##b[_i].data = 0;			\
-	}							\
-} while (0)
-
-/*
-
-#define find_index(p, b, n)	({									\
-	p->index##b[n] = INDEX_NOT_FOUND;							\
-	auto range = (p)->htable##b.equal_range(p->data##b[n]);		\
-    for (auto it = range.first; it != range.second; ++it) {		\
-		p->index##b[n] = it->second;							\
-		break;													\
-	}															\
-	p->index##b[n] >= 0;										\
-})
-
-#define check_index(p, b, n) ((p)->index##b[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : (p)->index##b[n] >= 0)
-
 #define UINT_TYPE(b) UINT_TYPE_##b
 #define UINT_TYPE_2 uint16_t
 #define UINT_TYPE_4 uint32_t
 #define UINT_TYPE_8 uint64_t
 
-#define replace_hash(p, b, i, d)	do {								\
-	int node_index = i+d;												\
-	UINT_TYPE(b) *_n = p->node##b + node_index;							\
-	auto range = p->htable##b.equal_range(p->node##b[node_index]);		\
-    for (auto it = range.first; it != range.second; ++it) {				\
-		if(it->second == node_index) {									\
-			it = p->htable##b.erase(it);								\
-			break;														\
-		}																\
-	}																	\
-	_n = p->data##b + d;												\
-	p->htable##b.insert(std::pair<UINT_TYPE(b),int>(*_n, node_index));	\
-} while (0)*/
+#define find_index(p, b, n)	({					\
+	p->index##b[n] = INDEX_NOT_FOUND;			\
+	UINT_TYPE(b) _n = p->data##b[n];			\
+												\
+	struct hlist_node##b *h;					\
+	HASH_FIND(hh, p->htable##b, &_n, b, h);		\
+	if(h != NULL && h->head != NULL)			\
+		p->index##b[n] = h->head->index;		\
+	p->index##b[n] >= 0;						\
+})
 
-static int find_index(struct sw842_param *p, int b, int n) {
-	switch(b) {
-		case 2: {
-			p->index2[n] = INDEX_NOT_FOUND;
-			auto range = (p)->htable2.equal_range(p->data2[n]);
-		    for (auto it = range.first; it != range.second; ++it) {
-				p->index2[n] = it->second;
-				break;
-			}
-			return p->index2[n] >= 0;
-		}
-		case 4: {
-			p->index4[n] = INDEX_NOT_FOUND;
-			auto range = (p)->htable4.equal_range(p->data4[n]);
-		    for (auto it = range.first; it != range.second; ++it) {
-				p->index4[n] = it->second;
-				break;
-			}
-			return p->index4[n] >= 0;
-		}
-		case 8: {
-			p->index8[n] = INDEX_NOT_FOUND;
-			auto range = (p)->htable8.equal_range(p->data8[n]);
-		    for (auto it = range.first; it != range.second; ++it) {
-				p->index8[n] = it->second;
-				break;
-			}
-			return p->index8[n] >= 0;		
-		}
-	}
-	return 0;
-}	
+#define check_index(p, b, n) ((p)->index##b[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : (p)->index##b[n] >= 0)
 
-static int check_index(struct sw842_param *p, int b, int n) {
-	switch(b) {
-		case 2: {
-			return p->index2[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : p->index2[n] >= 0;
-		}
-		case 4: {
-			return p->index4[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : p->index4[n] >= 0;
-		}
-		case 8: {
-			return p->index8[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : p->index8[n] >= 0;
-		}
-	}
-	return 0;
-}
-					 
-static void replace_hash(struct sw842_param *p, int b, uint16_t i, int d) {
-	int node_index = i+d;
-	switch(b) {
-		case 2: {
-			uint16_t *_n2 = p->node2 + node_index;
-			auto range = p->htable2.equal_range(p->node2[node_index]);
-		    for (auto it = range.first; it != range.second; ++it) {
-				if(it->second == node_index) {
-					it = p->htable2.erase(it);
-					break;
-				}
-			}
-			_n2 = p->data2 + d;
-			p->htable2.insert(std::pair<uint16_t,int>(*_n2, node_index));
-			break;
-		}
-		case 4: {
-			uint32_t *_n4 = p->node4 + node_index;
-			auto range = p->htable4.equal_range(p->node4[node_index]);
-		    for (auto it = range.first; it != range.second; ++it) {
-				if(it->second == node_index) {
-					it = p->htable4.erase(it);
-					break;
-				}
-			}
-			_n4 = p->data4 + d;
-			p->htable4.insert(std::pair<uint32_t,int>(*_n4, node_index));
-			break;
-		}
-		case 8: {
-			uint64_t *_n8 = p->node8 + node_index;
-			auto range = p->htable8.equal_range(p->node8[node_index]);
-		    for (auto it = range.first; it != range.second; ++it) {
-				if(it->second == node_index) {
-					it = p->htable8.erase(it);
-					break;
-				}
-			}
-			_n8 = p->data8 + d;
-			p->htable8.insert(std::pair<uint64_t,int>(*_n8, node_index));
-			break;		
-		}
-
-	}
-}	
+#define replace_hash(p, b, i, d)	do {													\
+	int node_index = i+d;																	\
+	UINT_TYPE(b) _n = p->node##b[node_index];												\
+																							\
+	struct hlist_node##b *h;																\
+	HASH_FIND(hh, p->htable##b, &_n, b, h);													\
+																							\
+	if(h != NULL) {																			\
+		struct node##b##_el *el, *tmp;														\
+		DL_SEARCH_SCALAR(h->head,el,index,node_index);										\
+		if(el != NULL) {																	\
+			DL_DELETE(h->head,el);															\
+      		free(el);																		\
+		}																					\
+	}																						\
+																							\
+	h = NULL;																				\
+	_n = p->data##b[d];																		\
+	p->node##b[node_index] = _n;															\
+																							\
+	HASH_FIND(hh, p->htable##b, &_n, b, h);													\
+	if(h == NULL) {																			\
+		h = (struct hlist_node##b *) malloc(sizeof(struct hlist_node##b));					\
+    	h->data = _n;																		\
+    	h->head = NULL;																		\
+    	HASH_ADD(hh, p->htable##b, data, b, h);												\
+    }																						\
+    																						\
+    struct node##b##_el *el = (struct node##b##_el *) malloc(sizeof(struct node##b##_el));	\
+    el->index = node_index;																	\
+    DL_APPEND(h->head, el);																	\
+} while (0)
 
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
 
@@ -501,13 +417,12 @@ static int process_next(struct sw842_param *p)
 	p->index2[1] = INDEX_NOT_CHECKED;
 	p->index2[2] = INDEX_NOT_CHECKED;
 	p->index2[3] = INDEX_NOT_CHECKED;
-	printf("process_next\n");;
+
 	/* check up to OPS_MAX - 1; last op is our fallback */
 	for (i = 0; i < OPS_MAX - 1; i++) {
 		if (check_template(p, i))
 			break;
 	}
-	printf("checked template\n");
 	ret = add_template(p, i);
 	if (ret)
 		return ret;
@@ -533,6 +448,10 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	uint64_t last, next, pad, total;
 	uint8_t repeat_count = 0;
 
+	p->htable2 = NULL;
+	p->htable4 = NULL;
+	p->htable8 = NULL;
+
 	p->in = (uint8_t *)in;
 	p->instart = p->in;
 	p->ilen = ilen;
@@ -543,7 +462,6 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	total = p->olen;
 
 	*olen = 0;
-	printf("init stuff is done\n");
 	/* if using strict mode, we can only compress a multiple of 8 */
 	if (SW842_STRICT && (ilen % 8)) {
 		fprintf(stderr, "Using strict mode, can't compress len %d\n", ilen);
@@ -558,14 +476,13 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	last = ~get_unaligned64((uint64_t *)p->in);
 
 	while (p->ilen > 7) {
-		printf("p->ilen: %d\n", p->ilen);
 		next = get_unaligned64((uint64_t *)p->in);
-		printf("test1\n");
+
 		/* must get the next data, as we need to update the hashtable
 		 * entries with the new data every time
 		 */
 		get_next_data(p);
-		printf("test2\n");
+
 		/* we don't care about endianness in last or next;
 		 * we're just comparing 8 bytes to another 8 bytes,
 		 * they're both the same endianness
@@ -575,35 +492,27 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 			if (++repeat_count <= REPEAT_BITS_MAX)
 				goto repeat;
 		}
-		printf("test3\n");
 		if (repeat_count) {
 			ret = add_repeat_template(p, repeat_count);
 			repeat_count = 0;
 			if (next == last) /* reached max repeat bits */
 				goto repeat;
 		}
-		printf("test4\n");
-		if (next == 0){
-			printf("zeros\n");
+
+		if (next == 0)
 			ret = add_zeros_template(p);
-		} else {
-			printf("no zeros\n");
+		else
 			ret = process_next(p);
-		}
-		printf("test5\n");
+
 		if (ret)
 			return ret;
 
 repeat:
 		last = next;
-		printf("pre-hashtable-update\n");
 		update_hashtables(p);
-		printf("post-hashtable-update\n");
 		p->in += 8;
 		p->ilen -= 8;
 	}
-
-	printf("got out of the loop\n");
 
 	if (repeat_count) {
 		ret = add_repeat_template(p, repeat_count);
@@ -622,9 +531,8 @@ skip_comp:
 	}
 
 	ret = add_end_template(p);
-	if (ret){
-		printf("return after add_end_template()\n");
-		return ret;}
+	if (ret)
+		return ret;
 
 	/*
 	 * crc(0:31) is appended to target data starting with the next
@@ -637,9 +545,8 @@ skip_comp:
 	//crc.process_bytes(in, ilen);
 	//crc = crc32_be(0, in, ilen);
 	//ret = add_bits(p, crc.checksum(), CRC_BITS);
-	if (ret){
-		printf("return after crc\n");
-		return ret;}
+	if (ret)
+		return ret;
 
 	if (p->bit) {
 		p->out++;

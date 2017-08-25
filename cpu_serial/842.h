@@ -73,12 +73,15 @@
  * code is detected.
  */
 
-#include <cstdint>
-#include <climits>
-#include <unordered_map>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <limits.h>
 #include <errno.h>
 #include <string.h>
 
+#include "uthash/src/uthash.h"
+#include "uthash/src/utlist.h"
 #include "../generic/unaligned.h"
 #include "../generic/endianness.h"
 #include "kerneldeps.h"
@@ -130,6 +133,39 @@
 /* the max of the regular templates - not including the special templates */
 #define OPS_MAX		(0x1a)
 
+struct node2_el {
+    uint8_t index;
+    struct node2_el *next, *prev;
+};
+
+struct hlist_node2 {
+	uint16_t data;
+	struct node2_el *head;
+	UT_hash_handle hh;
+};
+
+struct node4_el {
+    uint16_t index;
+    struct node4_el *next, *prev;
+};
+
+struct hlist_node4 {
+	uint32_t data;
+	struct node4_el *head;
+	UT_hash_handle hh;
+};
+
+struct node8_el {
+    uint8_t index;
+    struct node8_el *next, *prev;
+};
+
+struct hlist_node8 {
+	uint64_t data;
+	struct node8_el *head;
+	UT_hash_handle hh;
+};
+
 struct sw842_param {
 	uint8_t *in;
 	uint8_t *instart;
@@ -143,9 +179,9 @@ struct sw842_param {
 	int index8[1];
 	int index4[2];
 	int index2[4];
-	std::unordered_multimap<uint64_t, int> htable8;
-	std::unordered_multimap<uint32_t, int> htable4;
-	std::unordered_multimap<uint16_t, int> htable2;	
+	struct hlist_node8 *htable8;
+	struct hlist_node4 *htable4;
+	struct hlist_node2 *htable2;	
 	uint64_t node8[1 << I8_BITS];
 	uint32_t node4[1 << I4_BITS];
 	uint16_t node2[1 << I2_BITS];
@@ -165,18 +201,5 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 
 int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		     uint8_t *out, unsigned int *olen);
-
-/*
-static inline uint16_t get_unaligned(uint16_t *in){
-	return get_unaligned16(in);
-}
-
-static inline uint32_t get_unaligned(uint32_t *in){
-	return get_unaligned32(in);
-}
-
-static inline uint64_t get_unaligned(uint64_t *in){
-	return get_unaligned64(in);
-}*/
 
 #endif

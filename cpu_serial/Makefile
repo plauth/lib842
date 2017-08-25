@@ -1,5 +1,5 @@
-CXX := g++
-CXXFLAGS := -std=c++11
+CXX := gcc
+CXXFLAGS := -std=gnu11
 LIB_DIRS := 
 LDFLAGS := 
 
