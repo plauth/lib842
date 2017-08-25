@@ -62,6 +62,8 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 	{ D8, N0, N0, N0, 0x00 }, /* 64 */
 };
 
+//static uint64_t outbits = 0;
+
 #define INDEX_NOT_FOUND		(-1)
 #define INDEX_NOT_CHECKED	(-2)
 
@@ -75,6 +77,8 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 		(p)->node##b[_i].data = 0;			\
 	}							\
 } while (0)
+
+/*
 
 #define find_index(p, b, n)	({									\
 	p->index##b[n] = INDEX_NOT_FOUND;							\
@@ -105,7 +109,101 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 	}																	\
 	_n = p->data##b + d;												\
 	p->htable##b.insert(std::pair<UINT_TYPE(b),int>(*_n, node_index));	\
-} while (0)
+} while (0)*/
+
+static int find_index(struct sw842_param *p, int b, int n) {
+	switch(b) {
+		case 2: {
+			p->index2[n] = INDEX_NOT_FOUND;
+			auto range = (p)->htable2.equal_range(p->data2[n]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				p->index2[n] = it->second;
+				break;
+			}
+			return p->index2[n] >= 0;
+		}
+		case 4: {
+			p->index4[n] = INDEX_NOT_FOUND;
+			auto range = (p)->htable4.equal_range(p->data4[n]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				p->index4[n] = it->second;
+				break;
+			}
+			return p->index4[n] >= 0;
+		}
+		case 8: {
+			p->index8[n] = INDEX_NOT_FOUND;
+			auto range = (p)->htable8.equal_range(p->data8[n]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				p->index8[n] = it->second;
+				break;
+			}
+			return p->index8[n] >= 0;		
+		}
+	}
+	return 0;
+}	
+
+static int check_index(struct sw842_param *p, int b, int n) {
+	switch(b) {
+		case 2: {
+			return p->index2[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : p->index2[n] >= 0;
+		}
+		case 4: {
+			return p->index4[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : p->index4[n] >= 0;
+		}
+		case 8: {
+			return p->index8[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : p->index8[n] >= 0;
+		}
+	}
+	return 0;
+}
+					 
+static void replace_hash(struct sw842_param *p, int b, uint16_t i, int d) {
+	int node_index = i+d;
+	switch(b) {
+		case 2: {
+			uint16_t *_n2 = p->node2 + node_index;
+			auto range = p->htable2.equal_range(p->node2[node_index]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				if(it->second == node_index) {
+					it = p->htable2.erase(it);
+					break;
+				}
+			}
+			_n2 = p->data2 + d;
+			p->htable2.insert(std::pair<uint16_t,int>(*_n2, node_index));
+			break;
+		}
+		case 4: {
+			uint32_t *_n4 = p->node4 + node_index;
+			auto range = p->htable4.equal_range(p->node4[node_index]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				if(it->second == node_index) {
+					it = p->htable4.erase(it);
+					break;
+				}
+			}
+			_n4 = p->data4 + d;
+			p->htable4.insert(std::pair<uint32_t,int>(*_n4, node_index));
+			break;
+		}
+		case 8: {
+			uint64_t *_n8 = p->node8 + node_index;
+			auto range = p->htable8.equal_range(p->node8[node_index]);
+		    for (auto it = range.first; it != range.second; ++it) {
+				if(it->second == node_index) {
+					it = p->htable8.erase(it);
+					break;
+				}
+			}
+			_n8 = p->data8 + d;
+			p->htable8.insert(std::pair<uint64_t,int>(*_n8, node_index));
+			break;		
+		}
+
+	}
+}	
 
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
 
@@ -149,7 +247,8 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 
 	if (DIV_ROUND_UP(bits, 8) > p->olen)
 		return -ENOSPC;
-
+ 
+	//outbits += n;
 	o = *out & bmask[b];
 	d <<= s;
 
@@ -458,6 +557,7 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	last = ~get_unaligned64((uint64_t *)p->in);
 
 	while (p->ilen > 7) {
+		printf("p->ilen: %d\n", p->ilen);
 		next = get_unaligned64((uint64_t *)p->in);
 
 		/* must get the next data, as we need to update the hashtable
@@ -491,10 +591,14 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 
 repeat:
 		last = next;
+		printf("pre-hashtable-update\n");
 		update_hashtables(p);
+		printf("post-hashtable-update\n");
 		p->in += 8;
 		p->ilen -= 8;
 	}
+
+	printf("got out of the loop\n");
 
 	if (repeat_count) {
 		ret = add_repeat_template(p, repeat_count);
@@ -552,6 +656,8 @@ skip_comp:
 		return -ENOSPC;
 
 	*olen = total - p->olen;
+
+	//printf("Out: %lld bits (%f bytes)\n", outbits, (outbits / 8.0f));
 
 	return 0;
 }
