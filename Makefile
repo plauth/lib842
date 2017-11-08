@@ -1,41 +1,35 @@
-CXX=g++
-CUDAPATH?=/usr/local/cuda
-CUDA_INC?=-I $(CUDAPATH)/include
+CC=g++
+CC_FLAGS=-Wall -fPIC
 
-UNAME := $(shell uname)
-ifeq ($(UNAME), Darwin)
-OPENCL_LIB = -framework OpenCL
-OPENCL_INC =
-all: libclhook.dylib
-endif
 
-ifeq ($(UNAME), Linux)
-.PHONY: .check-env
-.check-env:
-	@if [ ! -d "$(CLDIR)" ]; then \
-		echo "ERROR: set CLDIR variable."; exit 1; \
-	fi
-OPENCL_LIB = -L$(CLDIR)/lib -lOpenCL
-OPENCL_INC = -I $(CLDIR)/include
-all: libclhook.so libcudahook.so
-endif
+MODULES   := serial
+SRC_DIR_SERIAL := src/serial
+OBJ_DIR := $(addprefix obj/,$(MODULES))
+BIN_DIR := $(addprefix bin/,$(MODULES))
 
-COMMONFLAGS=-Wall -fPIC -shared -ldl
+SRC_FILES_SERIAL := $(wildcard $(SRC_DIR_SERIAL)/*.c)
+OBJ_FILES_SERIAL := $(patsubst src/serial/%.c,obj/serial/%.o,$(SRC_FILES_SERIAL))
 
-libclhook.dylib: clhook.cpp
-	$(CXX) $(OPENCL_INC) $(OPENCL_LIB) -Wall -dynamiclib -o libclhook.dylib clhook.cpp
+.PHONY: all checkdirs clean
+#.check-env:
 
-libclhook.so: clhook.cpp
-	$(CXX) $(OPENCL_INC) $(OPENCL_LIB) $(COMMONFLAGS) -o libclhook.so cpu_serial/842_compress.c cpu_serial/842_decompress.c clhook.cpp
+all: checkdirs serial
 
-libcudahook.so: cudahook.cpp
-	$(CXX) $(CUDA_INC) $(COMMONFLAGS) -o libcudahook.so cpu_serial/842_compress.c cpu_serial/842_decompress.c cudahook.cpp
 
-hellocuda: hello.cu
-	/usr/local/cuda/bin/nvcc hello.cu -o hello -g --cudart=shared
+$(OBJ_FILES_SERIAL): $(SRC_FILES_SERIAL)
+	$(CC) $(CC_FLAGS) -c -o $@ $<
+
+serial: $(OBJ_FILES_SERIAL)
+	$(CC) $(CC_FLAGS) -shared -Wl,-soname,lib842.so.1 -o bin/serial/lib842.so.1 $(OBJ_FILES_SERIAL)
 
 clean:
-	rm -Rf libcudahook.so
-	rm -Rf libcudahook.dylib
-	rm -Rf libclhook.so
-	rm -Rf libclhook.dylib
+	rm -Rf obj
+	rm -Rf bin
+
+checkdirs: $(OBJ_DIR) $(BIN_DIR)
+
+$(OBJ_DIR):
+	@mkdir -p $@
+
+$(BIN_DIR):
+	@mkdir -p $@
