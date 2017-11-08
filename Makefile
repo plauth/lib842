@@ -1,11 +1,13 @@
-CC=g++
-CC_FLAGS=-Wall -fPIC
+CC=gcc
+CC_FLAGS=-Wall -fPIC -g
 
 
 MODULES   := serial
-SRC_DIR_SERIAL := src/serial
 OBJ_DIR := $(addprefix obj/,$(MODULES))
 BIN_DIR := $(addprefix bin/,$(MODULES))
+
+SRC_DIR_SERIAL := src/serial
+OBJ_DIR_SERIAL := obj/serial
 
 SRC_FILES_SERIAL := $(wildcard $(SRC_DIR_SERIAL)/*.c)
 OBJ_FILES_SERIAL := $(patsubst src/serial/%.c,obj/serial/%.o,$(SRC_FILES_SERIAL))
@@ -15,21 +17,21 @@ OBJ_FILES_SERIAL := $(patsubst src/serial/%.c,obj/serial/%.o,$(SRC_FILES_SERIAL)
 
 all: checkdirs serial
 
-
-$(OBJ_FILES_SERIAL): $(SRC_FILES_SERIAL)
-	$(CC) $(CC_FLAGS) -c -o $@ $<
+$(OBJ_DIR_SERIAL)/%.o: $(SRC_DIR_SERIAL)/%.c
+	$(CC) $(CC_FLAGS) -I$(SRC_DIR_SERIAL) -c $< -o $@
 
 serial: $(OBJ_FILES_SERIAL)
-	$(CC) $(CC_FLAGS) -shared -Wl,-soname,lib842.so.1 -o bin/serial/lib842.so.1 $(OBJ_FILES_SERIAL)
+	$(CC) $(CC_FLAGS) -shared -Wl,-soname,lib842.so -o bin/serial/lib842.so $(OBJ_FILES_SERIAL)
 
 clean:
 	rm -Rf obj
 	rm -Rf bin
+	rm -Rf test/test
 
 checkdirs: $(OBJ_DIR) $(BIN_DIR)
 
-$(OBJ_DIR):
-	@mkdir -p $@
+test: serial
+	$(CC) test/test.c -o test/test -I./include -L./bin/serial/ -l842 
 
-$(BIN_DIR):
+$(BIN_DIR) $(OBJ_DIR):
 	@mkdir -p $@

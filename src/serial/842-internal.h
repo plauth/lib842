@@ -82,8 +82,8 @@
 
 #include "uthash/src/uthash.h"
 #include "uthash/src/utlist.h"
-#include "../generic/unaligned.h"
-#include "../generic/endianness.h"
+#include "../common/unaligned.h"
+#include "../common/endianness.h"
 #include "kerneldeps.h"
 
 //#define DEBUG 1
@@ -195,11 +195,5 @@ struct sw842_param_decomp {
 	uint8_t *ostart;
 	uint64_t olen;
 };
-
-int sw842_compress(const uint8_t *in, unsigned int ilen,
-		   uint8_t *out, unsigned int *olen, void *wmem);
-
-int sw842_decompress(const uint8_t *in, unsigned int ilen,
-		     uint8_t *out, unsigned int *olen);
 
 #endif

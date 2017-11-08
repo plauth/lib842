@@ -16,7 +16,7 @@
  * See 842.h for details of the 842 compressed format.
  */
 
-#include "842.h"
+#include "842-internal.h"
 
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE	(2 * (1 << I2_BITS))
