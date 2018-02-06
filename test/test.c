@@ -55,21 +55,53 @@ int main( int argc, const char* argv[])
 		fclose(fp);
 	}
 
-	/*
+	printf("Input:\n");
 	for (int i = 0; i < ilen; i++)
 	{
 	    if (i > 0) printf(" ");
 	    printf("%02X", in[i]);
 	}
-	printf("\n");*/
+	printf("\n\n");
 	
 	sw842_compress(in, ilen, out, &olen, wmem_comp);
+
+	printf("Compressed Output:\n");
+	for (int i = 0; i < olen; i++)
+	{
+	    if (i > 0) printf(" ");
+	    printf("%02X", out[i]);
+	}
+	printf("\n\n");
+
+/*
+	unsigned char outhw[32] = {0x01,0x81,0x81,0x89,0x89,0x91,0x91,0x99,0x9f,0xb3,0xf3,0x8b,0x42,0xc0,0x00,0x00};
+		for (int i = 0; i < olen; i++)
+	{
+	    if (i > 0) printf(" ");
+	    printf("%02X", outhw[i]);
+	}
+	printf("\n\n");
+			for (int i = 0; i < olen; i++)
+	{
+	    if (i > 0) printf(" ");
+	    printf("%d", out[i] == outhw[i]);
+	}
+	printf("\n\n");*/
+
+	sw842_decompress(out, olen, decompressed, &dlen);
+
+	printf("Restored input:\n");
+	for (int i = 0; i < dlen; i++)
+	{
+	    if (i > 0) printf(" ");
+	    printf("%02X", decompressed[i]);
+	}
+	printf("\n\n");
 
 	printf("Input: %d bytes\n", ilen);
 	printf("Output: %d bytes\n", olen);
 	printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
-	sw842_decompress(out, olen, decompressed, &dlen);
 
 	if (memcmp(in, decompressed, ilen) == 0) {
 		printf("Compression- and decompression was successful!\n");

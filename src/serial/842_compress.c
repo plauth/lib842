@@ -447,6 +447,7 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	int ret;
 	uint64_t last, next, pad, total;
 	uint8_t repeat_count = 0;
+	uint32_t crc;
 
 	p->htable2 = NULL;
 	p->htable4 = NULL;
@@ -541,10 +542,9 @@ skip_comp:
 	 * same here so that sw842 decompression can be used for both
 	 * compressed data.
 	 */
-	//boost::crc_32_type  crc;
-	//crc.process_bytes(in, ilen);
-	//crc = crc32_be(0, in, ilen);
-	//ret = add_bits(p, crc.checksum(), CRC_BITS);
+	crc = crc32_be(0, (const void*) in, ilen);
+
+	ret = add_bits(p, crc, CRC_BITS);
 	if (ret)
 		return ret;
 

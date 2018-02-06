@@ -1,3 +1,6 @@
+#ifndef __ENDIANNESS_H__
+#define __ENDIANNESS_H__
+
 
 static inline uint16_t swap_endianness16(uint16_t input) {
 	#ifdef __x86_64__
@@ -43,3 +46,4 @@ static inline uint64_t swap_endianness64(uint64_t input) {
 		(uint64_t)((input & (uint64_t)0xff00000000000000ULL) >> 56);
 	#endif
 }
+#endif

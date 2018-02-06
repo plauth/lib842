@@ -79,11 +79,13 @@
 #include <limits.h>
 #include <errno.h>
 #include <string.h>
+#include <zlib.h>
 
 #include "uthash/src/uthash.h"
 #include "uthash/src/utlist.h"
 #include "../common/unaligned.h"
 #include "../common/endianness.h"
+#include "../common/crc32.h"
 #include "kerneldeps.h"
 
 //#define DEBUG 1
