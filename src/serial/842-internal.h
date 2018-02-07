@@ -1,6 +1,6 @@
 
-#ifndef __842_H__
-#define __842_H__
+#ifndef __842_INTERNAL_H__
+#define __842_INTERNAL_H__
 
 /* The 842 compressed format is made up of multiple blocks, each of
  * which have the format:
@@ -80,6 +80,8 @@
 #include <errno.h>
 #include <string.h>
 #include <zlib.h>
+
+#include "../../include/842.h"
 
 #include "uthash/src/uthash.h"
 #include "uthash/src/utlist.h"

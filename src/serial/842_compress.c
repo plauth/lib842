@@ -441,9 +441,10 @@ static int process_next(struct sw842_param *p)
  * 0 on error.
  */
 int sw842_compress(const uint8_t *in, unsigned int ilen,
-		   uint8_t *out, unsigned int *olen, void *wmem)
+		   uint8_t *out, unsigned int *olen)
 {
-	struct sw842_param *p = (struct sw842_param *)wmem;
+	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param)); 
+
 	int ret;
 	uint64_t last, next, pad, total;
 	uint8_t repeat_count = 0;
@@ -570,6 +571,7 @@ skip_comp:
 	*olen = total - p->olen;
 
 	//printf("Out: %lld bits (%f bytes)\n", outbits, (outbits / 8.0f));
+	free(p);
 
 	return 0;
 }

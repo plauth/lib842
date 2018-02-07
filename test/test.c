@@ -10,8 +10,6 @@ int nextMultipleOfEight(unsigned int input) {
 
 int main( int argc, const char* argv[])
 {
-
-	void* wmem_comp = malloc(sizeof(struct sw842_param)); 
 	uint8_t *in, *out, *decompressed;
 	unsigned int ilen, olen, dlen;
 
@@ -63,7 +61,7 @@ int main( int argc, const char* argv[])
 	}
 	printf("\n\n");
 	
-	sw842_compress(in, ilen, out, &olen, wmem_comp);
+	sw842_compress(in, ilen, out, &olen);
 
 	printf("Compressed Output:\n");
 	for (int i = 0; i < olen; i++)
