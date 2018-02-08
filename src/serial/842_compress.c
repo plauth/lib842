@@ -96,11 +96,17 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 	HASH_FIND(hh, p->htable##b, &_n, b, h);													\
 																							\
 	if(h != NULL) {																			\
-		struct node##b##_el *el;														\
+		struct node##b##_el *el;															\
 		DL_SEARCH_SCALAR(h->head,el,index,node_index);										\
 		if(el != NULL) {																	\
 			DL_DELETE(h->head,el);															\
       		free(el);																		\
+      		int count = 0;																	\
+      		DL_COUNT(h->head,el, count);													\
+      		if(count == 0) {																\
+      			HASH_DEL(p->htable##b, h);													\
+      			free(h);																	\
+      		}																				\
 		}																					\
 	}																						\
 																							\

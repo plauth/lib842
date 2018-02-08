@@ -79,7 +79,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <string.h>
-#include <zlib.h>
+
 
 #include "../../include/842.h"
 
