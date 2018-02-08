@@ -75,56 +75,43 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 #define UINT_TYPE_4 uint32_t
 #define UINT_TYPE_8 uint64_t
 
-#define find_index(p, b, n)	({					\
-	p->index##b[n] = INDEX_NOT_FOUND;			\
-	UINT_TYPE(b) _n = p->data##b[n];			\
-												\
-	struct hlist_node##b *h;					\
+#define find_index(p, b, n)	({			\
+	p->index##b[n] = INDEX_NOT_FOUND;		\
+	UINT_TYPE(b) _n = p->data##b[n];		\
+							\
+	struct hlist_node##b *h;			\
 	HASH_FIND(hh, p->htable##b, &_n, b, h);		\
-	if(h != NULL && h->head != NULL)			\
-		p->index##b[n] = h->head->index;		\
-	p->index##b[n] >= 0;						\
+	if(h != NULL)					\
+		p->index##b[n] = h->index;		\
+	p->index##b[n] >= 0;				\
 })
 
 #define check_index(p, b, n) ((p)->index##b[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : (p)->index##b[n] >= 0)
 
-#define replace_hash(p, b, i, d)	do {													\
-	int node_index = i+d;																	\
-	UINT_TYPE(b) _n = p->node##b[node_index];												\
-																							\
-	struct hlist_node##b *h;																\
-	HASH_FIND(hh, p->htable##b, &_n, b, h);													\
-																							\
-	if(h != NULL) {																			\
-		struct node##b##_el *el;															\
-		DL_SEARCH_SCALAR(h->head,el,index,node_index);										\
-		if(el != NULL) {																	\
-			DL_DELETE(h->head,el);															\
-      		free(el);																		\
-      		int count = 0;																	\
-      		DL_COUNT(h->head,el, count);													\
-      		if(count == 0) {																\
-      			HASH_DEL(p->htable##b, h);													\
-      			free(h);																	\
-      		}																				\
-		}																					\
-	}																						\
-																							\
-	h = NULL;																				\
-	_n = p->data##b[d];																		\
-	p->node##b[node_index] = _n;															\
-																							\
-	HASH_FIND(hh, p->htable##b, &_n, b, h);													\
-	if(h == NULL) {																			\
-		h = (struct hlist_node##b *) malloc(sizeof(struct hlist_node##b));					\
-    	h->data = _n;																		\
-    	h->head = NULL;																		\
-    	HASH_ADD(hh, p->htable##b, data, b, h);												\
-    }																						\
-    																						\
-    struct node##b##_el *el = (struct node##b##_el *) malloc(sizeof(struct node##b##_el));	\
-    el->index = node_index;																	\
-    DL_APPEND(h->head, el);																	\
+#define replace_hash(p, b, i, d)	do {							\
+	int node_index = i+d;									\
+	UINT_TYPE(b) data_old = p->node##b[node_index];						\
+												\
+	struct hlist_node##b *h;								\
+	HASH_FIND(hh, p->htable##b, &data_old, b, h);						\
+												\
+	if(h != NULL && h->data == data_old) {							\
+      		HASH_DEL(p->htable##b, h);							\
+		free(h);									\
+	}											\
+												\
+	UINT_TYPE(b) data_new = p->data##b[d];							\
+	p->node##b[node_index] = data_new;							\
+	HASH_FIND(hh, p->htable##b, &data_new, b, h);						\
+	if(h == NULL) {										\
+		h = (struct hlist_node##b *) malloc(sizeof(struct hlist_node##b));		\
+		h->data = data_new;								\
+		h->index = node_index;								\
+		HASH_ADD(hh, p->htable##b, data, b, h);						\
+	} else {										\
+		h->index = node_index;								\
+	}											\
+    												\
 } while (0)
 
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };

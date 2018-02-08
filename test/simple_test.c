@@ -82,7 +82,6 @@ int main( int argc, const char* argv[])
 			acc_olen += chunk_olen;
 		}
 
-
 		uint8_t* chunk_in = in;
 		uint8_t* chunk_out = out;
 		uint8_t* chunk_decomp = decompressed;
