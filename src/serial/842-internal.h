@@ -137,21 +137,36 @@
 /* the max of the regular templates - not including the special templates */
 #define OPS_MAX		(0x1a)
 
+struct node2_el {
+    uint8_t index;
+    struct node2_el *next, *prev;
+};
+
 struct hlist_node2 {
 	uint16_t data;
-	uint8_t index;
+	struct node2_el *head;
 	UT_hash_handle hh;
+};
+
+struct node4_el {
+    uint16_t index;
+    struct node4_el *next, *prev;
 };
 
 struct hlist_node4 {
 	uint32_t data;
-	uint16_t index;
+	struct node4_el *head;
 	UT_hash_handle hh;
+};
+
+struct node8_el {
+    uint8_t index;
+    struct node8_el *next, *prev;
 };
 
 struct hlist_node8 {
 	uint64_t data;
-	uint8_t index;
+	struct node8_el *head;
 	UT_hash_handle hh;
 };
 
