@@ -83,8 +83,7 @@
 
 #include "../../include/842.h"
 
-#include "uthash/src/uthash.h"
-#include "uthash/src/utlist.h"
+#include "../serial/uthash/src/uthash.h"
 #include "../common/unaligned.h"
 #include "../common/endianness.h"
 #include "../common/crc32.h"

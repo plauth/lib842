@@ -92,7 +92,7 @@ int main( int argc, const char* argv[])
 			
 			sw842_decompress(chunk_out, chunk_olen, chunk_decomp, &chunk_dlen);
 
-			if (!memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) == 0) {
+			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) == 0)) {
 				fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
 				return -1;
 			}
