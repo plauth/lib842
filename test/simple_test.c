@@ -7,10 +7,6 @@
 #define CHUNK_SIZE 32768
 
 
-int nextMultipleOfEight(unsigned int input) {
-	return (input + 7) & ~7;
-} 
-
 int nextMultipleOfChunkSize(unsigned int input) {
 	return (input + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
 } 

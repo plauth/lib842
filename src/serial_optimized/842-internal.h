@@ -83,11 +83,11 @@
 
 #include "../../include/842.h"
 
-#include "../serial/uthash/src/uthash.h"
-#include "../common/unaligned.h"
+#include "../common/memaccess.h"
 #include "../common/endianness.h"
 #include "../common/crc32.h"
 #include "kerneldeps.h"
+#include "../../test/hash.hpp"
 
 //#define DEBUG 1
 
@@ -136,24 +136,6 @@
 /* the max of the regular templates - not including the special templates */
 #define OPS_MAX		(0x1a)
 
-struct hlist_node2 {
-	uint16_t data;
-	uint8_t index;
-	UT_hash_handle hh;
-};
-
-struct hlist_node4 {
-	uint32_t data;
-	uint16_t index;
-	UT_hash_handle hh;
-};
-
-struct hlist_node8 {
-	uint64_t data;
-	uint8_t index;
-	UT_hash_handle hh;
-};
-
 struct sw842_param {
 	uint8_t *in;
 	uint8_t *instart;
@@ -161,18 +143,24 @@ struct sw842_param {
 	uint8_t *out;
 	uint64_t olen;
 	uint8_t bit;
+
 	uint64_t data8[1];
 	uint32_t data4[2];
 	uint16_t data2[4];
 	int index8[1];
 	int index4[2];
 	int index2[4];
-	struct hlist_node8 *htable8;
-	struct hlist_node4 *htable4;
-	struct hlist_node2 *htable2;	
-	uint64_t node8[1 << I8_BITS];
-	uint32_t node4[1 << I4_BITS];
-	uint16_t node2[1 << I2_BITS];
+
+	int16_t hashTable16[1 << DICT16_BITS];
+	int16_t hashTable32[1 << DICT32_BITS];
+	int16_t hashTable64[1 << DICT64_BITS];
+	uint16_t ringBuffer16[1 << BUFFER16_BITS];
+	uint32_t ringBuffer32[1 << BUFFER32_BITS];
+	uint64_t ringBuffer64[1 << BUFFER64_BITS];
+
+	uint64_t collisions16;
+	uint64_t collisions32;
+	uint64_t collisions64;
 };
 
 struct sw842_param_decomp {

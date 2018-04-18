@@ -18,21 +18,6 @@
 
 #include "842-internal.h"
 
-/* By default, we allow compressing input buffers of any length, but we must
- * use the non-standard "short data" template so the decompressor can correctly
- * reproduce the uncompressed data buffer at the right length.  However the
- * hardware 842 compressor will not recognize the "short data" template, and
- * will fail to decompress any compressed buffer containing it (I have no idea
- * why anyone would want to use software to compress and hardware to decompress
- * but that's beside the point).  This parameter forces the compression
- * function to simply reject any input buffer that isn't a multiple of 8 bytes
- * long, instead of using the "short data" template, so that all compressed
- * buffers produced by this function will be decompressable by the 842 hardware
- * decompressor.  Unless you have a specific need for that, leave this disabled
- * so that any length buffer can be compressed.
- */
-#define SW842_STRICT 1
-
 static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 	{ I8, N0, N0, N0, 0x19 }, /* 8 */
 	{ I4, I4, N0, N0, 0x18 }, /* 18 */
@@ -67,13 +52,40 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 #define INDEX_NOT_FOUND		(-1)
 #define INDEX_NOT_CHECKED	(-2)
 
-#define get_input_data(p, o, b)						\
-	swap_endianness##b(get_unaligned##b((__be##b *)((p)->in + (o))))
-
 #define UINT_TYPE(b) UINT_TYPE_##b
 #define UINT_TYPE_2 uint16_t
 #define UINT_TYPE_4 uint32_t
 #define UINT_TYPE_8 uint64_t
+
+template<typename T> static inline void replace_hash(struct sw842_param *p, uint16_t index, uint16_t offset) {
+		uint16_t ringBufferIndex = index + offset;
+        uint16_t oldValueHash, newValueHash;
+        switch(sizeof(T)) {
+                case 2:
+                        oldValueHash = hash<T, uint16_t, DICT16_BITS>(p->ringBuffer16[ringBufferIndex]);
+                        newValueHash = hash<T, uint16_t, DICT16_BITS>(p->data2[offset]);
+                        p->hashTable16[oldValueHash] = NO_ENTRY;
+                        p->ringBuffer16[ringBufferIndex] = p->data2[offset];
+                        p->hashTable16[newValueHash] = ringBufferIndex;
+                        break;
+                case 4:
+                        oldValueHash = hash<T, uint16_t, DICT32_BITS>(p->ringBuffer32[ringBufferIndex]);
+                        newValueHash = hash<T, uint16_t, DICT32_BITS>(p->data4[offset]);
+                        p->hashTable32[oldValueHash] = NO_ENTRY;
+                        p->ringBuffer32[ringBufferIndex] = p->data4[offset];
+                        p->hashTable32[newValueHash] = ringBufferIndex;
+                        break;
+                case 8:
+                        oldValueHash = hash<T, uint16_t, DICT64_BITS>(p->ringBuffer64[ringBufferIndex]);
+                        newValueHash = hash<T, uint16_t, DICT64_BITS>(p->data4[offset]);
+                        p->hashTable64[oldValueHash] = NO_ENTRY;
+                        p->ringBuffer64[ringBufferIndex] = p->data8[offset];
+                        p->hashTable64[newValueHash] = ringBufferIndex;
+                        break;
+                default:
+                        fprintf(stderr, "Invalid template parameter T for function replace_hash(...)\n");
+        }
+}
 
 #define find_index(p, b, n)	({			\
 	p->index##b[n] = INDEX_NOT_FOUND;		\
@@ -87,32 +99,6 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 })
 
 #define check_index(p, b, n) ((p)->index##b[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : (p)->index##b[n] >= 0)
-
-#define replace_hash(p, b, i, d)	do {							\
-	int node_index = i+d;									\
-	UINT_TYPE(b) data_old = p->node##b[node_index];						\
-												\
-	struct hlist_node##b *h;								\
-	HASH_FIND(hh, p->htable##b, &data_old, b, h);						\
-												\
-	if(h != NULL && h->data == data_old) {							\
-      		HASH_DEL(p->htable##b, h);							\
-		free(h);									\
-	}											\
-												\
-	UINT_TYPE(b) data_new = p->data##b[d];							\
-	p->node##b[node_index] = data_new;							\
-	HASH_FIND(hh, p->htable##b, &data_new, b, h);						\
-	if(h == NULL) {										\
-		h = (struct hlist_node##b *) malloc(sizeof(struct hlist_node##b));		\
-		h->data = data_new;								\
-		h->index = node_index;								\
-		HASH_ADD(hh, p->htable##b, data, b, h);						\
-	} else {										\
-		h->index = node_index;								\
-	}											\
-    												\
-} while (0)
 
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
 
@@ -164,19 +150,19 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 	if (bits <= 8)
 		*out = o | d;
 	else if (bits <= 16)
-		put_unaligned_le16(swap_endianness16(o << 8 | d), (__be16 *)out);
+		write16((__be16 *)out, swap_endianness16(o << 8 | d));
 	else if (bits <= 24)
-		put_unaligned_le32(swap_endianness32(o << 24 | d << 8), (__be32 *)out);
+		write32((__be32 *)out, swap_endianness32(o << 24 | d << 8));
 	else if (bits <= 32)
-		put_unaligned_le32(swap_endianness32(o << 24 | d), (__be32 *)out);
+		write32((__be32 *)out, swap_endianness32(o << 24 | d));
 	else if (bits <= 40)
-		put_unaligned_le64(swap_endianness64(o << 56 | d << 24), (__be64 *)out);
+		write64((__be64 *)out, swap_endianness64(o << 56 | d << 24));
 	else if (bits <= 48)
-		put_unaligned_le64(swap_endianness64(o << 56 | d << 16), (__be64 *)out);
+		write64((__be64 *)out, swap_endianness64(o << 56 | d << 16));
 	else if (bits <= 56)
-		put_unaligned_le64(swap_endianness64(o << 56 | d << 8), (__be64 *)out);
+		write64((__be64 *)out, swap_endianness64(o << 56 | d << 8));
 	else
-		put_unaligned_le64(swap_endianness64(o << 56 | d), (__be64 *)out);
+		write64((__be64 *)out, swap_endianness64(o << 56 | d));
 
 	p->bit += n;
 
@@ -224,7 +210,7 @@ static int add_template(struct sw842_param *p, uint8_t c)
 			break;
 		case OP_AMOUNT_4:
 			if (b == 2 && t[i] & OP_ACTION_DATA)
-				ret = add_bits(p, get_input_data(p, 2, 32), 32);
+				ret = add_bits(p, swap_endianness32(read32(p->in + 2)), 32);
 			else if (b != 0 && b != 4)
 				inv = true;
 			else if (t[i] & OP_ACTION_INDEX)
@@ -293,30 +279,6 @@ static int add_repeat_template(struct sw842_param *p, uint8_t r)
 	return 0;
 }
 
-static int add_short_data_template(struct sw842_param *p, uint8_t b)
-{
-	int ret, i;
-
-	if (!b || b > SHORT_DATA_BITS_MAX)
-		return -EINVAL;
-
-	ret = add_bits(p, OP_SHORT_DATA, OP_BITS);
-	if (ret)
-		return ret;
-
-	ret = add_bits(p, b, SHORT_DATA_BITS);
-	if (ret)
-		return ret;
-
-	for (i = 0; i < b; i++) {
-		ret = add_bits(p, p->in[i], 8);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
 static int add_zeros_template(struct sw842_param *p)
 {
 	int ret = add_bits(p, OP_ZEROS, OP_BITS);
@@ -367,13 +329,13 @@ static bool check_template(struct sw842_param *p, uint8_t c)
 
 static void get_next_data(struct sw842_param *p)
 {
-	p->data8[0] = get_input_data(p, 0, 64);
-	p->data4[0] = get_input_data(p, 0, 32);
-	p->data4[1] = get_input_data(p, 4, 32);
-	p->data2[0] = get_input_data(p, 0, 16);
-	p->data2[1] = get_input_data(p, 2, 16);
-	p->data2[2] = get_input_data(p, 4, 16);
-	p->data2[3] = get_input_data(p, 6, 16);
+	p->data8[0] = swap_endianness64(read64(p->in    ));
+	p->data4[0] = swap_endianness32(read32(p->in    ));
+	p->data4[1] = swap_endianness32(read32(p->in + 4));
+	p->data2[0] = swap_endianness16(read16(p->in    ));
+	p->data2[1] = swap_endianness16(read16(p->in + 2));
+	p->data2[2] = swap_endianness16(read16(p->in + 4));
+	p->data2[3] = swap_endianness16(read16(p->in + 6));
 }
 
 /* update the hashtable entries.
@@ -382,18 +344,19 @@ static void get_next_data(struct sw842_param *p)
  */
 static void update_hashtables(struct sw842_param *p)
 {
-	uint64_t pos = p->in - p->instart;
-	uint64_t n8 = (pos >> 3) % (1 << I8_BITS);
-	uint64_t n4 = (pos >> 2) % (1 << I4_BITS);
-	uint64_t n2 = (pos >> 1) % (1 << I2_BITS);
 
-	replace_hash(p, 8, n8, 0);
-	replace_hash(p, 4, n4, 0);
-	replace_hash(p, 4, n4, 1);
-	replace_hash(p, 2, n2, 0);
-	replace_hash(p, 2, n2, 1);
-	replace_hash(p, 2, n2, 2);
-	replace_hash(p, 2, n2, 3);
+	uint64_t pos = p->in - p->instart;
+    uint16_t i64 = (pos >> 3) % (1 << BUFFER64_BITS);
+    uint16_t i32 = (pos >> 2) % (1 << BUFFER32_BITS);
+    uint16_t i16 = (pos >> 1) % (1 << BUFFER16_BITS);
+
+    replace_hash<uint16_t>(p, i16, 0);
+    replace_hash<uint16_t>(p, i16, 1);
+    replace_hash<uint16_t>(p, i16, 2);
+    replace_hash<uint16_t>(p, i16, 3);
+    replace_hash<uint32_t>(p, i32, 0);
+    replace_hash<uint32_t>(p, i32, 1);
+    replace_hash<uint64_t>(p, i64, 0);
 }
 
 /* find the next template to use, and add it
@@ -443,9 +406,9 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	uint8_t repeat_count = 0;
 	uint32_t crc;
 
-	p->htable2 = NULL;
-	p->htable4 = NULL;
-	p->htable8 = NULL;
+	p->collisions16 = 0;
+	p->collisions32 = 0;
+	p->collisions64 = 0;
 
 	p->in = (uint8_t *)in;
 	p->instart = p->in;
@@ -463,15 +426,11 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 		return -EINVAL;
 	}
 
-	/* let's compress at least 8 bytes, mkay? */
-	if (unlikely(ilen < 8))
-		goto skip_comp;
-
 	/* make initial 'last' different so we don't match the first time */
-	last = ~get_unaligned64((uint64_t *)p->in);
+	last = ~read64((uint64_t *)p->in);
 
 	while (p->ilen > 7) {
-		next = get_unaligned64((uint64_t *)p->in);
+		next = read64((uint64_t *)p->in);
 
 		/* must get the next data, as we need to update the hashtable
 		 * entries with the new data every time
@@ -515,16 +474,6 @@ repeat:
 			return ret;
 	}
 
-skip_comp:
-	if (p->ilen > 0) {
-		ret = add_short_data_template(p, p->ilen);
-		if (ret)
-			return ret;
-
-		p->in += p->ilen;
-		p->ilen = 0;
-	}
-
 	ret = add_end_template(p);
 	if (ret)
 		return ret;
@@ -536,7 +485,7 @@ skip_comp:
 	 * same here so that sw842 decompression can be used for both
 	 * compressed data.
 	 */
-	crc = crc32_be(0, (const void*) in, ilen);
+	crc = crc32_be(0, (const unsigned char *) in, ilen);
 
 	ret = add_bits(p, crc, CRC_BITS);
 	if (ret)
