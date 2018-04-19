@@ -15,7 +15,6 @@
  *
  * See 842.h for details of the 842 compressed format.
  */
-
 #include "842-internal.h"
 
 static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
@@ -86,7 +85,54 @@ template<typename T> static inline void replace_hash(struct sw842_param *p, uint
                         fprintf(stderr, "Invalid template parameter T for function replace_hash(...)\n");
         }
 }
+/*
+template<typename T> static inline bool find_index(struct sw842_param *p, uint16_t offset) {
+	return false;
+}*/
 
+template<typename T> static inline bool find_index(struct sw842_param *p, uint16_t offset) {
+		uint16_t hashValue;
+		int16_t index;
+        switch(sizeof(T)) {
+                case 2:
+                	p->index2[offset] = INDEX_NOT_FOUND;
+                	hashValue = hash<T, uint16_t, DICT16_BITS>(p->data2[offset]);
+                	index = p->hashTable16[hashValue];
+                	if(index != NO_ENTRY && p->ringBuffer16[index] == p->data2[offset]) {
+                		p->index2[offset] = index;
+                		return true;
+                	} else if (index != NO_ENTRY && p->ringBuffer16[index] != p->data2[offset]) {
+                		//fprintf(stderr, "Collision detected\n");
+                	}
+                	break;
+                case 4:
+                	p->index4[offset] = INDEX_NOT_FOUND;
+                	hashValue = hash<T, uint16_t, DICT32_BITS>(p->data4[offset]);
+                	index = p->hashTable32[hashValue];
+                	if(index != NO_ENTRY && p->ringBuffer32[index] == p->data4[offset]) {
+                		p->index4[offset] = index;
+                 		return true;
+                	} else if (index != NO_ENTRY && p->ringBuffer32[index] != p->data4[offset]) {
+                		//fprintf(stderr, "Collision detected\n");
+                	}
+                	break;
+                case 8:
+                	p->index8[offset] = INDEX_NOT_FOUND;
+                	hashValue = hash<T, uint16_t, DICT64_BITS>(p->data8[offset]);
+                	index = p->hashTable64[hashValue];
+                	if(index != NO_ENTRY && p->ringBuffer64[index] == p->data8[offset]) {
+                		p->index8[offset] = index;
+                 		return true;
+                	} else if (index != NO_ENTRY && p->ringBuffer64[index] != p->data8[offset]) {
+                		//fprintf(stderr, "Collision detected\n");
+                	}
+                	
+                	break;
+        }
+        return false;
+}
+
+/*
 #define find_index(p, b, n)	({			\
 	p->index##b[n] = INDEX_NOT_FOUND;		\
 	UINT_TYPE(b) _n = p->data##b[n];		\
@@ -99,6 +145,7 @@ template<typename T> static inline void replace_hash(struct sw842_param *p, uint
 })
 
 #define check_index(p, b, n) ((p)->index##b[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : (p)->index##b[n] >= 0)
+*/
 
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
 
@@ -302,27 +349,34 @@ static int add_end_template(struct sw842_param *p)
 static bool check_template(struct sw842_param *p, uint8_t c)
 {
 	uint8_t *t = comp_ops[c];
-	int i, match, b = 0;
+	bool match = false;
+	int i, b = 0;
 
 	if (c >= OPS_MAX)
 		return false;
 
 	for (i = 0; i < 4; i++) {
 		if (t[i] & OP_ACTION_INDEX) {
-			if (t[i] & OP_AMOUNT_2)
-				match = check_index(p, 2, b >> 1);
-			else if (t[i] & OP_AMOUNT_4)
-				match = check_index(p, 4, b >> 2);
-			else if (t[i] & OP_AMOUNT_8)
-				match = check_index(p, 8, 0);
-			else
+			if (t[i] & OP_AMOUNT_2) {
+				match = find_index<uint16_t>(p, b >> 1);
+			} else if (t[i] & OP_AMOUNT_4) {
+				match = find_index<uint32_t>(p, b >> 2);
+			} else if (t[i] & OP_AMOUNT_8) {
+				match = find_index<uint64_t>(p, 0);
+			} else {
 				return false;
-			if (!match)
+			}
+			if (!match) {
 				return false;
+			}
 		}
 
 		b += t[i] & OP_AMOUNT;
 	}
+
+	#ifdef DEBUG
+	printf("found match for template (0x%02hhx, 0x%02hhx, 0x%02hhx, 0x%02hhx)\n\n", t[0], t[1], t[2], t[3]);
+	#endif
 
 	return true;
 }
@@ -409,6 +463,18 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	p->collisions16 = 0;
 	p->collisions32 = 0;
 	p->collisions64 = 0;
+
+	for(uint16_t i = 0; i < (1 << DICT16_BITS); i++) {
+		p->hashTable16[i] = NO_ENTRY;
+	}
+
+    for(uint16_t i = 0; i < (1 << DICT32_BITS); i++) {
+            p->hashTable32[i] = NO_ENTRY;
+    }
+
+    for(uint16_t i = 0; i < (1 << DICT64_BITS); i++) {
+            p->hashTable64[i] = NO_ENTRY;
+    }
 
 	p->in = (uint8_t *)in;
 	p->instart = p->in;

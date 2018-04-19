@@ -4,7 +4,8 @@
 
 #include "842.h"
 
-#define CHUNK_SIZE 32768
+//#define CHUNK_SIZE 32768
+#define CHUNK_SIZE 4096
 
 
 int nextMultipleOfChunkSize(unsigned int input) {
