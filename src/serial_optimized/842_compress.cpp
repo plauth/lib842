@@ -16,35 +16,7 @@
  * See 842.h for details of the 842 compressed format.
  */
 #include "842-internal.h"
-
-static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
-	{ I8, N0, N0, N0, 0x19 }, /* 8 */
-	{ I4, I4, N0, N0, 0x18 }, /* 18 */
-	{ I4, I2, I2, N0, 0x17 }, /* 25 */
-	{ I2, I2, I4, N0, 0x13 }, /* 25 */
-	{ I2, I2, I2, I2, 0x12 }, /* 32 */
-	{ I4, I2, D2, N0, 0x16 }, /* 33 */
-	{ I4, D2, I2, N0, 0x15 }, /* 33 */
-	{ I2, D2, I4, N0, 0x0e }, /* 33 */
-	{ D2, I2, I4, N0, 0x09 }, /* 33 */
-	{ I2, I2, I2, D2, 0x11 }, /* 40 */
-	{ I2, I2, D2, I2, 0x10 }, /* 40 */
-	{ I2, D2, I2, I2, 0x0d }, /* 40 */
-	{ D2, I2, I2, I2, 0x08 }, /* 40 */
-	{ I4, D4, N0, N0, 0x14 }, /* 41 */
-	{ D4, I4, N0, N0, 0x04 }, /* 41 */
-	{ I2, I2, D4, N0, 0x0f }, /* 48 */
-	{ I2, D2, I2, D2, 0x0c }, /* 48 */
-	{ I2, D4, I2, N0, 0x0b }, /* 48 */
-	{ D2, I2, I2, D2, 0x07 }, /* 48 */
-	{ D2, I2, D2, I2, 0x06 }, /* 48 */
-	{ D4, I2, I2, N0, 0x03 }, /* 48 */
-	{ I2, D2, D4, N0, 0x0a }, /* 56 */
-	{ D2, I2, D4, N0, 0x05 }, /* 56 */
-	{ D4, I2, D2, N0, 0x02 }, /* 56 */
-	{ D4, D2, I2, N0, 0x01 }, /* 56 */
-	{ D8, N0, N0, N0, 0x00 }, /* 64 */
-};
+#include "../common/opcodes.h"
 
 //static uint64_t outbits = 0;
 
@@ -81,7 +53,7 @@ template<typename T> static inline void replace_hash(struct sw842_param *p, uint
         }
 }
 
-template<typename T> static inline bool find_index(struct sw842_param *p, uint16_t offset) {
+template<typename T> static inline void find_index(struct sw842_param *p, uint16_t offset) {
 		uint16_t hashValue;
 		int16_t index;
         switch(sizeof(T)) {
@@ -91,9 +63,6 @@ template<typename T> static inline bool find_index(struct sw842_param *p, uint16
                 	index = p->hashTable16[hashValue];
                 	if(index != NO_ENTRY && p->ringBuffer16[index] == p->data2[offset]) {
                 		p->index2[offset] = index;
-                		return true;
-                	} else if (index != NO_ENTRY && p->ringBuffer16[index] != p->data2[offset]) {
-                		//fprintf(stderr, "Collision detected\n");
                 	}
                 	break;
                 case 4:
@@ -102,9 +71,6 @@ template<typename T> static inline bool find_index(struct sw842_param *p, uint16
                 	index = p->hashTable32[hashValue];
                 	if(index != NO_ENTRY && p->ringBuffer32[index] == p->data4[offset]) {
                 		p->index4[offset] = index;
-                 		return true;
-                	} else if (index != NO_ENTRY && p->ringBuffer32[index] != p->data4[offset]) {
-                		//fprintf(stderr, "Collision detected\n");
                 	}
                 	break;
                 case 8:
@@ -113,14 +79,45 @@ template<typename T> static inline bool find_index(struct sw842_param *p, uint16
                 	index = p->hashTable64[hashValue];
                 	if(index != NO_ENTRY && p->ringBuffer64[index] == p->data8[offset]) {
                 		p->index8[offset] = index;
-                 		return true;
-                	} else if (index != NO_ENTRY && p->ringBuffer64[index] != p->data8[offset]) {
-                		//fprintf(stderr, "Collision detected\n");
                 	}
-                	
                 	break;
         }
-        return false;
+}
+
+static inline uint8_t get_template(struct sw842_param *p) {
+		uint16_t template_key = 0;
+		
+		if(p->index8[0] >= 0) {
+			template_key = I8 * 3;
+		} else {
+			if(p->index4[0] >= 0) {
+				template_key += I4 * 3;
+			} else {
+				if(p->index2[0] >= 0)
+					template_key += I2 * 3;
+				if(p->index2[1] >= 0)
+					template_key += I2 * 5;
+			}
+			if(p->index4[1] >= 0) {
+				template_key += I4 * 5;
+			} else {
+				if(p->index2[2] >= 0)
+					template_key += I2 * 7;
+				if(p->index2[3] >= 0)
+					template_key += I2 * 11;
+			}			
+		}
+
+		template_key >>= 2;
+
+
+
+		if (template_key > 117) {
+			fprintf(stderr, "Invalid template_key '%d', the key is larger than maximum value 117!\n", template_key);
+			exit(-EINVAL);
+		}
+		
+		return ops_dict[template_key];
 }
 
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
@@ -198,20 +195,17 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 	return 0;
 }
 
-static int add_template(struct sw842_param *p, uint8_t c)
+static int add_template(struct sw842_param *p, uint8_t template_key)
 {
 	int ret, i, b = 0;
-	uint8_t *t = comp_ops[c];
+	uint8_t *t = template_dict[template_key];
 	bool inv = false;
 
-	if (c >= OPS_MAX)
-		return -EINVAL;
-
 	#ifdef DEBUG
-	printf("template %x\n", t[4]);
+	printf("template %x\n", template_key);
 	#endif
 
-	ret = add_bits(p, t[4], OP_BITS);
+	ret = add_bits(p, template_key, OP_BITS);
 	if (ret)
 		return ret;
 
@@ -266,7 +260,7 @@ static int add_template(struct sw842_param *p, uint8_t c)
 
 		if (inv) {
 			fprintf(stderr, "Invalid templ %x op %d : %x %x %x %x\n",
-			       c, i, t[0], t[1], t[2], t[3]);
+			       template_key, i, t[0], t[1], t[2], t[3]);
 			return -EINVAL;
 		}
 
@@ -275,7 +269,7 @@ static int add_template(struct sw842_param *p, uint8_t c)
 
 	if (b != 8) {
 		fprintf(stderr, "Invalid template %x len %x : %x %x %x %x\n",
-		       c, b, t[0], t[1], t[2], t[3]);
+		       template_key, b, t[0], t[1], t[2], t[3]);
 		return -EINVAL;
 	}
 
@@ -322,41 +316,6 @@ static int add_end_template(struct sw842_param *p)
 	return 0;
 }
 
-static bool check_template(struct sw842_param *p, uint8_t c)
-{
-	uint8_t *t = comp_ops[c];
-	bool match = false;
-	int i, b = 0;
-
-	if (c >= OPS_MAX)
-		return false;
-
-	for (i = 0; i < 4; i++) {
-		if (t[i] & OP_ACTION_INDEX) {
-			if (t[i] & OP_AMOUNT_2) {
-				match = find_index<uint16_t>(p, b >> 1);
-			} else if (t[i] & OP_AMOUNT_4) {
-				match = find_index<uint32_t>(p, b >> 2);
-			} else if (t[i] & OP_AMOUNT_8) {
-				match = find_index<uint64_t>(p, 0);
-			} else {
-				return false;
-			}
-			if (!match) {
-				return false;
-			}
-		}
-
-		b += t[i] & OP_AMOUNT;
-	}
-
-	#ifdef DEBUG
-	printf("found match for template (0x%02hhx, 0x%02hhx, 0x%02hhx, 0x%02hhx)\n\n", t[0], t[1], t[2], t[3]);
-	#endif
-
-	return true;
-}
-
 static void get_next_data(struct sw842_param *p)
 {
 	p->data8[0] = swap_endianness64(read64(p->in    ));
@@ -394,7 +353,8 @@ static void update_hashtables(struct sw842_param *p)
  */
 static int process_next(struct sw842_param *p)
 {
-	int ret, i;
+	int ret;
+	uint8_t template_key;
 
 	p->index8[0] = INDEX_NOT_CHECKED;
 	p->index4[0] = INDEX_NOT_CHECKED;
@@ -404,12 +364,17 @@ static int process_next(struct sw842_param *p)
 	p->index2[2] = INDEX_NOT_CHECKED;
 	p->index2[3] = INDEX_NOT_CHECKED;
 
-	/* check up to OPS_MAX - 1; last op is our fallback */
-	for (i = 0; i < OPS_MAX - 1; i++) {
-		if (check_template(p, i))
-			break;
-	}
-	ret = add_template(p, i);
+	find_index<uint64_t>(p, 0);
+	find_index<uint32_t>(p, 0);
+	find_index<uint32_t>(p, 1);
+	find_index<uint16_t>(p, 0);
+	find_index<uint16_t>(p, 1);
+	find_index<uint16_t>(p, 2);
+	find_index<uint16_t>(p, 3);
+
+	template_key = get_template(p);
+
+	ret = add_template(p, template_key);
 	if (ret)
 		return ret;
 
