@@ -51,11 +51,6 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 #define INDEX_NOT_FOUND		(-1)
 #define INDEX_NOT_CHECKED	(-2)
 
-#define UINT_TYPE(b) UINT_TYPE_##b
-#define UINT_TYPE_2 uint16_t
-#define UINT_TYPE_4 uint32_t
-#define UINT_TYPE_8 uint64_t
-
 template<typename T> static inline void replace_hash(struct sw842_param *p, uint16_t index, uint16_t offset) {
 		uint16_t ringBufferIndex = index + offset;
         uint16_t oldValueHash, newValueHash;
@@ -85,10 +80,6 @@ template<typename T> static inline void replace_hash(struct sw842_param *p, uint
                         fprintf(stderr, "Invalid template parameter T for function replace_hash(...)\n");
         }
 }
-/*
-template<typename T> static inline bool find_index(struct sw842_param *p, uint16_t offset) {
-	return false;
-}*/
 
 template<typename T> static inline bool find_index(struct sw842_param *p, uint16_t offset) {
 		uint16_t hashValue;
@@ -131,21 +122,6 @@ template<typename T> static inline bool find_index(struct sw842_param *p, uint16
         }
         return false;
 }
-
-/*
-#define find_index(p, b, n)	({			\
-	p->index##b[n] = INDEX_NOT_FOUND;		\
-	UINT_TYPE(b) _n = p->data##b[n];		\
-							\
-	struct hlist_node##b *h;			\
-	HASH_FIND(hh, p->htable##b, &_n, b, h);		\
-	if(h != NULL)					\
-		p->index##b[n] = h->index;		\
-	p->index##b[n] >= 0;				\
-})
-
-#define check_index(p, b, n) ((p)->index##b[n] == INDEX_NOT_CHECKED ? find_index(p, b, n) : (p)->index##b[n] >= 0)
-*/
 
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
 
