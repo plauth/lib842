@@ -150,6 +150,9 @@ struct sw842_param {
 	int index8[1];
 	int index4[2];
 	int index2[4];
+	uint64_t hash8[1];
+	uint64_t hash4[2];
+	uint16_t hash2[4];
 
 	int16_t hashTable16[1 << DICT16_BITS];
 	int16_t hashTable32[1 << DICT32_BITS];
@@ -157,10 +160,6 @@ struct sw842_param {
 	uint16_t ringBuffer16[1 << BUFFER16_BITS];
 	uint32_t ringBuffer32[1 << BUFFER32_BITS];
 	uint64_t ringBuffer64[1 << BUFFER64_BITS];
-
-	uint64_t collisions16;
-	uint64_t collisions32;
-	uint64_t collisions64;
 };
 
 struct sw842_param_decomp {

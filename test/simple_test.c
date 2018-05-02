@@ -68,7 +68,6 @@ int main( int argc, const char* argv[])
 
 		int num_chunks = ilen / CHUNK_SIZE;
 
-		#pragma omp parallel for
 		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			
 			unsigned int chunk_olen = CHUNK_SIZE * 2;
