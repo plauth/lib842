@@ -3,3 +3,4 @@ cpu_serial/842_test.dSYM
 obj/
 bin/
 test/simple_test
+vec.out
