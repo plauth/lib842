@@ -81,7 +81,7 @@
 #include <string.h>
 
 
-#include "../../include/842.h"
+#include "../../include/sw842.h"
 
 #include "../common/memaccess.h"
 #include "../common/endianness.h"

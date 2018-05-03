@@ -1,5 +1,5 @@
-#ifndef __842_H__
-#define __842_H__
+#ifndef __SW842_H__
+#define __SW842_H__
 
 #include <stdint.h>
 
