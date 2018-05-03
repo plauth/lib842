@@ -226,171 +226,152 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 	return 0;
 }
 
-static int add_template_internal(struct sw842_param *p, uint8_t template_key)
-{
-	int ret, i, b = 0;
-	uint8_t *t = template_dict[template_key];
-	bool inv = false;
-
-	#ifdef DEBUG
-	printf("template %x\n", template_key);
-	#endif
-
-	ret = add_bits(p, template_key, OP_BITS);
+template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param *p) {
+	int ret = 0;
+	ret = add_bits(p, TEMPLATE_KEY, OP_BITS);
 	if (ret)
 		return ret;
 
-	for (i = 0; i < 4; i++) {
-		#ifdef DEBUG
-		printf("op %x\n", t[i]);
-		#endif
-
-		switch (t[i] & OP_AMOUNT) {
-		case OP_AMOUNT_8:
-			if (b)
-				inv = true;
-			else if (t[i] & OP_ACTION_INDEX)
-				ret = add_bits(p, p->index8[0], I8_BITS);
-			else if (t[i] & OP_ACTION_DATA)
-				ret = add_bits(p, p->data8[0], 64);
-			else
-				inv = true;
-			break;
-		case OP_AMOUNT_4:
-			if (b == 2 && t[i] & OP_ACTION_DATA)
-				ret = add_bits(p, swap_endianness32(read32(p->in + 2)), 32);
-			else if (b != 0 && b != 4)
-				inv = true;
-			else if (t[i] & OP_ACTION_INDEX)
-				ret = add_bits(p, p->index4[b >> 2], I4_BITS);
-			else if (t[i] & OP_ACTION_DATA)
-				ret = add_bits(p, p->data4[b >> 2], 32);
-			else
-				inv = true;
-			break;
-		case OP_AMOUNT_2:
-			if (b != 0 && b != 2 && b != 4 && b != 6)
-				inv = true;
-			if (t[i] & OP_ACTION_INDEX)
-				ret = add_bits(p, p->index2[b >> 1], I2_BITS);
-			else if (t[i] & OP_ACTION_DATA)
-				ret = add_bits(p, p->data2[b >> 1], 16);
-			else
-				inv = true;
-			break;
-		case OP_AMOUNT_0:
-			inv = (b != 8) || !(t[i] & OP_ACTION_NOOP);
-			break;
-		default:
-			inv = true;
-			break;
-		}
-
-		if (ret)
-			return ret;
-
-		if (inv) {
-			fprintf(stderr, "Invalid templ %x op %d : %x %x %x %x\n",
-			       template_key, i, t[0], t[1], t[2], t[3]);
-			return -EINVAL;
-		}
-
-		b += t[i] & OP_AMOUNT;
-	}
-
-	if (b != 8) {
-		fprintf(stderr, "Invalid template %x len %x : %x %x %x %x\n",
-		       template_key, b, t[0], t[1], t[2], t[3]);
-		return -EINVAL;
-	}
-
-
-	return 0;
-}
-
-template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param *p) {
     switch(TEMPLATE_KEY) {
         case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
-    		return add_template_internal(p, 0x00);
+        	ret = add_bits(p, p->data8[0], 64);
     	    break;
         case 0x01:	// { D4, D2, I2, N0 }, 56 bits
-    		return add_template_internal(p, 0x01);
+        	ret |= add_bits(p, p->data4[0], 32);
+        	ret |= add_bits(p, p->data2[2], 16);
+        	ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
         case 0x02:	// { D4, I2, D2, N0 }, 56 bits
-    		return add_template_internal(p, 0x02);
+        	ret |= add_bits(p, p->data4[0], 32);
+			ret |= add_bits(p, p->index2[2], I2_BITS);
+			ret |= add_bits(p, p->data2[3], 16);
     	    break;
 		case 0x03: 	// { D4, I2, I2, N0 }, 48 bits
-    		return add_template_internal(p, 0x03);
+			ret |= add_bits(p, p->data4[0], 32);
+    		ret |= add_bits(p, p->index2[2], I2_BITS);
+    		ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
 		case 0x04:	// { D4, I4, N0, N0 }, 41 bits
-    		return add_template_internal(p, 0x04);
+			ret |= add_bits(p, p->data4[0], 32);
+			ret |= add_bits(p, p->index4[1], I4_BITS);
     	    break;
 		case 0x05:	// { D2, I2, D4, N0 }, 56 bits
-    		return add_template_internal(p, 0x05);
+			ret |= add_bits(p, p->data2[0], 16);
+			ret |= add_bits(p, p->index2[1], I2_BITS);
+			ret |= add_bits(p, p->data4[1], 32);
     	    break;
 		case 0x06:	// { D2, I2, D2, I2 }, 48 bits
-    		return add_template_internal(p, 0x06);
+			ret |= add_bits(p, p->data2[0], 16);
+			ret |= add_bits(p, p->index2[1], I2_BITS);
+			ret |= add_bits(p, p->data2[2], 16);
+			ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
 		case 0x07:	// { D2, I2, I2, D2 }, 48 bits
-    		return add_template_internal(p, 0x07);
+			ret |= add_bits(p, p->data2[0], 16);
+			ret |= add_bits(p, p->index2[1], I2_BITS);
+			ret |= add_bits(p, p->index2[2], I2_BITS);
+			ret |= add_bits(p, p->data2[3], 16);
     	    break;
 		case 0x08:	// { D2, I2, I2, I2 }, 40 bits
-    		return add_template_internal(p, 0x08);
+			ret |= add_bits(p, p->data2[0], 16);
+			ret |= add_bits(p, p->index2[1], I2_BITS);
+			ret |= add_bits(p, p->index2[2], I2_BITS);
+			ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
 		case 0x09:	// { D2, I2, I4, N0 }, 33 bits
-    		return add_template_internal(p, 0x09);
+			ret |= add_bits(p, p->data2[0], 16);
+			ret |= add_bits(p, p->index2[1], I2_BITS);
+			ret |= add_bits(p, p->index4[1], I4_BITS);
     	    break;
 		case 0x0a:	// { I2, D2, D4, N0 }, 56 bits
-    		return add_template_internal(p, 0x0a);
+    		ret |= add_bits(p, p->index2[0], I2_BITS);
+    		ret |= add_bits(p, p->data2[1], 16);
+    		ret |= add_bits(p, p->data4[1], 32);
     	    break;
 		case 0x0b:	// { I2, D4, I2, N0 }, 48 bits
-    		return add_template_internal(p, 0x0b);
+			ret |= add_bits(p, p->index2[0], I2_BITS);
+			ret |= add_bits(p, swap_endianness32(read32(p->in + 2)), 32);
+			ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
 		case 0x0c:	// { I2, D2, I2, D2 }, 48 bits
-    		return add_template_internal(p, 0x0c);
+			ret |= add_bits(p, p->index2[0], I2_BITS);
+    		ret |= add_bits(p, p->data2[1], 16);
+			ret |= add_bits(p, p->index2[2], I2_BITS);
+    		ret |= add_bits(p, p->data2[3], 16);
     	    break;
 		case 0x0d:	// { I2, D2, I2, I2 }, 40 bits
-    		return add_template_internal(p, 0x0d);
+			ret |= add_bits(p, p->index2[0], I2_BITS);
+    		ret |= add_bits(p, p->data2[1], 16);
+			ret |= add_bits(p, p->index2[2], I2_BITS);
+    		ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
 		case 0x0e:	// { I2, D2, I4, N0 }, 33 bits
-    		return add_template_internal(p, 0x0e);
+			ret |= add_bits(p, p->index2[0], I2_BITS);
+    		ret |= add_bits(p, p->data2[1], 16);
+    		ret |= add_bits(p, p->index4[1], I4_BITS);
     	    break;
 		case 0x0f:	// { I2, I2, D4, N0 }, 48 bits
-    		return add_template_internal(p, 0x0f);
+    		ret |= add_bits(p, p->index2[0], I2_BITS);
+    		ret |= add_bits(p, p->index2[1], I2_BITS);
+    		ret |= add_bits(p, p->data4[1], 32);
     	    break;
 		case 0x10:	// { I2, I2, D2, I2 }, 40 bits
-    		return add_template_internal(p, 0x10);
+    		ret |= add_bits(p, p->index2[0], I2_BITS);
+    		ret |= add_bits(p, p->index2[1], I2_BITS);
+    		ret |= add_bits(p, p->data2[2], 16);
+       		ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
 		case 0x11:	// { I2, I2, I2, D2 }, 40 bits
-    		return add_template_internal(p, 0x11);
+    		ret |= add_bits(p, p->index2[0], I2_BITS);
+    		ret |= add_bits(p, p->index2[1], I2_BITS);
+       		ret |= add_bits(p, p->index2[2], I2_BITS);
+    		ret |= add_bits(p, p->data2[3], 16);
     	    break;
 		case 0x12:	// { I2, I2, I2, I2 }, 32 bits
-    		return add_template_internal(p, 0x12);
+    		ret |= add_bits(p, p->index2[0], I2_BITS);
+    		ret |= add_bits(p, p->index2[1], I2_BITS);
+       		ret |= add_bits(p, p->index2[2], I2_BITS);
+       		ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
 		case 0x13:	// { I2, I2, I4, N0 }, 25 bits
-    		return add_template_internal(p, 0x13);
+    		ret |= add_bits(p, p->index2[0], I2_BITS);
+    		ret |= add_bits(p, p->index2[1], I2_BITS);
+       		ret |= add_bits(p, p->index4[1], I4_BITS);
     	    break;
 		case 0x14:	// { I4, D4, N0, N0 }, 41 bits
-    		return add_template_internal(p, 0x14);
+       		ret |= add_bits(p, p->index4[0], I4_BITS);
+    		ret |= add_bits(p, p->data4[1], 32);
     	    break;
 		case 0x15:	// { I4, D2, I2, N0 }, 33 bits
-    		return add_template_internal(p, 0x15);
+       		ret |= add_bits(p, p->index4[0], I4_BITS);
+    		ret |= add_bits(p, p->data2[2], 16);
+    		ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
 		case 0x16:	// { I4, I2, D2, N0 }, 33 bits
-    		return add_template_internal(p, 0x16);
+       		ret |= add_bits(p, p->index4[0], I4_BITS);
+    		ret |= add_bits(p, p->index2[2], I2_BITS);
+    		ret |= add_bits(p, p->data2[3], 16);
     	    break;
 		case 0x17:	// { I4, I2, I2, N0 }, 25 bits
-    		return add_template_internal(p, 0x17);
+       		ret |= add_bits(p, p->index4[0], I4_BITS);
+    		ret |= add_bits(p, p->index2[2], I2_BITS);
+    		ret |= add_bits(p, p->index2[3], I2_BITS);
     	    break;
 		case 0x18:	// { I4, I4, N0, N0 }, 18 bits
-    		return add_template_internal(p, 0x18);
+    		ret |= add_bits(p, p->index4[0], I4_BITS);
+			ret |= add_bits(p, p->index4[1], I4_BITS);
     	    break;
 		case 0x19:	// { I8, N0, N0, N0 }, 8 bits
-    		return add_template_internal(p, 0x19);
+    		ret = add_bits(p, p->index8[0], I8_BITS);
     	    break;
         default:
         	fprintf(stderr, "Invalid template: %x\n", TEMPLATE_KEY);
         }
+
+		if (ret)
+			return ret;
+
+		return 0;
 }
 
 static int add_repeat_template(struct sw842_param *p, uint8_t r)
