@@ -99,7 +99,7 @@ int main( int argc, const char* argv[])
 		uint8_t* chunk_decomp = decompressed;
 		int chunk_olen = CHUNK_SIZE * 2;
 
-		for(int out_chunk_pos = 0; out_chunk_pos < olen; out_chunk_pos+=(CHUNK_SIZE * 2)) {
+		for(unsigned int out_chunk_pos = 0; out_chunk_pos < olen; out_chunk_pos+=(CHUNK_SIZE * 2)) {
 			chunk_dlen = CHUNK_SIZE;
 			
 			#ifdef USEHW

@@ -101,7 +101,7 @@ static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n)
 	else if (p->ilen < 4 && bits > 16 && bits <= 24)
 		return __split_next_bits(p, d, n, 8);
 
-	if (DIV_ROUND_UP(bits, 8) > p->ilen)
+	if (bytes_rounded_up(bits) > p->ilen)
 		return -EOVERFLOW;
 
 	if (bits <= 8)
@@ -378,7 +378,7 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		return -EINVAL;
 	}
 
-	if (unlikely((total - p.olen) > UINT_MAX))
+	if ((total - p.olen) > UINT_MAX)
 		return -ENOSPC;
 
 	*olen = total - p.olen;

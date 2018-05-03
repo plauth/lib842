@@ -171,4 +171,8 @@ struct sw842_param_decomp {
 	uint64_t olen;
 };
 
+uint64_t static inline bytes_rounded_up(uint64_t bits) {
+	return (bits + 8 - 1) / 8;
+}
+
 #endif

@@ -1,8 +1,13 @@
+ifeq ($(shell uname),Darwin)
+CC=gcc-7
+CXX=g++-7
+else
 CC=gcc
-CC_FLAGS=-Wall -fPIC -g -O3
-
 CXX=g++
-CXX_FLAGS=-Wall -fPIC -g -O3
+endif
+
+CC_FLAGS=-Wall -fPIC -g -O3
+CXX_FLAGS=-Wall -fPIC -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow
 
 
 MODULES   := serial serial_optimized cryptodev
@@ -48,6 +53,7 @@ clean:
 	rm -Rf obj
 	rm -Rf bin
 	rm -Rf test/simple_test
+	rm -Rf vec.out
 
 checkdirs: $(OBJ_DIR) $(BIN_DIR)
 
@@ -67,7 +73,12 @@ test_cryptodev: checkdirs $(OBJ_FILES_CRYPTODEV)
 	$(CC) $(CC_FLAGS) $(OBJ_FILES_CRYPTODEV) -DUSEHW=1 test/simple_test.c -o bin/cryptodev/simple_test -I./include 
 	bin/cryptodev/simple_test
 
+ifeq ($(shell uname),Darwin)
+standalone: test_serial_standalone test_serial_optimized_standalone
+else
 standalone: test_serial_standalone test_serial_optimized_standalone test_cryptodev
+endif
+
 
 libs: serial_lib
 

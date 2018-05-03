@@ -191,7 +191,7 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 	else if (p->olen < 4 && bits > 16 && bits <= 24)
 		return __split_add_bits(p, d, n, 8);
 
-	if (DIV_ROUND_UP(bits, 8) > p->olen)
+	if (bytes_rounded_up(bits) > p->olen)
 		return -ENOSPC;
  
 	//outbits += n;
@@ -689,7 +689,7 @@ repeat:
 		p->olen -= pad;
 	}
 
-	if (unlikely((total - p->olen) > UINT_MAX))
+	if ((total - p->olen) > UINT_MAX)
 		return -ENOSPC;
 
 	*olen = total - p->olen;
