@@ -96,23 +96,18 @@
 #define OP_ZEROS	(0x1C)
 #define OP_END		(0x1E)
 
-/* sw only template - this is not in the hw design; it's used only by this
- * software compressor and decompressor, to allow input buffers that aren't
- * a multiple of 8.
- */
-#define OP_SHORT_DATA	(0x1D)
-
 /* additional bits of each op param */
 #define OP_BITS		(5)
 #define REPEAT_BITS	(6)
-#define SHORT_DATA_BITS	(3)
 #define I2_BITS		(8)
 #define I4_BITS		(9)
 #define I8_BITS		(8)
+#define D2_BITS 	(16)
+#define D4_BITS 	(32)
+#define D8_BITS 	(64)
 #define CRC_BITS	(32)
 
 #define REPEAT_BITS_MAX		(0x3f)
-#define SHORT_DATA_BITS_MAX	(0x7)
 
 /* Arbitrary values used to indicate action */
 #define OP_ACTION	(0x70)

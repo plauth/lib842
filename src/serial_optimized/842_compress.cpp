@@ -170,6 +170,7 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 {
 	int b = p->bit;
 	int bits = b + n;
+
 	int s = round_up(bits, 8) - bits;
 	uint64_t o;
 	uint8_t *out = p->out;
@@ -228,141 +229,190 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 
 template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param *p) {
 	int ret = 0;
-	ret = add_bits(p, TEMPLATE_KEY, OP_BITS);
-	if (ret)
-		return ret;
+	uint64_t out = 0;
 
     switch(TEMPLATE_KEY) {
         case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
-        	ret = add_bits(p, p->data8[0], 64);
+        	ret |= add_bits(p, TEMPLATE_KEY, OP_BITS);
+        	ret |= add_bits(p, p->data8[0], 64);
     	    break;
         case 0x01:	// { D4, D2, I2, N0 }, 56 bits
-        	ret |= add_bits(p, p->data4[0], 32);
-        	ret |= add_bits(p, p->data2[2], 16);
-        	ret |= add_bits(p, p->index2[3], I2_BITS);
+        	out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + D2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->data4[0])  << (D2_BITS + I2_BITS)) 						|
+        			(((uint64_t) p->data2[2])  << (I2_BITS)) 								|
+        			(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + D4_BITS + D2_BITS + I2_BITS);
     	    break;
         case 0x02:	// { D4, I2, D2, N0 }, 56 bits
-        	ret |= add_bits(p, p->data4[0], 32);
-			ret |= add_bits(p, p->index2[2], I2_BITS);
-			ret |= add_bits(p, p->data2[3], 16);
+         	out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + I2_BITS + D2_BITS))			|
+        		 	(((uint64_t) p->data4[0])  << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
+        		 	(((uint64_t) p->data2[3]));
+        	ret = add_bits(p, out, OP_BITS + D4_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x03: 	// { D4, I2, I2, N0 }, 48 bits
-			ret |= add_bits(p, p->data4[0], 32);
-    		ret |= add_bits(p, p->index2[2], I2_BITS);
-    		ret |= add_bits(p, p->index2[3], I2_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + I2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->data4[0])  << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
+        		 	(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + D4_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x04:	// { D4, I4, N0, N0 }, 41 bits
-			ret |= add_bits(p, p->data4[0], 32);
-			ret |= add_bits(p, p->index4[1], I4_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + I4_BITS))						|
+        		 	(((uint64_t) p->data4[0])  << (I4_BITS))								|
+        		 	(((uint64_t) p->index4[1]));
+        	ret = add_bits(p, out, OP_BITS + D4_BITS + I4_BITS);
     	    break;
 		case 0x05:	// { D2, I2, D4, N0 }, 56 bits
-			ret |= add_bits(p, p->data2[0], 16);
-			ret |= add_bits(p, p->index2[1], I2_BITS);
-			ret |= add_bits(p, p->data4[1], 32);
+			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + D4_BITS))			|
+        		 	(((uint64_t) p->data2[0])  << (I2_BITS + D4_BITS))						|
+        		 	(((uint64_t) p->index2[1]) << (D4_BITS))								|
+        		 	(((uint64_t) p->data4[1]));
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + D4_BITS); 
     	    break;
 		case 0x06:	// { D2, I2, D2, I2 }, 48 bits
-			ret |= add_bits(p, p->data2[0], 16);
-			ret |= add_bits(p, p->index2[1], I2_BITS);
-			ret |= add_bits(p, p->data2[2], 16);
-			ret |= add_bits(p, p->index2[3], I2_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + D2_BITS + I2_BITS))	|
+        		 	(((uint64_t) p->data2[0])  << (I2_BITS + D2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->index2[1]) << (D2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->data2[2])  << (I2_BITS))								|
+        		 	(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x07:	// { D2, I2, I2, D2 }, 48 bits
-			ret |= add_bits(p, p->data2[0], 16);
-			ret |= add_bits(p, p->index2[1], I2_BITS);
-			ret |= add_bits(p, p->index2[2], I2_BITS);
-			ret |= add_bits(p, p->data2[3], 16);
+			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + I2_BITS + D2_BITS))	|
+        		 	(((uint64_t) p->data2[0])  << (I2_BITS + I2_BITS + D2_BITS))			|
+        		 	(((uint64_t) p->index2[1]) << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
+        		 	(((uint64_t) p->data2[3]));
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x08:	// { D2, I2, I2, I2 }, 40 bits
-			ret |= add_bits(p, p->data2[0], 16);
-			ret |= add_bits(p, p->index2[1], I2_BITS);
-			ret |= add_bits(p, p->index2[2], I2_BITS);
-			ret |= add_bits(p, p->index2[3], I2_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + I2_BITS + I2_BITS))	|
+        		 	(((uint64_t) p->data2[0])  << (I2_BITS + I2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->index2[1]) << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
+        		 	(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x09:	// { D2, I2, I4, N0 }, 33 bits
-			ret |= add_bits(p, p->data2[0], 16);
-			ret |= add_bits(p, p->index2[1], I2_BITS);
-			ret |= add_bits(p, p->index4[1], I4_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + I4_BITS))			|
+        		 	(((uint64_t) p->data2[0])  << (I2_BITS + I4_BITS))						|
+        		 	(((uint64_t) p->index2[1]) << (I4_BITS))								|
+        		 	(((uint64_t) p->index4[1]));
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + I4_BITS);
     	    break;
 		case 0x0a:	// { I2, D2, D4, N0 }, 56 bits
-    		ret |= add_bits(p, p->index2[0], I2_BITS);
-    		ret |= add_bits(p, p->data2[1], 16);
-    		ret |= add_bits(p, p->data4[1], 32);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + D4_BITS))			|
+        		 	(((uint64_t) p->index2[0]) << (D2_BITS + D4_BITS))						|
+        		 	(((uint64_t) p->data2[1])  << (D4_BITS))								|
+        		 	(((uint64_t) p->data4[1]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D2_BITS + D4_BITS);
     	    break;
 		case 0x0b:	// { I2, D4, I2, N0 }, 48 bits
-			ret |= add_bits(p, p->index2[0], I2_BITS);
-			ret |= add_bits(p, swap_endianness32(read32(p->in + 2)), 32);
-			ret |= add_bits(p, p->index2[3], I2_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D4_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->index2[0]) << (D4_BITS + I2_BITS))						|
+        		 	(((uint64_t) swap_endianness32(read32(p->in + 2)))  << (I2_BITS))		|
+        		 	(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D4_BITS + I2_BITS);
     	    break;
 		case 0x0c:	// { I2, D2, I2, D2 }, 48 bits
-			ret |= add_bits(p, p->index2[0], I2_BITS);
-    		ret |= add_bits(p, p->data2[1], 16);
-			ret |= add_bits(p, p->index2[2], I2_BITS);
-    		ret |= add_bits(p, p->data2[3], 16);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + I2_BITS + D2_BITS))	|
+        		 	(((uint64_t) p->index2[0]) << (D2_BITS + I2_BITS + D2_BITS))			|
+        		 	(((uint64_t) p->data2[1])  << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
+        		 	(((uint64_t) p->data2[3]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D2_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x0d:	// { I2, D2, I2, I2 }, 40 bits
-			ret |= add_bits(p, p->index2[0], I2_BITS);
-    		ret |= add_bits(p, p->data2[1], 16);
-			ret |= add_bits(p, p->index2[2], I2_BITS);
-    		ret |= add_bits(p, p->index2[3], I2_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + I2_BITS + I2_BITS))	|
+        		 	(((uint64_t) p->index2[0]) << (D2_BITS + I2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->data2[1])  << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
+        		 	(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D2_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x0e:	// { I2, D2, I4, N0 }, 33 bits
-			ret |= add_bits(p, p->index2[0], I2_BITS);
-    		ret |= add_bits(p, p->data2[1], 16);
-    		ret |= add_bits(p, p->index4[1], I4_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + I4_BITS))			|
+        		 	(((uint64_t) p->index2[0]) << (D2_BITS + I4_BITS))						|
+        		 	(((uint64_t) p->data2[1])  << (I4_BITS))								|
+        		 	(((uint64_t) p->index4[1]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D2_BITS + I4_BITS);
     	    break;
 		case 0x0f:	// { I2, I2, D4, N0 }, 48 bits
-    		ret |= add_bits(p, p->index2[0], I2_BITS);
-    		ret |= add_bits(p, p->index2[1], I2_BITS);
-    		ret |= add_bits(p, p->data4[1], 32);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + D4_BITS))			|
+        		 	(((uint64_t) p->index2[0]) << (I2_BITS + D4_BITS))						|
+        		 	(((uint64_t) p->index2[1]) << (D4_BITS))								|
+        		 	(((uint64_t) p->data4[1]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + D4_BITS);
     	    break;
 		case 0x10:	// { I2, I2, D2, I2 }, 40 bits
-    		ret |= add_bits(p, p->index2[0], I2_BITS);
-    		ret |= add_bits(p, p->index2[1], I2_BITS);
-    		ret |= add_bits(p, p->data2[2], 16);
-       		ret |= add_bits(p, p->index2[3], I2_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + D2_BITS + I2_BITS))	|
+        		 	(((uint64_t) p->index2[0]) << (I2_BITS + D2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->index2[1]) << (D2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->data2[2])  << (I2_BITS))								|
+        		 	(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x11:	// { I2, I2, I2, D2 }, 40 bits
-    		ret |= add_bits(p, p->index2[0], I2_BITS);
-    		ret |= add_bits(p, p->index2[1], I2_BITS);
-       		ret |= add_bits(p, p->index2[2], I2_BITS);
-    		ret |= add_bits(p, p->data2[3], 16);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + I2_BITS + D2_BITS))	|
+        		 	(((uint64_t) p->index2[0]) << (I2_BITS + I2_BITS + D2_BITS))			|
+        		 	(((uint64_t) p->index2[1]) << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
+        		 	(((uint64_t) p->data2[3]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x12:	// { I2, I2, I2, I2 }, 32 bits
-    		ret |= add_bits(p, p->index2[0], I2_BITS);
-    		ret |= add_bits(p, p->index2[1], I2_BITS);
-       		ret |= add_bits(p, p->index2[2], I2_BITS);
-       		ret |= add_bits(p, p->index2[3], I2_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + I2_BITS + I2_BITS))	|
+        		 	(((uint64_t) p->index2[0]) << (I2_BITS + I2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->index2[1]) << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
+        		 	(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x13:	// { I2, I2, I4, N0 }, 25 bits
-    		ret |= add_bits(p, p->index2[0], I2_BITS);
-    		ret |= add_bits(p, p->index2[1], I2_BITS);
-       		ret |= add_bits(p, p->index4[1], I4_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + I4_BITS))			|
+        		 	(((uint64_t) p->index2[0]) << (I2_BITS + I4_BITS))						|
+        		 	(((uint64_t) p->index2[1]) << (I4_BITS))								|
+        		 	(((uint64_t) p->index4[1]));
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + I4_BITS);
     	    break;
 		case 0x14:	// { I4, D4, N0, N0 }, 41 bits
-       		ret |= add_bits(p, p->index4[0], I4_BITS);
-    		ret |= add_bits(p, p->data4[1], 32);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + D4_BITS))						|
+        		 	(((uint64_t) p->index4[0]) << (D4_BITS))								|
+        		 	(((uint64_t) p->data4[1]));
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + D4_BITS);
     	    break;
 		case 0x15:	// { I4, D2, I2, N0 }, 33 bits
-       		ret |= add_bits(p, p->index4[0], I4_BITS);
-    		ret |= add_bits(p, p->data2[2], 16);
-    		ret |= add_bits(p, p->index2[3], I2_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + D2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->index4[0]) << (D2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->data2[2])  << (I2_BITS))								|
+        		 	(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x16:	// { I4, I2, D2, N0 }, 33 bits
-       		ret |= add_bits(p, p->index4[0], I4_BITS);
-    		ret |= add_bits(p, p->index2[2], I2_BITS);
-    		ret |= add_bits(p, p->data2[3], 16);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + I2_BITS + D2_BITS))			|
+        		 	(((uint64_t) p->index4[0]) << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
+        		 	(((uint64_t) p->data2[3]));
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x17:	// { I4, I2, I2, N0 }, 25 bits
-       		ret |= add_bits(p, p->index4[0], I4_BITS);
-    		ret |= add_bits(p, p->index2[2], I2_BITS);
-    		ret |= add_bits(p, p->index2[3], I2_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + I2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->index4[0]) << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
+        		 	(((uint64_t) p->index2[3]));
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x18:	// { I4, I4, N0, N0 }, 18 bits
-    		ret |= add_bits(p, p->index4[0], I4_BITS);
-			ret |= add_bits(p, p->index4[1], I4_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + I4_BITS))						|
+        		 	(((uint64_t) p->index4[0]) << (I4_BITS))								|
+        		 	(((uint64_t) p->index4[1]));
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + I4_BITS);
     	    break;
 		case 0x19:	// { I8, N0, N0, N0 }, 8 bits
-    		ret = add_bits(p, p->index8[0], I8_BITS);
+			out =	(((uint64_t) TEMPLATE_KEY) << (I8_BITS))								|
+        		 	(((uint64_t) p->index8[0]));
+        	ret = add_bits(p, out, OP_BITS + I8_BITS);
     	    break;
         default:
         	fprintf(stderr, "Invalid template: %x\n", TEMPLATE_KEY);

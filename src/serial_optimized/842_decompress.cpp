@@ -55,9 +55,9 @@ static uint8_t decomp_ops[OPS_MAX][4] = {
 
 
 #define beN_to_cpu(d, s)					\
-	((s) == 2 ? swap_endianness16(read16((__be16 *)d)) :	\
-	 (s) == 4 ? swap_endianness32(read32((__be32 *)d)) :	\
-	 (s) == 8 ? swap_endianness64(read64((__be64 *)d)) :	\
+	((s) == 2 ? swap_endianness16(read16(d)) :	\
+	 (s) == 4 ? swap_endianness32(read32(d)) :	\
+	 (s) == 8 ? swap_endianness64(read64(d)) :	\
 	 0)
 
 static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n);
@@ -107,11 +107,11 @@ static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n)
 	if (bits <= 8)
 		*d = *in >> (8 - bits);
 	else if (bits <= 16)
-		*d = swap_endianness16(read16((__be16 *)in)) >> (16 - bits);
+		*d = swap_endianness16(read16(in)) >> (16 - bits);
 	else if (bits <= 32)
-		*d = swap_endianness32(read32((__be32 *)in)) >> (32 - bits);
+		*d = swap_endianness32(read32(in)) >> (32 - bits);
 	else
-		*d = swap_endianness64(read64((__be64 *)in)) >> (64 - bits);
+		*d = swap_endianness64(read64(in)) >> (64 - bits);
 
 	*d &= GENMASK_ULL(n - 1, 0);
 
@@ -140,13 +140,13 @@ static int do_data(struct sw842_param_decomp *p, uint8_t n)
 
 	switch (n) {
 	case 2:
-		write16((__be16 *)p->out, swap_endianness16(v));
+		write16(p->out, swap_endianness16(v));
 		break;
 	case 4:
-		write32((__be32 *)p->out, swap_endianness32(v));
+		write32(p->out, swap_endianness32(v));
 		break;
 	case 8:
-		write64((__be64 *)p->out, swap_endianness64(v));
+		write64(p->out, swap_endianness64(v));
 		break;
 	default:
 		return -EINVAL;
@@ -278,7 +278,7 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 {
 	struct sw842_param_decomp p;
 	int ret;
-	uint64_t op, rep, tmp, bytes, total;
+	uint64_t op, rep, total;
 	uint64_t crc;
 
 	p.in = (uint8_t *)in;
@@ -330,24 +330,6 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 			memset(p.out, 0, 8);
 			p.out += 8;
 			p.olen -= 8;
-
-			break;
-		case OP_SHORT_DATA:
-			ret = next_bits(&p, &bytes, SHORT_DATA_BITS);
-			if (ret)
-				return ret;
-
-			if (!bytes || bytes > SHORT_DATA_BITS_MAX)
-				return -EINVAL;
-
-			while (bytes-- > 0) {
-				ret = next_bits(&p, &tmp, 8);
-				if (ret)
-					return ret;
-				*p.out = (uint8_t)tmp;
-				p.out++;
-				p.olen--;
-			}
 
 			break;
 		case OP_END:
