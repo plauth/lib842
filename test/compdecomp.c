@@ -30,7 +30,8 @@ int main( int argc, const char* argv[])
 	in = out = decompressed = NULL;
 	unsigned int ilen, olen, dlen;
 	ilen = olen = dlen = 0;
-	long long timestart, timeend;
+	long long timestart_comp, timeend_comp;
+	long long timestart_decomp, timeend_decomp;
 
 	if(argc <= 1) {
 		ilen = 32;
@@ -85,12 +86,12 @@ int main( int argc, const char* argv[])
 	if(ilen > CHUNK_SIZE) {
 		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
 		unsigned int acc_olen = 0;
-		unsigned int chunk_dlen;
+		
 
 		int num_chunks = ilen / CHUNK_SIZE;
 
-		timestart = timestamp();
-		#pragma omp parallel for
+		timestart_comp = timestamp();
+		#pragma omp parallel for reduction(+ : acc_olen)
 		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			
 			unsigned int chunk_olen = CHUNK_SIZE * 2;
@@ -104,16 +105,20 @@ int main( int argc, const char* argv[])
 			#endif
 			acc_olen += chunk_olen;
 		}
-		timeend = timestamp();
+		timeend_comp = timestamp();
 		
-		uint8_t* chunk_in = in;
-		uint8_t* chunk_out = out;
-		uint8_t* chunk_decomp = decompressed;
 		int chunk_olen = CHUNK_SIZE * 2;
 
 
-		for(unsigned int out_chunk_pos = 0; out_chunk_pos < olen; out_chunk_pos+=(CHUNK_SIZE * 2)) {
-			chunk_dlen = CHUNK_SIZE;
+		timestart_decomp = timestamp();
+		#pragma omp parallel for
+		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+			unsigned int chunk_dlen = CHUNK_SIZE;
+
+			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
+			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
+			uint8_t* chunk_decomp = in + (CHUNK_SIZE * chunk_num);
+			
 			
 			#ifdef USEHW
 			hw842_decompress(chunk_out, chunk_olen, chunk_decomp, &chunk_dlen);
@@ -125,16 +130,14 @@ int main( int argc, const char* argv[])
 				fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
 				//return -1;
 			}
-
-			chunk_in += CHUNK_SIZE;
-			chunk_out += (CHUNK_SIZE*2);
-			chunk_decomp += CHUNK_SIZE;
 		}
+		timeend_decomp = timestamp();
 
 		printf("Input: %d bytes\n", ilen);
 		printf("Output: %d bytes\n", acc_olen);
 		printf("Compression factor: %f\n", (float) acc_olen / (float) ilen);
-		printf("Compression performance: %lld ms / %f MiB/s\n", timeend - timestart, (ilen / 1024 / 1024) / ((float) (timeend - timestart) / 1000));
+		printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
+		printf("Decompression performance: %lld ms / %f MiB/s\n", timeend_decomp - timestart_decomp, (ilen / 1024 / 1024) / ((float) (timeend_decomp - timestart_decomp) / 1000));
 
 		printf("Compression- and decompression was successful!\n");
 	} else {
