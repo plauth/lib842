@@ -167,6 +167,7 @@ template<uint8_t NBITS, uint8_t SBITS> static int __split_add_bits(struct sw842_
 }
 
 template<uint8_t NBITS> static int add_bits(struct sw842_param *p, uint64_t d) {
+	int b = p->bit;
 	uint8_t bits = p->bit + NBITS;
 	uint8_t s = round_up(bits, 8) - bits;
 	uint64_t o;
@@ -193,7 +194,7 @@ template<uint8_t NBITS> static int add_bits(struct sw842_param *p, uint64_t d) {
 		return -ENOSPC;
  
 	//outbits += n;
-	o = *out & bmask[p->bit];
+	o = *out & bmask[b];
 	d <<= s;
 
 	switch(NBITS) {
@@ -709,10 +710,10 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	}
 
 	/* make initial 'last' different so we don't match the first time */
-	last = ~read64((uint64_t *)p->in);
+	last = ~read64(p->in);
 
 	while (p->ilen > 7) {
-		next = read64((uint64_t *)p->in);
+		next = read64(p->in);
 
 		/* must get the next data, as we need to update the hashtable
 		 * entries with the new data every time

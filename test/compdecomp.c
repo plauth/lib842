@@ -24,7 +24,7 @@ int main( int argc, const char* argv[])
 	ilen = olen = dlen = 0;
 
 	if(argc <= 1) {
-		ilen = 8;
+		ilen = 32;
 		olen = ilen * 2;
 		#ifdef USEHW
 		dlen = ilen * 2;
@@ -35,13 +35,13 @@ int main( int argc, const char* argv[])
 		out = (uint8_t*) malloc(olen);
 		decompressed = (uint8_t*) malloc(dlen);
 
-		uint8_t tmp[] = "00112233";
+		uint8_t tmp[] = "0011223344556677889900AABBCCDDEE";
 
 		memset(in, 0, ilen);
 		memset(out, 0, olen);
 		memset(decompressed, 0, dlen);
 
-		strncpy((char *) in, (const char *) tmp, 8);
+		strncpy((char *) in, (const char *) tmp, 32);
 
 	} else if (argc == 2) {
 		FILE *fp;
@@ -141,7 +141,18 @@ int main( int argc, const char* argv[])
 		printf("Output: %d bytes\n", olen);
 		printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
+		for (int i = 0; i < 32; i++) {
+			printf("%02x:", in[i]);
+		}
 
+		printf("\n\n");
+
+		for (int i = 0; i < 32; i++) {
+			printf("%02x:", decompressed[i]);
+		}
+
+		printf("\n\n");
+	
 		if (memcmp(in, decompressed, ilen) == 0) {
 			printf("Compression- and decompression was successful!\n");
 		} else {
