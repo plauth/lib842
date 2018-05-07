@@ -7,7 +7,7 @@ CXX=g++
 endif
 
 CC_FLAGS=-Wall -fPIC -g -O3
-CXX_FLAGS=-Wall -fPIC -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow
+CXX_FLAGS=-Wall -fPIC -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp
 
 
 MODULES   := serial serial_optimized cryptodev
