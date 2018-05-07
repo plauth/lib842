@@ -44,7 +44,7 @@ $(OBJ_DIR_SERIAL_OPT)/%.o: $(SRC_DIR_SERIAL_OPT)/%.cpp
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
 
 $(OBJ_DIR_CRYPTODEV)/%.o: $(SRC_DIR_CRYPTODEV)/%.c
-	$(CC) $(CC_FLAGS) -c $< -o $@
+	$(CXX) $(CXX_FLAGS) -c $< -o $@
 
 serial_lib: checkdirs $(OBJ_FILES_SERIAL)
 	$(CC) $(CC_FLAGS) -shared -Wl,-soname,lib842.so -Wl,--no-as-needed -o bin/serial/lib842.so $(OBJ_FILES_SERIAL)
@@ -69,13 +69,13 @@ test_serial_optimized_standalone: checkdirs $(OBJ_FILES_SERIAL_OPT)
 	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_SERIAL_OPT) test/compdecomp.c -o bin/serial_optimized/compdecomp -I./include 
 	bin/serial_optimized/compdecomp
 
-goldenunit: test_serial_optimized_standalone test_cryptodev
-	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV) test/goldenunit.c -o bin/cryptodev/goldenunit -I./include 
-	bin/serial_optimized/goldenunit
-
 test_cryptodev: checkdirs $(OBJ_FILES_CRYPTODEV)
-	$(CC) $(CC_FLAGS) $(OBJ_FILES_CRYPTODEV) -DUSEHW=1 test/compdecomp.c -o bin/cryptodev/compdecomp -I./include 
+	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_CRYPTODEV) -DUSEHW=1 test/compdecomp.c -o bin/cryptodev/compdecomp -I./include 
 	bin/cryptodev/compdecomp
+
+goldenunit: test_serial_optimized_standalone test_cryptodev
+	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_CRYPTODEV) $(OBJ_FILES_SERIAL_OPT) test/goldenunit.c -o bin/serial_optimized/goldenunit -I./include 
+	bin/serial_optimized/goldenunit
 
 ifeq ($(shell uname),Darwin)
 standalone: test_serial_standalone test_serial_optimized_standalone

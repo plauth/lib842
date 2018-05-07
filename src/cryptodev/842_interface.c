@@ -81,8 +81,8 @@ int c842_compress(struct cryptodev_ctx* ctx, const void* input, unsigned int ile
 	cryp.ses = ctx->sess.ses;
 	cryp.len = ilen;
 	cryp.dlen = *olen;
-	cryp.src = (void*)input;
-	cryp.dst = output;
+	cryp.src = (__u8*)input;
+	cryp.dst = (__u8*)output;
 	cryp.op = COP_ENCRYPT;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
 		fprintf(stderr, "ioctl(CIOCCRYPT)\n");
@@ -120,8 +120,8 @@ int c842_decompress(struct cryptodev_ctx* ctx, const void* input, unsigned int i
 	cryp.ses = ctx->sess.ses;
 	cryp.len = ilen;
 	cryp.dlen = *olen;
-	cryp.src = (void*)input;
-	cryp.dst = output;
+	cryp.src = (__u8*)input;
+	cryp.dst = (__u8*)output;
 	cryp.op = COP_DECRYPT;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
 		fprintf(stderr, "ioctl(CIOCCRYPT)\n");

@@ -74,7 +74,7 @@ int main( int argc, const char* argv[])
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 			
-			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
+			hw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
 			acc_olen += chunk_olen;
 		}
 
@@ -86,7 +86,7 @@ int main( int argc, const char* argv[])
 		for(unsigned int out_chunk_pos = 0; out_chunk_pos < olen; out_chunk_pos+=(CHUNK_SIZE * 2)) {
 			chunk_dlen = CHUNK_SIZE;
 			
-			hw842_decompress(chunk_out, chunk_olen, chunk_decomp, &chunk_dlen);
+			sw842_decompress(chunk_out, chunk_olen, chunk_decomp, &chunk_dlen);
 
 			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) == 0)) {
 				fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
@@ -105,8 +105,22 @@ int main( int argc, const char* argv[])
 		printf("Compression- and decompression was successful!\n");
 	} else {
 
+		hw842_compress(in, ilen, out, &olen);
+		printf("Compressed result (HW):\n");
+		for (int i = 0; i < 16; i++) {
+			printf("%02x:", out[i]);
+		}
+		printf("\n\n");
+		memset(out, 0, olen);
+
 		sw842_compress(in, ilen, out, &olen);
-		hw842_decompress(out, olen, decompressed, &dlen);
+		printf("Compressed result (SW):\n");
+		for (int i = 0; i < 16; i++) {
+			printf("%02x:", out[i]);
+		}
+		printf("\n\n");
+
+		sw842_decompress(out, olen, decompressed, &dlen);
 
 		printf("Input: %d bytes\n", ilen);
 		printf("Output: %d bytes\n", olen);
