@@ -348,6 +348,7 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 	 * next bit after End of stream template.
 	 */
 	ret = next_bits(&p, &crc, CRC_BITS);
+	crc = swap_endianness32(crc);
 	
 	if (ret)
 		return ret;

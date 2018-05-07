@@ -73,9 +73,11 @@ test_cryptodev: checkdirs $(OBJ_FILES_CRYPTODEV)
 	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_CRYPTODEV) -DUSEHW=1 test/compdecomp.c -o bin/cryptodev/compdecomp -I./include 
 	bin/cryptodev/compdecomp
 
-goldenunit: test_serial_optimized_standalone test_cryptodev
-	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_CRYPTODEV) $(OBJ_FILES_SERIAL_OPT) test/goldenunit.c -o bin/serial_optimized/goldenunit -I./include 
-	bin/serial_optimized/goldenunit
+goldenunit: checkdirs $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV)
+	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_CRYPTODEV) $(OBJ_FILES_SERIAL_OPT) test/goldenunit1.c -o bin/serial_optimized/goldenunit1 -I./include 
+	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_CRYPTODEV) $(OBJ_FILES_SERIAL_OPT) test/goldenunit2.c -o bin/serial_optimized/goldenunit2 -I./include 
+	bin/serial_optimized/goldenunit1
+	bin/serial_optimized/goldenunit2
 
 ifeq ($(shell uname),Darwin)
 standalone: test_serial_standalone test_serial_optimized_standalone

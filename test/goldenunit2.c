@@ -98,37 +98,14 @@ int main( int argc, const char* argv[])
 			chunk_decomp += CHUNK_SIZE;
 		}
 
-		printf("Input: %d bytes\n", ilen);
-		printf("Output: %d bytes\n", acc_olen);
-		printf("Compression factor: %f\n", (float) acc_olen / (float) ilen);
-
-		printf("Compression- and decompression was successful!\n");
+		printf("Compression (HW) and decompression (SW) was successful!\n");
 	} else {
 
 		hw842_compress(in, ilen, out, &olen);
-		printf("Compressed result (HW):\n");
-		for (int i = 0; i < 16; i++) {
-			printf("%02x:", out[i]);
-		}
-		printf("\n\n");
-		memset(out, 0, olen);
-
-		sw842_compress(in, ilen, out, &olen);
-		printf("Compressed result (SW):\n");
-		for (int i = 0; i < 16; i++) {
-			printf("%02x:", out[i]);
-		}
-		printf("\n\n");
-
 		sw842_decompress(out, olen, decompressed, &dlen);
 
-		printf("Input: %d bytes\n", ilen);
-		printf("Output: %d bytes\n", olen);
-		printf("Compression factor: %f\n", (float) olen / (float) ilen);
-
-
 		if (memcmp(in, decompressed, ilen) == 0) {
-			printf("Compression- and decompression was successful!\n");
+			printf("Compression (HW) and decompression (SW) was successful!\n");
 		} else {
 			fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
 			return -1;

@@ -719,7 +719,7 @@ repeat:
 	 */
 	crc = crc32_be(0, (const unsigned char *) in, ilen);
 
-	ret = add_bits(p, crc, CRC_BITS);
+	ret = add_bits(p, swap_endianness32(crc), CRC_BITS);
 	if (ret)
 		return ret;
 
