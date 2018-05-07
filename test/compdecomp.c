@@ -2,9 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef USEHW
 #include "hw842.h"
+#else
 #include "sw842.h"
+#endif
 
+//#define CHUNK_SIZE 32768
 #define CHUNK_SIZE 4096
 
 
@@ -22,7 +26,11 @@ int main( int argc, const char* argv[])
 	if(argc <= 1) {
 		ilen = 8;
 		olen = ilen * 2;
+		#ifdef USEHW
 		dlen = ilen * 2;
+		#else
+		dlen = ilen;
+		#endif
 		in = (uint8_t*) malloc(ilen);
 		out = (uint8_t*) malloc(olen);
 		decompressed = (uint8_t*) malloc(dlen);
@@ -45,7 +53,11 @@ int main( int argc, const char* argv[])
 		ilen = nextMultipleOfChunkSize(ilen);
 		printf("original file length (padded): %d\n", ilen);
 		olen = ilen * 2;
+		#ifdef USEHW
 		dlen = ilen * 2;
+		#else
+		dlen = ilen;
+		#endif
 		fseek(fp, 0, SEEK_SET);
 
 		in = (uint8_t*) malloc(ilen);
@@ -74,7 +86,11 @@ int main( int argc, const char* argv[])
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 			
+			#ifdef USEHW
+			hw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
+			#else
 			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
+			#endif
 			acc_olen += chunk_olen;
 		}
 
@@ -86,7 +102,11 @@ int main( int argc, const char* argv[])
 		for(unsigned int out_chunk_pos = 0; out_chunk_pos < olen; out_chunk_pos+=(CHUNK_SIZE * 2)) {
 			chunk_dlen = CHUNK_SIZE;
 			
+			#ifdef USEHW
 			hw842_decompress(chunk_out, chunk_olen, chunk_decomp, &chunk_dlen);
+			#else
+			sw842_decompress(chunk_out, chunk_olen, chunk_decomp, &chunk_dlen);
+			#endif
 
 			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) == 0)) {
 				fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
@@ -105,8 +125,17 @@ int main( int argc, const char* argv[])
 		printf("Compression- and decompression was successful!\n");
 	} else {
 
+		#ifdef USEHW
+		hw842_compress(in, ilen, out, &olen);
+		#else
 		sw842_compress(in, ilen, out, &olen);
+		#endif
+
+		#ifdef USEHW
 		hw842_decompress(out, olen, decompressed, &dlen);
+		#else
+		sw842_decompress(out, olen, decompressed, &dlen);
+		#endif
 
 		printf("Input: %d bytes\n", ilen);
 		printf("Output: %d bytes\n", olen);
