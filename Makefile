@@ -52,26 +52,30 @@ serial_lib: checkdirs $(OBJ_FILES_SERIAL)
 clean:
 	rm -Rf obj
 	rm -Rf bin
-	rm -Rf test/simple_test
+	rm -Rf test/compdecomp
 	rm -Rf vec.out
 
 checkdirs: $(OBJ_DIR) $(BIN_DIR)
 
 test_serial_standalone: checkdirs $(OBJ_FILES_SERIAL)
-	$(CC) $(CC_FLAGS) $(OBJ_FILES_SERIAL) test/simple_test.c -o bin/serial/simple_test -I./include 
-	bin/serial/simple_test
+	$(CC) $(CC_FLAGS) $(OBJ_FILES_SERIAL) test/compdecomp.c -o bin/serial/compdecomp -I./include 
+	bin/serial/compdecomp
 
 test_serial_lib: serial_lib
-	$(CC) $(CC_FLAGS) test/simple_test.c -o test/simple_test -I./include -L./bin/serial/ -l842
-	LD_LIBRARY_PATH=$(shell pwd)/$(BIN_DIR):$(shell echo $$LD_LIBRARY_PATH) test/simple_test
+	$(CC) $(CC_FLAGS) test/compdecomp.c -o test/compdecomp -I./include -L./bin/serial/ -l842
+	LD_LIBRARY_PATH=$(shell pwd)/$(BIN_DIR):$(shell echo $$LD_LIBRARY_PATH) test/compdecomp
 
 test_serial_optimized_standalone: checkdirs $(OBJ_FILES_SERIAL_OPT)
-	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_SERIAL_OPT) test/simple_test.c -o bin/serial_optimized/simple_test -I./include 
-	bin/serial_optimized/simple_test
+	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_SERIAL_OPT) test/compdecomp.c -o bin/serial_optimized/compdecomp -I./include 
+	bin/serial_optimized/compdecomp
+
+goldenunit: test_serial_optimized_standalone test_cryptodev
+	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV) test/goldenunit.c -o bin/cryptodev/goldenunit -I./include 
+	bin/serial_optimized/goldenunit
 
 test_cryptodev: checkdirs $(OBJ_FILES_CRYPTODEV)
-	$(CC) $(CC_FLAGS) $(OBJ_FILES_CRYPTODEV) -DUSEHW=1 test/simple_test.c -o bin/cryptodev/simple_test -I./include 
-	bin/cryptodev/simple_test
+	$(CC) $(CC_FLAGS) $(OBJ_FILES_CRYPTODEV) -DUSEHW=1 test/compdecomp.c -o bin/cryptodev/compdecomp -I./include 
+	bin/cryptodev/compdecomp
 
 ifeq ($(shell uname),Darwin)
 standalone: test_serial_standalone test_serial_optimized_standalone
