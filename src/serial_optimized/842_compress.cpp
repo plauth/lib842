@@ -22,7 +22,6 @@
 
 #define INDEX_NOT_FOUND		(-1)
 #define INDEX_NOT_CHECKED	(-2)
-#define assume(cond) do { if (!(cond)) __builtin_unreachable(); } while (0)
 
 /*
 template<typename V, uint8_t dictBits> static inline void hash_vec(V* __restrict__ input, V* __restrict__ hash) {
@@ -169,8 +168,6 @@ template<uint8_t NBITS, uint8_t SBITS> static int __split_add_bits(struct sw842_
 
 template<uint8_t NBITS> static int add_bits(struct sw842_param *p, uint64_t d) {
 	uint8_t bits = p->bit + NBITS;
-	assume(bits >= NBITS && bits <= NBITS + 7);
-
 	uint8_t s = round_up(bits, 8) - bits;
 	uint64_t o;
 	uint8_t *out = p->out;
@@ -199,22 +196,75 @@ template<uint8_t NBITS> static int add_bits(struct sw842_param *p, uint64_t d) {
 	o = *out & bmask[p->bit];
 	d <<= s;
 
-	if (bits <= 8)
-		*out = o | d;
-	else if (bits <= 16)
-		write16(out, swap_endianness16(o << 8 | d));
-	else if (bits <= 24)
-		write32(out, swap_endianness32(o << 24 | d << 8));
-	else if (bits <= 32)
-		write32(out, swap_endianness32(o << 24 | d));
-	else if (bits <= 40)
-		write64(out, swap_endianness64(o << 56 | d << 24));
-	else if (bits <= 48)
-		write64(out, swap_endianness64(o << 56 | d << 16));
-	else if (bits <= 56)
-		write64(out, swap_endianness64(o << 56 | d << 8));
-	else
-		write64(out, swap_endianness64(o << 56 | d));
+	switch(NBITS) {
+		case 5: // bits <= 12
+			if (bits <= 8)
+				*out = o | d;
+			else if (bits <= 16)
+				write16(out, swap_endianness16(o << 8 | d));
+			break;
+		case 13: // bits <= 20
+		case 16: // bits <= 23
+			if (bits <= 16)
+				write16(out, swap_endianness16(o << 8 | d));
+			else if (bits <= 24)
+				write32(out, swap_endianness32(o << 24 | d << 8));
+			break;
+		case 23: // bits <= 30
+			if (bits <= 24)
+				write32(out, swap_endianness32(o << 24 | d << 8));
+			else if (bits <= 32)
+				write32(out, swap_endianness32(o << 24 | d));
+			break;
+		case 30: // bits <= 37
+			if (bits <= 32)
+				write32(out, swap_endianness32(o << 24 | d));
+			else if (bits <= 40)
+				write64(out, swap_endianness64(o << 56 | d << 24));
+			break;
+		case 37: // bits <= 44
+		case 38: // bits <= 45
+			if (bits <= 40)
+				write64(out, swap_endianness64(o << 56 | d << 24));
+			else if (bits <= 48)
+				write64(out, swap_endianness64(o << 56 | d << 16));
+			break;
+		case 45: // bits <= 52
+		case 46: // bits <= 53
+			if (bits <= 48)
+				write64(out, swap_endianness64(o << 56 | d << 16));
+			else if (bits <= 56)
+				write64(out, swap_endianness64(o << 56 | d << 8));
+			break;
+		case 53: //bits <= 60
+			if (bits <= 56)
+				write64(out, swap_endianness64(o << 56 | d << 8));
+			else
+				write64(out, swap_endianness64(o << 56 | d));
+			break;
+		case 61:
+		case 64:
+			write64(out, swap_endianness64(o << 56 | d));
+			break;
+		default:
+			if (bits <= 8)
+				*out = o | d;
+			else if (bits <= 16)
+				write16(out, swap_endianness16(o << 8 | d));
+			else if (bits <= 24)
+				write32(out, swap_endianness32(o << 24 | d << 8));
+			else if (bits <= 32)
+				write32(out, swap_endianness32(o << 24 | d));
+			else if (bits <= 40)
+				write64(out, swap_endianness64(o << 56 | d << 24));
+			else if (bits <= 48)
+				write64(out, swap_endianness64(o << 56 | d << 16));
+			else if (bits <= 56)
+				write64(out, swap_endianness64(o << 56 | d << 8));
+			else
+				write64(out, swap_endianness64(o << 56 | d));
+	}
+
 
 	p->bit += NBITS;
 
@@ -432,11 +482,11 @@ static int add_repeat_template(struct sw842_param *p, uint8_t r)
 	if (!r || --r > REPEAT_BITS_MAX)
 		return -EINVAL;
 
-	ret = add_bits<OP_BITS>(p, OP_REPEAT);
-	if (ret)
-		return ret;
+	uint64_t out =	(((uint64_t) OP_REPEAT) << (REPEAT_BITS))								|
+        		 	(((uint64_t) r));
 
-	ret = add_bits<REPEAT_BITS>(p, r);
+    ret = add_bits<OP_BITS + REPEAT_BITS>(p, out);
+
 	if (ret)
 		return ret;
 
