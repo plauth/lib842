@@ -2,8 +2,9 @@ ifeq ($(shell uname),Darwin)
 CC=gcc-7
 CXX=g++-7
 else
-CC=gcc
-CXX=g++
+CC=/opt/at11.0/bin/gcc
+CXX=/opt/at11.0/bin/g++
+NVCC=nvcc
 endif
 
 CC_FLAGS=-Wall -fPIC -g -O3
@@ -78,6 +79,9 @@ goldenunit: checkdirs $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV)
 	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_CRYPTODEV) $(OBJ_FILES_SERIAL_OPT) test/goldenunit2.c -o bin/serial_optimized/goldenunit2 -I./include 
 	bin/serial_optimized/goldenunit1
 	bin/serial_optimized/goldenunit2
+
+cuda:
+	$(NVCC) test/transferbench.cu  -g -O3 obj/serial_optimized/842_decompress.o obj/serial_optimized/842_compress.o -o transferbench -I./include -D_FORCE_INLINES
 
 ifeq ($(shell uname),Darwin)
 standalone: test_serial_standalone test_serial_optimized_standalone
