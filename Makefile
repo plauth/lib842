@@ -1,17 +1,22 @@
 ifeq ($(shell uname),Darwin)
 CC=gcc-7
 CXX=g++-7
+CC_FLAGS=-Wall -std=c99 -fPIC -g -O3
+else ifeq ($(shell uname),AIX)
+CC=gcc
+CXX=g++
+CC_FLAGS=-Wall -maix64 -std=c11 -fPIC -g -O3 -Wl,-b64 -fopenmp
 else
 CC=/opt/at11.0/bin/gcc
 CXX=/opt/at11.0/bin/g++
+CC_FLAGS=-Wall -std=c99 -fPIC -g -O3
 NVCC=nvcc
 endif
 
-CC_FLAGS=-Wall -fPIC -g -O3
 CXX_FLAGS=-Wall -fPIC -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp
 
 
-MODULES   := serial serial_optimized cryptodev
+MODULES   := serial serial_optimized cryptodev aix
 OBJ_DIR := $(addprefix obj/,$(MODULES))
 BIN_DIR := $(addprefix bin/,$(MODULES))
 
@@ -36,7 +41,11 @@ OBJ_FILES_CRYPTODEV := $(patsubst $(SRC_DIR_CRYPTODEV)/%.c,$(OBJ_DIR_CRYPTODEV)/
 .PHONY: all checkdirs clean
 #.check-env:
 
+ifeq ($(shell uname),AIX)
+all: checkdirs test_aix_standalone
+else
 all: checkdirs standalone
+endif
 
 $(OBJ_DIR_SERIAL)/%.o: $(SRC_DIR_SERIAL)/%.c
 	$(CC) $(CC_FLAGS) -c $< -o $@
@@ -82,6 +91,10 @@ goldenunit: checkdirs $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV)
 
 cuda:
 	$(NVCC) test/transferbench.cu  -g -O3 obj/serial_optimized/842_decompress.o obj/serial_optimized/842_compress.o -o transferbench -I./include -D_FORCE_INLINES
+
+test_aix_standalone: checkdirs test/compdecomp_aix.c	
+	$(CC) -O3 -std=c11 test/compdecomp_aix.c -o bin/aix/compdecomp -Wl,-b64 -maix64 -fopenmp
+	LIBPATH=/opt/freeware/lib64 bin/aix/compdecomp
 
 ifeq ($(shell uname),Darwin)
 standalone: test_serial_standalone test_serial_optimized_standalone
