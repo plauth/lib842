@@ -71,9 +71,13 @@ int main( int argc, const char* argv[])
 		fseek(fp, 0, SEEK_END);
 		unsigned int flen = ftell(fp);
 		ilen = flen;
+		#ifndef BENCHMARK
 		printf("original file length: %d\n", ilen);
+		#endif
 		ilen = nextMultipleOfChunkSize(ilen);
+		#ifndef BENCHMARK
 		printf("original file length (padded): %d\n", ilen);
+		#endif
 		olen = ilen * 2;
 		dlen = ilen * 2;
 		fseek(fp, 0, SEEK_SET);
@@ -104,7 +108,9 @@ int main( int argc, const char* argv[])
 	}
 
 	if(ilen > CHUNK_SIZE) {
+		#ifndef BENCHMARK
 		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
+		#endif
 		size_t acc_olen = 0;
 		ret = 0;
 	
@@ -154,7 +160,9 @@ int main( int argc, const char* argv[])
 			}
 		}
 		timeend_decomp = timestamp();
-		
+		#ifdef BENCHMARK
+		printf("%.4f,%.4f\n", (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000), (ilen / 1024 / 1024) / ((float) (timeend_decomp - timestart_decomp) / 1000));
+		#else
 		printf("Input: %d bytes\n", ilen);
 		printf("Output: %d bytes\n", currentChunkPos);
 		printf("Compression factor: %f\n", (float) currentChunkPos / (float) ilen);
@@ -162,6 +170,7 @@ int main( int argc, const char* argv[])
 		printf("Decompression performance: %lld ms / %f MiB/s\n", timeend_decomp - timestart_decomp, (ilen / 1024 / 1024) / ((float) (timeend_decomp - timestart_decomp) / 1000));
 
 		printf("Compression- and decompression was successful!\n");
+		#endif
 		} else {
 		ret = accel_compress(in, ilen, out, &olen, 0);
 		if (ret < 0) {
