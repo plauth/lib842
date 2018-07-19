@@ -1,5 +1,5 @@
 CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
-CXX_FLAGS	:= -Wall -fPIC -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp
+CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp
 
 ifeq ($(shell uname),Darwin)
 CC=gcc-7
@@ -9,12 +9,12 @@ else ifeq ($(shell uname),AIX)
 CC=gcc
 CXX=g++
 CC_FLAGS+=-maix64 -Wl,-b64
-else ifeq ($(shell uname),ppc64le)
+else ifeq ($(shell uname -p),ppc64le)
 CC=/opt/at11.0/bin/gcc
 CXX=/opt/at11.0/bin/g++
 NVCC=nvcc
 LDFLAGS_OCL := -lOpenCL
-else ifeq ($(shell uname),x86_64)
+else ifeq ($(shell uname -p),x86_64)
 CC=gcc
 CXX=g++
 LDFLAGS_OCL := -lOpenCL

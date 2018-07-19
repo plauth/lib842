@@ -49,7 +49,7 @@ void CL842Kernels::prepareDecompressKernel() {
             cl::vector<cl::Device> devices;
             devices = context.getInfo<CL_CONTEXT_DEVICES>();
             checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
-            std::string log = decompressProg.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0], &err);
+            std::string log = decompressProg.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0], NULL);
             std::cerr << "Build Log: " << log << std::endl;
         }
         checkErr(err, "cl::Programm::build()");
