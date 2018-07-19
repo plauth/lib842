@@ -53,13 +53,6 @@ static uint8_t decomp_ops[OPS_MAX][4] = {
 };
 
 
-
-#define beN_to_cpu(d, s)					\
-	((s) == 2 ? swap_endianness16(read16(d)) :	\
-	 (s) == 4 ? swap_endianness32(read32(d)) :	\
-	 (s) == 8 ? swap_endianness64(read64(d)) :	\
-	 0)
-
 static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n);
 
 static int __split_next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n, uint8_t s)
@@ -193,14 +186,6 @@ static int __do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, 
 
 	if (size != 2 && size != 4 && size != 8)
 		printf("__do_index invalid size %x\n", size);
-	#ifdef DEBUG
-	else	
-		printf("index%x to %lx off %lx adjoff %lx tot %lx data %lx\n",
-			 size, (unsigned long)index,
-			 (unsigned long)(index * size), (unsigned long)offset,
-			 (unsigned long)total,
-			 (unsigned long)beN_to_cpu(&p->ostart[offset], size));
-	#endif
 
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;

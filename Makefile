@@ -1,19 +1,26 @@
+CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
+CXX_FLAGS	:= -Wall -fPIC -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp
+
 ifeq ($(shell uname),Darwin)
 CC=gcc-7
 CXX=g++-7
-CC_FLAGS=-Wall -std=c99 -fPIC -g -O3
+LDFLAGS_OCL := -framework OpenCL
 else ifeq ($(shell uname),AIX)
 CC=gcc
 CXX=g++
-CC_FLAGS=-Wall -maix64 -std=c11 -fPIC -g -O3 -Wl,-b64 -fopenmp
-else
+CC_FLAGS+=-maix64 -Wl,-b64
+else ifeq ($(shell uname),ppc64le)
 CC=/opt/at11.0/bin/gcc
 CXX=/opt/at11.0/bin/g++
-CC_FLAGS=-Wall -std=c99 -fPIC -g -O3
 NVCC=nvcc
+LDFLAGS_OCL := -lOpenCL
+else ifeq ($(shell uname),x86_64)
+CC=gcc
+CXX=g++
+LDFLAGS_OCL := -lOpenCL
 endif
 
-CXX_FLAGS=-Wall -fPIC -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp
+
 
 
 MODULES   := serial serial_optimized cryptodev aix
@@ -88,6 +95,9 @@ goldenunit: checkdirs $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV)
 	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_CRYPTODEV) $(OBJ_FILES_SERIAL_OPT) test/goldenunit2.c -o bin/serial_optimized/goldenunit2 -I./include 
 	bin/serial_optimized/goldenunit1
 	bin/serial_optimized/goldenunit2
+
+ocl:
+	$(CXX) $(CXX_FLAGS) $(LDFLAGS_OCL) src/ocl/842_decompress.cpp src/ocl/cl842kernels.cpp -o ocl_test -I./include
 
 cuda:
 	$(NVCC) test/transferbench.cu  -g -O3 obj/serial_optimized/842_decompress.o obj/serial_optimized/842_compress.o -o transferbench -I./include -D_FORCE_INLINES

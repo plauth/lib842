@@ -4,3 +4,6 @@ obj/
 bin/
 test/simple_test
 vec.out
+
+ocl_test
+ocl_test.dSYM

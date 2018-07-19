@@ -11,6 +11,7 @@
 
 //#define CHUNK_SIZE 32768
 #define CHUNK_SIZE 4096
+#define STRLEN 32
 
 
 long long timestamp() {
@@ -35,7 +36,7 @@ int main( int argc, const char* argv[])
 	long long timestart_condense, timeend_condense;
 
 	if(argc <= 1) {
-		ilen = 32;
+		ilen = STRLEN;
 		olen = ilen * 2;
 		#ifdef USEHW
 		dlen = ilen * 2;
@@ -52,7 +53,7 @@ int main( int argc, const char* argv[])
 		memset(out, 0, olen);
 		memset(decompressed, 0, dlen);
 
-		strncpy((char *) in, (const char *) tmp, 32);
+		strncpy((char *) in, (const char *) tmp, STRLEN);
 
 	} else if (argc == 2) {
 		FILE *fp;
@@ -178,9 +179,9 @@ int main( int argc, const char* argv[])
 		printf("Output: %d bytes\n", olen);
 		printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
-		/*
-		for (int i = 0; i < 32; i++) {
-			printf("%02x:", in[i]);
+		
+		for (int i = 0; i < 64; i++) {
+			printf("%02x:", out[i]);
 		}
 
 		printf("\n\n");
@@ -190,7 +191,7 @@ int main( int argc, const char* argv[])
 		}
 
 		printf("\n\n");
-		*/ 
+		
 		
 		if (memcmp(in, decompressed, ilen) == 0) {
 			printf("Compression- and decompression was successful!\n");
