@@ -286,9 +286,8 @@ __kernel void decompress(__global uchar *in, ulong ilen, __global uchar *out, __
     //__local uchar out_chunk[CHUNK_SIZE];
 
     struct decomp_params p;
-    ulong op = 255;
+    ulong op;
     ulong rep, total;
-    ulong crc;
 
     p.in = in;
     p.bit = 0;
