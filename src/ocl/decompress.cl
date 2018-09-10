@@ -124,33 +124,9 @@ static void write16(__global void* ptr, ushort value) { ((__global unalign*)ptr)
 static void write32(__global void* ptr, uint   value) { ((__global unalign*)ptr)->value32 = value; }
 static void write64(__global void* ptr, ulong  value) { ((__global unalign*)ptr)->value64 = value; }
 
-static void next_bits(struct decomp_params *p, ulong *d, uchar n);
-
-static void __split_next_bits(struct decomp_params *p, ulong *d, uchar n, uchar s) {
-    ulong tmp = 0;
-    int ret;
-
-    next_bits(p, &tmp, n - s);
-    next_bits(p, d, s);
-
-    *d |= tmp << s;
-}
-
-static void next_bits(struct decomp_params *p, ulong *d, uchar n) {
+static void __next_bits(struct decomp_params *p, ulong *d, uchar n) {
     __global uchar *in = p->in;
-    uchar b = p->bit;
-    uchar bits = b + n;
-
-    if (bits > 64) {
-        __split_next_bits(p, d, n, 32);
-        return;
-    } else if (p->ilen < 8 && bits > 32 && bits <= 56) {
-        __split_next_bits(p, d, n, 16);
-        return;
-    } else if (p->ilen < 4 && bits > 16 && bits <= 24) {
-        __split_next_bits(p, d, n, 8);
-        return;
-    }
+    uchar bits = p->bit + n;
 
     if (bits <= 8)
         *d = *in >> (8 - bits);
@@ -174,83 +150,31 @@ static void next_bits(struct decomp_params *p, ulong *d, uchar n) {
     }
 }
 
-/*
-static void _next_bits(struct decomp_params *p, ulong *d, uchar n);
-
-static void split_next_bits(struct decomp_params *p, ulong *d, uchar n, uchar s) {
+static void __split_next_bits(struct decomp_params *p, ulong *d, uchar n, uchar s) {
     ulong tmp = 0;
-    int ret;
 
-    _next_bits(p, &tmp, n - s);
-    _next_bits(p, d, s);
+    __next_bits(p, &tmp, n - s);
+    __next_bits(p, d, s);
 
     *d |= tmp << s;
 }
 
-static void _next_bits(struct decomp_params *p, ulong *d, uchar n) {
-    __global uchar *in = p->in;
-    uchar b = p->bit;
-    uchar bits = b + n;
-
-    if (bits <= 8)
-        *d = *in >> (8 - bits);
-    else if (bits <= 16)
-        *d = swap_endianness16(read16(in)) >> (16 - bits);
-    else if (bits <= 32)
-        *d = swap_endianness32(read32(in)) >> (32 - bits);
-    else
-        *d = swap_endianness64(read64(in)) >> (64 - bits);
-
-    *d &= GENMASK_ULL(n - 1, 0);
-
-    p->bit += n;
-
-    if (p->bit > 7) {
-        p->in += p->bit / 8;
-        p->ilen -= p->bit / 8;
-        p->bit %= 8;
-    }
-}
-
-
 static void next_bits(struct decomp_params *p, ulong *d, uchar n) {
+    uchar bits = p->bit + n;
 
-    __global uchar *in = p->in;
-    uchar b = p->bit;
-    uchar bits = b + n;
-
-    #ifdef DEBUG
-    printf("next_bits: n = %d, bits = %d ", n, bits);
-    #endif
-    
     if (bits > 64) {
-        split_next_bits(p, d, n, 32);
+        __split_next_bits(p, d, n, 32);
+        return;
     } else if (p->ilen < 8 && bits > 32 && bits <= 56) {
-        split_next_bits(p, d, n, 16);
+        __split_next_bits(p, d, n, 16);
+        return;
     } else if (p->ilen < 4 && bits > 16 && bits <= 24) {
-        split_next_bits(p, d, n, 8);
+        __split_next_bits(p, d, n, 8);
+        return;
     }
 
-    if (bits <= 8)
-        *d = *in >> (8 - bits);
-    else if (bits <= 16)
-        *d = swap_endianness16(read16(in)) >> (16 - bits);
-    else if (bits <= 32)
-        *d = swap_endianness32(read32(in)) >> (32 - bits);
-    else
-        *d = swap_endianness64(read64(in)) >> (64 - bits);
-
-    *d &= GENMASK_ULL(n - 1, 0);
-
-    p->bit += n;
-
-    if (p->bit > 7) {
-        p->in += p->bit / 8;
-        p->ilen -= p->bit / 8;
-        p->bit %= 8;
-    }
+    __next_bits(p, d, n);
 }
-*/
 
 static void do_data(struct decomp_params *p, uchar n) {
     ulong v;
