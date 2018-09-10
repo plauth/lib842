@@ -1,5 +1,5 @@
-CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
-CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp
+CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp -DDEBUG
+CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp -I/opt/amdgpu-pro/include -L/opt/amdgpu-pro/lib/x86_64-linux-gnu/ 
 
 ifeq ($(shell uname),Darwin)
 CC=gcc-7
@@ -17,7 +17,7 @@ LDFLAGS_OCL := -lOpenCL
 else ifeq ($(shell uname -p),x86_64)
 CC=gcc
 CXX=g++
-LDFLAGS_OCL := -lOpenCL
+LDFLAGS_OCL := -lOpenCL 
 endif
 
 
@@ -97,7 +97,7 @@ goldenunit: checkdirs $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV)
 	bin/serial_optimized/goldenunit2
 
 ocl:
-	$(CXX) $(CXX_FLAGS) $(LDFLAGS_OCL) src/ocl/842_decompress.cpp src/ocl/cl842kernels.cpp -o ocl_test -I./include
+	$(CXX) $(CXX_FLAGS) src/ocl/842_decompress.cpp src/ocl/cl842kernels.cpp  $(LDFLAGS_OCL) -o ocl_test -I./include
 
 cuda:
 	$(NVCC) test/transferbench.cu  -g -O3 obj/serial_optimized/842_decompress.o obj/serial_optimized/842_compress.o -o transferbench -I./include -D_FORCE_INLINES

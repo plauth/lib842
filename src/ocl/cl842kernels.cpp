@@ -11,13 +11,14 @@ CL842Kernels::CL842Kernels() {
         cl::vector< cl::Platform > platformList;
         cl::Platform::get(&platformList);
         checkErr(platformList.size()!=0 ? CL_SUCCESS : -1, "cl::Platform::get");
-        std::cerr << "Platform number is: " << platformList.size() << std::endl;
+        std::cerr << "Number of available platforms: " << platformList.size() << std::endl;
+        cl::Platform platform = platformList[1];
 
         std::string platformVendor;
-        platformList[0].getInfo((cl_platform_info)CL_PLATFORM_VENDOR, &platformVendor);
+        platform.getInfo((cl_platform_info)CL_PLATFORM_VENDOR, &platformVendor);
 
-        std::cerr << "Platform is by: " << platformVendor << "\n";
-        cl_context_properties cprops[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)(platformList[0])(), 0};
+        std::cerr << "Current platform vendor: " << platformVendor << "\n";
+        cl_context_properties cprops[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
         //platformList[0]()
         context = cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);
         checkErr(err, "Context::Context()");
@@ -60,15 +61,15 @@ void CL842Kernels::prepareDecompressKernel() {
 }
 
 
-int CL842Kernels::decompress(cl::Buffer in, unsigned int ilen, cl::Buffer out, cl::Buffer olen) {
+int CL842Kernels::decompress(cl::Buffer in, uint64_t ilen, cl::Buffer out, cl::Buffer olen) {
     cl_int err;
     err = decompressKernel.setArg(0, in);
     checkErr(err, "Kernel::setArg(0)");
-    err = decompressKernel.setArg(1, sizeof(unsigned int), &ilen);
+    err = decompressKernel.setArg(1, sizeof(uint64_t), &ilen);
     checkErr(err, "Kernel::setArg(1)");
     err = decompressKernel.setArg(2, out);
     checkErr(err, "Kernel::setArg(2)");
-    err = decompressKernel.setArg(3, out);
+    err = decompressKernel.setArg(3, olen);
     checkErr(err, "Kernel::setArg(3)");
 
     //size_t workgroup_size = getMaxWorkGroupSize(context);
@@ -93,5 +94,10 @@ void CL842Kernels::writeBuffer(cl::Buffer buffer, const void * ptr, size_t size)
 void CL842Kernels::readBuffer(cl::Buffer buffer, void * ptr, size_t size) {
     this->queue.enqueueReadBuffer(buffer, CL_TRUE, 0, size, ptr);
     checkErr(queue.finish(), "enqueueReadBuffer()");
+}
+
+void CL842Kernels::fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size) {
+    this->queue.enqueueFillBuffer(buffer, value, offset, size);
+    checkErr(queue.finish(), "enqueueFillBuffer()");
 }
 

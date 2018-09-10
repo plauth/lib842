@@ -43,12 +43,11 @@
 #define I8_FIFO_SIZE    (8 * (1 << I8_BITS))
 
 
-#define BITS_PER_LONG_LONG 64
-#define GENMASK_ULL(h, l) \
-    (((~0ULL) << (l)) & (~0ULL >> (BITS_PER_LONG_LONG - 1 - (h))))
+#define GENMASK_ULL(h) \
+    (~0ULL >> (64 - (h)))
 
-#define __round_mask(x, y) ((__typeof__(x))((y)-1))
-#define round_down(x, y) ((x) & ~__round_mask(x, y))
+#define __round_mask(y) ((ulong)((y)-1))
+#define round_down(x, y) ((x) & ~__round_mask(y))
 
 struct decomp_params {
     __global uchar *in;
@@ -56,7 +55,7 @@ struct decomp_params {
     ulong ilen;
     __global uchar *out;
     __global uchar *ostart;
-    __global unsigned int olen;
+    ulong olen;
 };
 
 __constant uchar decomp_ops[OPS_MAX][4] = {
@@ -121,23 +120,61 @@ static ushort read16(__global const void* ptr) { return ((__global const unalign
 static uint   read32(__global const void* ptr) { return ((__global const unalign*)ptr)->value32; }
 static ulong  read64(__global const void* ptr) { return ((__global const unalign*)ptr)->value64; }
 
-static void write16(__global void* ptr, ushort value) { ((unalign*)ptr)->value16 = value; }
-static void write32(__global void* ptr, uint   value) { ((unalign*)ptr)->value32 = value; }
-static void write64(__global void* ptr, ulong  value) { ((unalign*)ptr)->value64 = value; }
+static void write16(__global void* ptr, ushort value) { ((__global unalign*)ptr)->value16 = value; }
+static void write32(__global void* ptr, uint   value) { ((__global unalign*)ptr)->value32 = value; }
+static void write64(__global void* ptr, ulong  value) { ((__global unalign*)ptr)->value64 = value; }
+
+static void next_bits(struct decomp_params *p, ulong *d, uchar n);
+
+static void __split_next_bits(struct decomp_params *p, ulong *d, uchar n, uchar s) {
+    ulong tmp = 0;
+    int ret;
+
+    next_bits(p, &tmp, n - s);
+    next_bits(p, d, s);
+
+    *d |= tmp << s;
+}
+
+static void next_bits(struct decomp_params *p, ulong *d, uchar n) {
+    __global uchar *in = p->in;
+    uchar b = p->bit;
+    uchar bits = b + n;
+
+    if (bits > 64) {
+        __split_next_bits(p, d, n, 32);
+        return;
+    } else if (p->ilen < 8 && bits > 32 && bits <= 56) {
+        __split_next_bits(p, d, n, 16);
+        return;
+    } else if (p->ilen < 4 && bits > 16 && bits <= 24) {
+        __split_next_bits(p, d, n, 8);
+        return;
+    }
+
+    if (bits <= 8)
+        *d = *in >> (8 - bits);
+    else if (bits <= 16)
+        *d = swap_endianness16(read16(in)) >> (16 - bits);
+    else if (bits <= 32)
+        *d = swap_endianness32(read32(in)) >> (32 - bits);
+    else
+        *d = swap_endianness64(read64(in)) >> (64 - bits);
+
+    ulong mask = ((ulong) ~0ULL) >> (64 - n);
+
+    *d &= mask;
+
+    p->bit += n;
+
+    if (p->bit > 7) {
+        p->in += p->bit / 8;
+        p->ilen -= p->bit / 8;
+        p->bit %= 8;
+    }
+}
 
 /*
-//typedef union { ushort value16; uint value32; ulong value64; } __attribute__((packed)) unalign;
-
-ushort read16(__global const void* ptr) { return *(__global const ushort*   )ptr; }
-uint   read32(__global const void* ptr) { return *(__global const uint*     )ptr; }
-ulong  read64(__global const void* ptr) { return *(__global const ulong*    )ptr; }
-
-void write16(__global void* ptr, ushort value) { *(ushort*  )ptr = value; }
-void write32(__global void* ptr, uint   value) { *(uint*    )ptr = value; }
-void write64(__global void* ptr, ulong  value) { *(ulong*   )ptr = value; }
-*/
-
-
 static void _next_bits(struct decomp_params *p, ulong *d, uchar n);
 
 static void split_next_bits(struct decomp_params *p, ulong *d, uchar n, uchar s) {
@@ -182,6 +219,9 @@ static void next_bits(struct decomp_params *p, ulong *d, uchar n) {
     uchar b = p->bit;
     uchar bits = b + n;
 
+    #ifdef DEBUG
+    printf("next_bits: n = %d, bits = %d ", n, bits);
+    #endif
     
     if (bits > 64) {
         split_next_bits(p, d, n, 32);
@@ -210,19 +250,19 @@ static void next_bits(struct decomp_params *p, ulong *d, uchar n) {
         p->bit %= 8;
     }
 }
+*/
 
 static void do_data(struct decomp_params *p, uchar n) {
     ulong v;
 
     next_bits(p, &v, n * 8);
 
-    
     switch (n) {
     case 2:
-        //write16(p->out, swap_endianness16(v));
+        write16(p->out, swap_endianness16(v));
         break;
     case 4:
-        //write32(p->out, swap_endianness32(v));
+        write32(p->out, swap_endianness32(v));
         break;
     case 8:
         write64(p->out, swap_endianness64(v));
@@ -289,11 +329,15 @@ static void do_index(struct decomp_params *p, uchar n) {
 static void do_op(struct decomp_params *p, uchar o) {
     int i;
 
+    #ifdef DEBUG
+    if (o >= OPS_MAX) {
+        printf("error: template is %x\n", o);
+        return;
+    }
+    #endif
+
     for (i = 0; i < 4; i++) {
         uchar op = decomp_ops[o][i];
-
-        //printf("op is %x\n", op);
-        
         switch (op & OP_ACTION) {
         case OP_ACTION_DATA:
             do_data(p, op & OP_AMOUNT);
@@ -304,18 +348,22 @@ static void do_op(struct decomp_params *p, uchar o) {
         case OP_ACTION_NOOP:
             break;
         default:
+            #ifdef DEBUG
+            printf("Internal error, invalid op %x\n", op);
+            #endif
             break;
         }
     }
 }
 
 
-__kernel void decompress(__global uchar *in, unsigned int ilen, __global uchar *out, __global unsigned int *olen) {
+__kernel void decompress(__global uchar *in, ulong ilen, __global uchar *out, __global ulong *olen) {
     //_local uchar in_chunk[CHUNK_SIZE];
     //__local uchar out_chunk[CHUNK_SIZE];
 
     struct decomp_params p;
-    ulong op, rep, total;
+    ulong op = 255;
+    ulong rep, total;
     ulong crc;
 
     p.in = in;
@@ -333,9 +381,15 @@ __kernel void decompress(__global uchar *in, unsigned int ilen, __global uchar *
     do {
         next_bits(&p, &op, OP_BITS);
 
-        switch (op) {
+        #ifdef DEBUG
+        printf("template is %x\n", (uchar)op);
+        #endif
+
+        switch ((uchar) op) {
         case OP_REPEAT:
-            //printf("case(op) = OP_REPEAT\n");
+            #ifdef DEBUG
+            printf("case(op) = OP_REPEAT\n");
+            #endif
             next_bits(&p, &rep, REPEAT_BITS);
             rep++;
 
@@ -355,7 +409,9 @@ __kernel void decompress(__global uchar *in, unsigned int ilen, __global uchar *
 
             break;
         case OP_ZEROS:
-            //printf("case(op) = OP_ZEROS\n");
+            #ifdef DEBUG
+            printf("case(op) = OP_ZEROS\n");
+            #endif
                 p.out[0] = 0;
                 p.out[1] = 0;
                 p.out[2] = 0;
@@ -368,12 +424,13 @@ __kernel void decompress(__global uchar *in, unsigned int ilen, __global uchar *
             p.olen -= 8;
 
             break;
-        case OP_END:
-
+        case 30:
+            #ifdef DEBUG
+            printf("case(op) = OP_END\n");
+            #endif
             break;
         default:
-            //printf("case(op) = default \n");
-            do_op(&p, op);
+            do_op(&p, (uchar) op);
             
             break;
         }

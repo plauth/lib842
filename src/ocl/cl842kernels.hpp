@@ -21,7 +21,8 @@ class CL842Kernels
     	cl::Buffer allocateBuffer(size_t size, cl_mem_flags flags);
     	void writeBuffer(cl::Buffer buffer, const void * ptr, size_t size);
     	void readBuffer(cl::Buffer buffer, void * ptr, size_t size);
-    	int decompress(cl::Buffer in, unsigned int ilen, cl::Buffer out, cl::Buffer olen);
+        void fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size);
+    	int decompress(cl::Buffer in, uint64_t ilen, cl::Buffer out, cl::Buffer olen);
 };
 
 #endif // CL842KERNELS_HPP
