@@ -87,7 +87,7 @@
 #include "../common/endianness.h"
 #include "../common/crc32.h"
 #include "kerneldeps.h"
-#include "../../test/hash.hpp"
+#include "../common/hash.hpp"
 
 //#define DEBUG 1
 
@@ -139,9 +139,9 @@ struct sw842_param {
 	uint64_t olen;
 	uint8_t bit;
 
-	uint64_t data8[1];
-	uint32_t data4[2];
-	uint16_t data2[4];
+	uint64_t data[7];
+	uint64_t hashes[7];
+
 	int index8[1];
 	int index4[2];
 	int index2[4];

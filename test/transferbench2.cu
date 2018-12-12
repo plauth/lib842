@@ -9,8 +9,8 @@
 #include "sw842.h"
 #endif
 
-//#define CHUNK_SIZE 32768
-#define CHUNK_SIZE 4096
+#define CHUNK_SIZE 32768
+//#define CHUNK_SIZE 4096
 
 #define ERRORCHECK() cErrorCheck(__FILE__, __LINE__)
 
@@ -19,31 +19,6 @@
     printf("Error: %s\n", cudaGetErrorString(err)); \
     exit( -1 ); \
   }
-
-#define TIMER_CREATE(t)                      \
-  cudaEvent_t t##_start, t##_end;            \
-  cudaEventCreate(&t##_start);               \
-  cudaEventCreate(&t##_end);               
- 
- 
-#define TIMER_START(t)                          \
-  cudaEventRecord(t##_start);                   \
-  cudaEventSynchronize(t##_start);              \
- 
- 
-#define TIMER_END(t)                                          \
-  cudaEventRecord(t##_start);                                 \
-  cudaEventSynchronize(t##_start);                            \
-  cudaEventRecord(t##_end);                                   \
-  cudaEventSynchronize(t##_end);                              \
-  cudaEventElapsedTime(&t, t##_start, t##_end);               
-
-long long timestamp() {
-	struct timeval te;
-	gettimeofday(&te, NULL);
-	long long ms = te.tv_sec * 1000LL + te.tv_usec/1000;
-	return ms;
-}
 
 int nextMultipleOfChunkSize(unsigned int input) {
 	return (input + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
@@ -73,9 +48,6 @@ int main( int argc, const char* argv[])
 	in = out = decompressed = NULL;
 	unsigned int ilen, olen, dlen;
 	ilen = olen = dlen = 0;
-	long long timestart_comp, timeend_comp;
-	long long timestart_decomp, timeend_decomp;
-	long long timestart_condense, timeend_condense;
 
 	if(argc <= 1) {
 		ilen = 32;
@@ -135,7 +107,6 @@ int main( int argc, const char* argv[])
 		uint64_t *compressedChunkPositions = (uint64_t*) malloc(sizeof(uint64_t) * num_chunks);
 		uint32_t *compressedChunkSizes = (uint32_t*) malloc(sizeof(uint32_t) * num_chunks);
 
-		timestart_comp = timestamp();
 		#pragma omp parallel for
 		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			
@@ -149,10 +120,12 @@ int main( int argc, const char* argv[])
 			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
 			#endif
 			compressedChunkSizes[chunk_num] = chunk_olen;
+			cuda_error = cudaMemcpy(cuda_uncompressed, chunk_in, CHUNK_SIZE, cudaMemcpyHostToDevice);
 		}
-		timeend_comp = timestamp();
-		timestart_condense = timeend_comp;
-
+		cudaDeviceSynchronize();
+        CHECK_ERROR(cuda_error);
+        ERRORCHECK();
+		
 		uint64_t currentChunkPos = 0;
 		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			compressedChunkPositions[chunk_num] = currentChunkPos;
@@ -167,11 +140,9 @@ int main( int argc, const char* argv[])
 			uint8_t * chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
 			memcpy(chunk_condensed, chunk_out, compressedChunkSizes[chunk_num]);
 		}
-		timeend_condense = timestamp();
 		
 		cudaMalloc((void**) &cuda_compressed, ilen);
 
-		timestart_decomp = timestamp();
 		#pragma omp parallel for
 		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			unsigned int chunk_dlen = CHUNK_SIZE;
@@ -192,25 +163,6 @@ int main( int argc, const char* argv[])
 				//return -1;
 			}
 		}
-		timeend_decomp = timestamp();
-
-		float timer_uncompressed, timer_compressed;
-		TIMER_CREATE(timer_uncompressed);
-		TIMER_CREATE(timer_compressed);
-
-		TIMER_START(timer_uncompressed);
-		cuda_error = cudaMemcpy(cuda_uncompressed, in, ilen, cudaMemcpyHostToDevice);
-		cudaDeviceSynchronize();
-		TIMER_END(timer_uncompressed);
-		CHECK_ERROR(cuda_error);
-		ERRORCHECK();
-
-                TIMER_START(timer_compressed);
-                cuda_error = cudaMemcpy(cuda_compressed, out_condensed, currentChunkPos, cudaMemcpyHostToDevice);
-		cudaDeviceSynchronize();
-                TIMER_END(timer_compressed);
-		CHECK_ERROR(cuda_error);
-                ERRORCHECK();
 
 		free(compressedChunkPositions);
 		free(compressedChunkSizes);

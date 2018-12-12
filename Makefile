@@ -1,5 +1,5 @@
-CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp -DDEBUG
-CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp -I/opt/amdgpu-pro/include -L/opt/amdgpu-pro/lib/x86_64-linux-gnu/ 
+CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
+CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp  
 
 ifeq ($(shell uname),Darwin)
 CC=gcc-7
