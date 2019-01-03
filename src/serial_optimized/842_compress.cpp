@@ -133,25 +133,24 @@ static inline uint8_t get_template_branchless(struct sw842_param *p) {
 
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
 
-template<uint8_t NBITS> static int add_bits(struct sw842_param *p, uint64_t d);
+static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n);
 
-template<uint8_t NBITS, uint8_t SBITS> static int __split_add_bits(struct sw842_param *p, uint64_t d)
+static int __split_add_bits(struct sw842_param *p, uint64_t d, uint8_t n, uint8_t s)
 {
 	int ret;
 
-	if (NBITS <= SBITS)
+	if (n <= s)
 		return -EINVAL;
 
-	ret = add_bits<NBITS - SBITS>(p, d >> SBITS);
+	ret = add_bits(p, d >> s, n - s);
 	if (ret)
 		return ret;
-	return add_bits<SBITS>(p, d & GENMASK_ULL(SBITS - 1, 0));
+	return add_bits(p, d & GENMASK_ULL(s - 1, 0), s);
 }
 
-template<uint8_t NBITS> static int add_bits(struct sw842_param *p, uint64_t d) {
-	int b = p->bit;
-	uint8_t bits = p->bit + NBITS;
-	uint8_t s = round_up(bits, 8) - bits;
+static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
+{
+	int b = p->bit, bits = b + n, s = round_up(bits, 8) - bits;
 	uint64_t o;
 	uint8_t *out = p->out;
 
@@ -159,18 +158,18 @@ template<uint8_t NBITS> static int add_bits(struct sw842_param *p, uint64_t d) {
 	printf("add %u bits %lx\n", (unsigned char)n, (unsigned long)d);
 	#endif
 
-	if (NBITS > 64)
+	if (n > 64)
 		return -EINVAL;
 
 	/* split this up if writing to > 8 bytes (i.e. n == 64 && p->bit > 0),
 	 * or if we're at the end of the output buffer and would write past end
 	 */
 	if (bits > 64)
-		return __split_add_bits<NBITS, 32>(p, d);
+		return __split_add_bits(p, d, n, 32);
 	else if (p->olen < 8 && bits > 32 && bits <= 56)
-		return __split_add_bits<NBITS, 16>(p, d);
+		return __split_add_bits(p, d, n, 16);
 	else if (p->olen < 4 && bits > 16 && bits <= 24)
-		return __split_add_bits<NBITS, 8 >(p, d);
+		return __split_add_bits(p, d, n, 8);
 
 	if (bytes_rounded_up(bits) > p->olen)
 		return -ENOSPC;
@@ -179,77 +178,24 @@ template<uint8_t NBITS> static int add_bits(struct sw842_param *p, uint64_t d) {
 	o = *out & bmask[b];
 	d <<= s;
 
-	switch(NBITS) {
-		case 5: // bits <= 12
-			if (bits <= 8)
-				*out = o | d;
-			else if (bits <= 16)
-				write16(out, swap_endianness16(o << 8 | d));
-			break;
-		case 13: // bits <= 20
-		case 16: // bits <= 23
-			if (bits <= 16)
-				write16(out, swap_endianness16(o << 8 | d));
-			else if (bits <= 24)
-				write32(out, swap_endianness32(o << 24 | d << 8));
-			break;
-		case 23: // bits <= 30
-			if (bits <= 24)
-				write32(out, swap_endianness32(o << 24 | d << 8));
-			else if (bits <= 32)
-				write32(out, swap_endianness32(o << 24 | d));
-			break;
-		case 30: // bits <= 37
-			if (bits <= 32)
-				write32(out, swap_endianness32(o << 24 | d));
-			else if (bits <= 40)
-				write64(out, swap_endianness64(o << 56 | d << 24));
-			break;
-		case 37: // bits <= 44
-		case 38: // bits <= 45
-			if (bits <= 40)
-				write64(out, swap_endianness64(o << 56 | d << 24));
-			else if (bits <= 48)
-				write64(out, swap_endianness64(o << 56 | d << 16));
-			break;
-		case 45: // bits <= 52
-		case 46: // bits <= 53
-			if (bits <= 48)
-				write64(out, swap_endianness64(o << 56 | d << 16));
-			else if (bits <= 56)
-				write64(out, swap_endianness64(o << 56 | d << 8));
-			break;
-		case 53: //bits <= 60
-			if (bits <= 56)
-				write64(out, swap_endianness64(o << 56 | d << 8));
-			else
-				write64(out, swap_endianness64(o << 56 | d));
-			break;
-		case 61:
-		case 64:
-			write64(out, swap_endianness64(o << 56 | d));
-			break;
-		default:
-			if (bits <= 8)
-				*out = o | d;
-			else if (bits <= 16)
-				write16(out, swap_endianness16(o << 8 | d));
-			else if (bits <= 24)
-				write32(out, swap_endianness32(o << 24 | d << 8));
-			else if (bits <= 32)
-				write32(out, swap_endianness32(o << 24 | d));
-			else if (bits <= 40)
-				write64(out, swap_endianness64(o << 56 | d << 24));
-			else if (bits <= 48)
-				write64(out, swap_endianness64(o << 56 | d << 16));
-			else if (bits <= 56)
-				write64(out, swap_endianness64(o << 56 | d << 8));
-			else
-				write64(out, swap_endianness64(o << 56 | d));
-	}
+	if (bits <= 8)
+		*out = o | d;
+	else if (bits <= 16)
+		write16(out, swap_endianness16(o << 8 | d));
+	else if (bits <= 24)
+		write32(out, swap_endianness32(o << 24 | d << 8));
+	else if (bits <= 32)
+		write32(out, swap_endianness32(o << 24 | d));
+	else if (bits <= 40)
+		write64(out, swap_endianness64(o << 56 | d << 24));
+	else if (bits <= 48)
+		write64(out, swap_endianness64(o << 56 | d << 16));
+	else if (bits <= 56)
+		write64(out, swap_endianness64(o << 56 | d << 8));
+	else
+		write64(out, swap_endianness64(o << 56 | d));
 
-
-	p->bit += NBITS;
+	p->bit += n;
 
 	if (p->bit > 7) {
 		p->out += p->bit / 8;
@@ -266,42 +212,42 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
 
     switch(TEMPLATE_KEY) {
         case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
-        	ret |= add_bits<OP_BITS>(p, TEMPLATE_KEY);
-        	ret |= add_bits<D8_BITS>(p, p->data[6]);
+        	ret |= add_bits(p, TEMPLATE_KEY, OP_BITS);
+        	ret |= add_bits(p, p->data[6], D8_BITS);
     	    break;
         case 0x01:	// { D4, D2, I2, N0 }, 56 bits
         	out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + D2_BITS + I2_BITS))			|
         		 	(((uint64_t) p->data[4])  << (D2_BITS + I2_BITS)) 						|
         			(((uint64_t) p->data[2])  << (I2_BITS)) 								|
         			(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + D4_BITS + D2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + D4_BITS + D2_BITS + I2_BITS);
     	    break;
         case 0x02:	// { D4, I2, D2, N0 }, 56 bits
          	out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + I2_BITS + D2_BITS))			|
         		 	(((uint64_t) p->data[4])  << (I2_BITS + D2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
         		 	(((uint64_t) p->data[3]));
-        	ret = add_bits<OP_BITS + D4_BITS + I2_BITS + D2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + D4_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x03: 	// { D4, I2, I2, N0 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + I2_BITS + I2_BITS))			|
         		 	(((uint64_t) p->data[4])  << (I2_BITS + I2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
         		 	(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + D4_BITS + I2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + D4_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x04:	// { D4, I4, N0, N0 }, 41 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + I4_BITS))						|
         		 	(((uint64_t) p->data[4])  << (I4_BITS))								    |
         		 	(((uint64_t) p->index4[1]));
-        	ret = add_bits<OP_BITS + D4_BITS + I4_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + D4_BITS + I4_BITS);
     	    break;
 		case 0x05:	// { D2, I2, D4, N0 }, 56 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + D4_BITS))			|
         		 	(((uint64_t) p->data[0])  << (I2_BITS + D4_BITS))						|
         		 	(((uint64_t) p->index2[1]) << (D4_BITS))								|
         		 	(((uint64_t) p->data[5]));
-        	ret = add_bits<OP_BITS + D2_BITS + I2_BITS + D4_BITS>(p, out); 
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + D4_BITS); 
     	    break;
 		case 0x06:	// { D2, I2, D2, I2 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + D2_BITS + I2_BITS))	|
@@ -309,7 +255,7 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
         		 	(((uint64_t) p->index2[1]) << (D2_BITS + I2_BITS))						|
         		 	(((uint64_t) p->data[2])  << (I2_BITS))								    |
         		 	(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + D2_BITS + I2_BITS + D2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x07:	// { D2, I2, I2, D2 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + I2_BITS + D2_BITS))	|
@@ -317,7 +263,7 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
         		 	(((uint64_t) p->index2[1]) << (I2_BITS + D2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
         		 	(((uint64_t) p->data[3]));
-        	ret = add_bits<OP_BITS + D2_BITS + I2_BITS + I2_BITS + D2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x08:	// { D2, I2, I2, I2 }, 40 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + I2_BITS + I2_BITS))	|
@@ -325,28 +271,28 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
         		 	(((uint64_t) p->index2[1]) << (I2_BITS + I2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
         		 	(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + D2_BITS + I2_BITS + I2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x09:	// { D2, I2, I4, N0 }, 33 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + I4_BITS))			|
         		 	(((uint64_t) p->data[0])  << (I2_BITS + I4_BITS))						|
         		 	(((uint64_t) p->index2[1]) << (I4_BITS))								|
         		 	(((uint64_t) p->index4[1]));
-        	ret = add_bits<OP_BITS + D2_BITS + I2_BITS + I4_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + D2_BITS + I2_BITS + I4_BITS);
     	    break;
 		case 0x0a:	// { I2, D2, D4, N0 }, 56 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + D4_BITS))			|
         		 	(((uint64_t) p->index2[0]) << (D2_BITS + D4_BITS))						|
         		 	(((uint64_t) p->data[1])  << (D4_BITS))								    |
         		 	(((uint64_t) p->data[5]));
-        	ret = add_bits<OP_BITS + I2_BITS + D2_BITS + D4_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D2_BITS + D4_BITS);
     	    break;
 		case 0x0b:	// { I2, D4, I2, N0 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D4_BITS + I2_BITS))			|
         		 	(((uint64_t) p->index2[0]) << (D4_BITS + I2_BITS))						|
         		 	(((uint64_t) swap_endianness32(read32(p->in + 2)))  << (I2_BITS))		|
         		 	(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + I2_BITS + D4_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D4_BITS + I2_BITS);
     	    break;
 		case 0x0c:	// { I2, D2, I2, D2 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + I2_BITS + D2_BITS))	|
@@ -354,7 +300,7 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
         		 	(((uint64_t) p->data[1])  << (I2_BITS + D2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
         		 	(((uint64_t) p->data[3]));
-        	ret = add_bits<OP_BITS + I2_BITS + D2_BITS + I2_BITS + D2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D2_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x0d:	// { I2, D2, I2, I2 }, 40 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + I2_BITS + I2_BITS))	|
@@ -362,21 +308,21 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
         		 	(((uint64_t) p->data[1])  << (I2_BITS + I2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
         		 	(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + I2_BITS + D2_BITS + I2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D2_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x0e:	// { I2, D2, I4, N0 }, 33 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + I4_BITS))			|
         		 	(((uint64_t) p->index2[0]) << (D2_BITS + I4_BITS))						|
         		 	(((uint64_t) p->data[1])  << (I4_BITS))								    |
         		 	(((uint64_t) p->index4[1]));
-        	ret = add_bits<OP_BITS + I2_BITS + D2_BITS + I4_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + D2_BITS + I4_BITS);
     	    break;
 		case 0x0f:	// { I2, I2, D4, N0 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + D4_BITS))			|
         		 	(((uint64_t) p->index2[0]) << (I2_BITS + D4_BITS))						|
         		 	(((uint64_t) p->index2[1]) << (D4_BITS))								|
         		 	(((uint64_t) p->data[5]));
-        	ret = add_bits<OP_BITS + I2_BITS + I2_BITS + D4_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + D4_BITS);
     	    break;
 		case 0x10:	// { I2, I2, D2, I2 }, 40 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + D2_BITS + I2_BITS))	|
@@ -384,7 +330,7 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
         		 	(((uint64_t) p->index2[1]) << (D2_BITS + I2_BITS))						|
         		 	(((uint64_t) p->data[2])  << (I2_BITS))								    |
         		 	(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + I2_BITS + I2_BITS + D2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x11:	// { I2, I2, I2, D2 }, 40 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + I2_BITS + D2_BITS))	|
@@ -392,7 +338,7 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
         		 	(((uint64_t) p->index2[1]) << (I2_BITS + D2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
         		 	(((uint64_t) p->data[3]));
-        	ret = add_bits<OP_BITS + I2_BITS + I2_BITS + I2_BITS + D2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x12:	// { I2, I2, I2, I2 }, 32 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + I2_BITS + I2_BITS))	|
@@ -400,52 +346,52 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
         		 	(((uint64_t) p->index2[1]) << (I2_BITS + I2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
         		 	(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + I2_BITS + I2_BITS + I2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x13:	// { I2, I2, I4, N0 }, 25 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + I4_BITS))			|
         		 	(((uint64_t) p->index2[0]) << (I2_BITS + I4_BITS))						|
         		 	(((uint64_t) p->index2[1]) << (I4_BITS))								|
         		 	(((uint64_t) p->index4[1]));
-        	ret = add_bits<OP_BITS + I2_BITS + I2_BITS + I4_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I2_BITS + I2_BITS + I4_BITS);
     	    break;
 		case 0x14:	// { I4, D4, N0, N0 }, 41 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + D4_BITS))						|
         		 	(((uint64_t) p->index4[0]) << (D4_BITS))								|
         		 	(((uint64_t) p->data[5]));
-        	ret = add_bits<OP_BITS + I4_BITS + D4_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + D4_BITS);
     	    break;
 		case 0x15:	// { I4, D2, I2, N0 }, 33 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + D2_BITS + I2_BITS))			|
         		 	(((uint64_t) p->index4[0]) << (D2_BITS + I2_BITS))						|
         		 	(((uint64_t) p->data[2])  << (I2_BITS))								    |
         		 	(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + I4_BITS + D2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x16:	// { I4, I2, D2, N0 }, 33 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + I2_BITS + D2_BITS))			|
         		 	(((uint64_t) p->index4[0]) << (I2_BITS + D2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
         		 	(((uint64_t) p->data[3]));
-        	ret = add_bits<OP_BITS + I4_BITS + D2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x17:	// { I4, I2, I2, N0 }, 25 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + I2_BITS + I2_BITS))			|
         		 	(((uint64_t) p->index4[0]) << (I2_BITS + I2_BITS))						|
         		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
         		 	(((uint64_t) p->index2[3]));
-        	ret = add_bits<OP_BITS + I4_BITS + I2_BITS + I2_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x18:	// { I4, I4, N0, N0 }, 18 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + I4_BITS))						|
         		 	(((uint64_t) p->index4[0]) << (I4_BITS))								|
         		 	(((uint64_t) p->index4[1]));
-        	ret = add_bits<OP_BITS + I4_BITS + I4_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I4_BITS + I4_BITS);
     	    break;
 		case 0x19:	// { I8, N0, N0, N0 }, 8 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I8_BITS))								|
         		 	(((uint64_t) p->index8[0]));
-        	ret = add_bits<OP_BITS + I8_BITS>(p, out);
+        	ret = add_bits(p, out, OP_BITS + I8_BITS);
     	    break;
         default:
         	fprintf(stderr, "Invalid template: %x\n", TEMPLATE_KEY);
@@ -468,7 +414,7 @@ static int add_repeat_template(struct sw842_param *p, uint8_t r)
 	uint64_t out =	(((uint64_t) OP_REPEAT) << (REPEAT_BITS))								|
         		 	(((uint64_t) r));
 
-    ret = add_bits<OP_BITS + REPEAT_BITS>(p, out);
+    ret = add_bits(p, out, OP_BITS + REPEAT_BITS);
 
 	if (ret)
 		return ret;
@@ -478,7 +424,7 @@ static int add_repeat_template(struct sw842_param *p, uint8_t r)
 
 static int add_zeros_template(struct sw842_param *p)
 {
-	int ret = add_bits<OP_BITS>(p, OP_ZEROS);
+	int ret = add_bits(p, OP_ZEROS, OP_BITS);
 
 	if (ret)
 		return ret;
@@ -488,7 +434,7 @@ static int add_zeros_template(struct sw842_param *p)
 
 static int add_end_template(struct sw842_param *p)
 {
-	int ret = add_bits<OP_BITS>(p, OP_END);
+	int ret = add_bits(p, OP_END, OP_BITS);
 
 	if (ret)
 		return ret;
@@ -755,7 +701,7 @@ repeat:
 	 */
 	crc = crc32_be(0, (const unsigned char *) in, ilen);
 
-	ret = add_bits<CRC_BITS>(p, swap_endianness32(crc));
+	ret = add_bits(p, swap_endianness32(crc), CRC_BITS);
 	if (ret)
 		return ret;
 
