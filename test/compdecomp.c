@@ -47,7 +47,9 @@ int main( int argc, const char* argv[])
 		out = (uint8_t*) malloc(olen);
 		decompressed = (uint8_t*) malloc(dlen);
 
-		uint8_t tmp[] = "0011223344556677889900AABBCCDDEE";
+		uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
+		//tmp[0] = 0xff;
+		//tmp[1] = 0x00;
 
 		memset(in, 0, ilen);
 		memset(out, 0, olen);
@@ -180,15 +182,17 @@ int main( int argc, const char* argv[])
 		printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
 		
-		for (int i = 0; i < 64; i++) {
-			printf("%02x:", out[i]);
-		}
+		//if(argc <= 1) {
+			for (int i = 0; i < 64; i++) {
+				printf("%02x:", out[i]);
+			}
 
-		printf("\n\n");
+			printf("\n\n");
 
-		for (int i = 0; i < 32; i++) {
-			printf("%02x:", decompressed[i]);
-		}
+			for (int i = 0; i < 32; i++) {
+				printf("%02x:", decompressed[i]);
+			}
+		//}
 
 		printf("\n\n");
 		

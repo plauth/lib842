@@ -132,12 +132,13 @@
 #define OPS_MAX		(0x1a)
 
 struct sw842_param {
+	struct bitstream* stream;
+
 	uint8_t *in;
 	uint8_t *instart;
 	uint64_t ilen;
 	uint8_t *out;
 	uint64_t olen;
-	uint8_t bit;
 
 	uint64_t data[7];
 	uint64_t hashes[7];
@@ -155,6 +156,8 @@ struct sw842_param {
 	uint16_t ringBuffer16[1 << BUFFER16_BITS];
 	uint32_t ringBuffer32[1 << BUFFER32_BITS];
 	uint64_t ringBuffer64[1 << BUFFER64_BITS];
+
+
 };
 
 struct sw842_param_decomp {
@@ -169,5 +172,12 @@ struct sw842_param_decomp {
 uint64_t static inline bytes_rounded_up(uint64_t bits) {
 	return (bits + 8 - 1) / 8;
 }
+
+struct bitstream* stream_open(void* buffer, size_t bytes);
+void stream_close(struct bitstream* s);
+size_t stream_size(const struct bitstream* s);
+//uint64_t stream_read_bits(struct bitstream* s, uint8_t n);
+void stream_write_bits(struct bitstream* s, uint64_t value, uint8_t n);
+size_t stream_flush(struct bitstream* s);
 
 #endif
