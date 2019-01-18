@@ -96,38 +96,10 @@ static inline uint8_t get_template(struct sw842_param *p) {
         template_key = max(p->templateKeys[6], former+latter);
 
         template_key >>= 1;
-
-        if (template_key > 223) {
-            fprintf(stderr, "Invalid template_key '%d', the key is larger than maximum value 117!\n", template_key);
-            exit(-EINVAL);
-        }
         
         return ops_dict[template_key];
 }
 
-
-static inline uint8_t get_template_branchless(struct sw842_param *p) {
-        uint16_t template_key = 0;
-        
-        template_key  = (p->index8[0] >= 0) * (I8 * 3);
-        template_key += (p->index4[0] >= 0 && p->index8[0] < 0) * (I4 * 3);
-        template_key += (p->index2[0] >= 0 && p->index4[0] < 0 && p->index8[0] < 0) * (I2 * 3);
-        template_key += (p->index2[1] >= 0 && p->index4[0] < 0 && p->index8[0] < 0) * (I2 * 5);
-        template_key += (p->index4[1] >= 0 && p->index8[0] < 0) * (I4 * 5);
-        template_key += (p->index2[2] >= 0 && p->index4[1] < 0 && p->index8[0] < 0) * (I2 * 7);
-        template_key += (p->index2[3] >= 0 && p->index4[1] < 0 && p->index8[0] < 0) * (I2 * 11);            
-
-        template_key >>= 2;
-
-
-
-        if (template_key > 117) {
-            fprintf(stderr, "Invalid template_key '%d', the key is larger than maximum value 117!\n", template_key);
-            exit(-EINVAL);
-        }
-        
-        return ops_dict[template_key];
-}
 
 template<uint8_t TEMPLATE_KEY> static inline void add_template(struct sw842_param *p) {
 	uint64_t out = 0;
