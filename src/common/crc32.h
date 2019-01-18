@@ -3,8 +3,6 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include "endianness.h"
 #include "crc32table.h"
 
 /* implements slicing-by-4 or slicing-by-8 algorithm */

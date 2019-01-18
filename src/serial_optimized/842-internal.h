@@ -128,6 +128,10 @@
 #define I8		(OP_ACTION_INDEX | OP_AMOUNT_8)
 #define N0		(OP_ACTION_NOOP  | OP_AMOUNT_0)
 
+#define I2N (13)
+#define I4N (53)
+#define I8N (149)
+
 /* the max of the regular templates - not including the special templates */
 #define OPS_MAX		(0x1a)
 
@@ -142,6 +146,8 @@ struct sw842_param {
 
 	uint64_t data[7];
 	uint64_t hashes[7];
+	uint8_t validity[7];
+	uint16_t templateKeys[7];
 
 	int index8[1];
 	int index4[2];

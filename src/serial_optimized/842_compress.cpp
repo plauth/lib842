@@ -18,12 +18,6 @@
 #include "842-internal.h"
 #include "../common/opcodes.h"
 
-//static uint64_t outbits = 0;
-
-#define INDEX_NOT_FOUND		(-1)
-#define INDEX_NOT_CHECKED	(-2)
-
-
 template<typename T> static inline void replace_hash(struct sw842_param *p, uint16_t index, uint16_t offset) {
 		uint16_t ringBufferIndex = index + offset;
 
@@ -45,66 +39,70 @@ template<typename T> static inline void replace_hash(struct sw842_param *p, uint
         }
 }
 
-template<typename T> static inline void find_index(struct sw842_param *p, uint16_t offset) {
-
+template<typename T, uint8_t OFFSET> static inline void find_index(struct sw842_param *p) {
 		int16_t index;
-        uint8_t dataIsEqual;
+
         switch(sizeof(T)) {
                 case 2:
-                	index = p->hashTable16[p->hashes[offset]];
-
-                    dataIsEqual = p->ringBuffer16[index] == p->data[offset];
-               		p->index2[offset] = (dataIsEqual * index) + ((!dataIsEqual) * INDEX_NOT_FOUND);
+                    index = p->hashTable16[p->hashes[OFFSET]];
+                    p->validity[OFFSET] = (index >= 0) && (p->ringBuffer16[index] == p->data[OFFSET]);
+           		    p->index2[OFFSET] = p->validity[OFFSET] * index;
+                    switch(OFFSET) {
+                        case 0:
+                            p->templateKeys[OFFSET] = (13 * 3) * p->validity[OFFSET];
+                            break;
+                        case 1:
+                            p->templateKeys[OFFSET] = (13 * 5) * p->validity[OFFSET];
+                            break;
+                        case 2:
+                            p->templateKeys[OFFSET] = (13 * 7) * p->validity[OFFSET];
+                            break;
+                        case 3:
+                            p->templateKeys[OFFSET] = (13 * 11) * p->validity[OFFSET];
+                            break;
+                    }
                 	break;
                 case 4:
-                	index = p->hashTable32[p->hashes[4+offset]];
-
-                    dataIsEqual = p->ringBuffer32[index] == p->data[4+offset];
-                    p->index4[offset] = (dataIsEqual * index) + ((!dataIsEqual) * INDEX_NOT_FOUND);
+                	index = p->hashTable32[p->hashes[4+OFFSET]];
+                    p->validity[4+OFFSET] = (index >= 0) && (p->ringBuffer32[index] == p->data[4+OFFSET]);
+                    p->index4[OFFSET] = p->validity[4+OFFSET] * index;
+                    switch(OFFSET) {
+                        case 0:
+                            p->templateKeys[4+OFFSET] = (53 * 3) * p->validity[4+OFFSET];
+                            break;
+                        case 1:
+                            p->templateKeys[4+OFFSET] = (53 * 5) * p->validity[4+OFFSET];
+                            break;
+                    }
                 	break;
                 case 8:
-                	index = p->hashTable64[p->hashes[6+offset]];
-
-                    dataIsEqual = p->ringBuffer64[index] == p->data[6+offset];
-                    p->index8[offset] = (dataIsEqual * index) + ((!dataIsEqual) * INDEX_NOT_FOUND);
+                	index = p->hashTable64[p->hashes[6+OFFSET]];
+                    p->validity[6+OFFSET] = (index >= 0) && (p->ringBuffer64[index] == p->data[6+OFFSET]);
+                    p->index8[OFFSET] = p->validity[6+OFFSET] * index;
+                    p->templateKeys[6+OFFSET] = (149 * 3) * p->validity[6+OFFSET];
                     break;
         }
 }
 
+static inline uint16_t max(uint16_t a, uint16_t b) {
+    return (a > b) ? a : b;
+}
+
 static inline uint8_t get_template(struct sw842_param *p) {
-		uint16_t template_key = 0;
-		
-		if(p->index8[0] >= 0) {
-			template_key = I8 * 3;
-		} else {
-			if(p->index4[0] >= 0) {
-				template_key += I4 * 3;
-			} else {
-				if(p->index2[0] >= 0)
-					template_key += I2 * 3;
-				if(p->index2[1] >= 0)
-					template_key += I2 * 5;
-			}
-			if(p->index4[1] >= 0) {
-				template_key += I4 * 5;
-			} else {
-				if(p->index2[2] >= 0)
-					template_key += I2 * 7;
-				if(p->index2[3] >= 0)
-					template_key += I2 * 11;
-			}			
-		}
+        uint16_t template_key = 0;
 
-		template_key >>= 2;
+        uint16_t former = max(p->templateKeys[4], p->templateKeys[0] + p->templateKeys[1]);
+        uint16_t latter = max(p->templateKeys[5], p->templateKeys[2] + p->templateKeys[3]);
+        template_key = max(p->templateKeys[6], former+latter);
 
+        template_key >>= 1;
 
-
-		if (template_key > 117) {
-			fprintf(stderr, "Invalid template_key '%d', the key is larger than maximum value 117!\n", template_key);
-			exit(-EINVAL);
-		}
-		
-		return ops_dict[template_key];
+        if (template_key > 223) {
+            fprintf(stderr, "Invalid template_key '%d', the key is larger than maximum value 117!\n", template_key);
+            exit(-EINVAL);
+        }
+        
+        return ops_dict[template_key];
 }
 
 
@@ -131,7 +129,7 @@ static inline uint8_t get_template_branchless(struct sw842_param *p) {
         return ops_dict[template_key];
 }
 
-template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param *p) {
+template<uint8_t TEMPLATE_KEY> static inline void add_template(struct sw842_param *p) {
 	uint64_t out = 0;
 
     switch(TEMPLATE_KEY) {
@@ -214,7 +212,7 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
 		case 0x0b:	// { I2, D4, I2, N0 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D4_BITS + I2_BITS))			|
         		 	(((uint64_t) p->index2[0]) << (D4_BITS + I2_BITS))						|
-        		 	(((uint64_t) swap_endianness32(read32(p->in + 2))))  << (I2_BITS)		                    |
+        		 	(((uint64_t) swap_be_to_native32(read32(p->in + 2))))  << (I2_BITS)		                    |
         		 	(((uint64_t) p->index2[3]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + D4_BITS + I2_BITS);
     	    break;
@@ -320,55 +318,40 @@ template<uint8_t TEMPLATE_KEY> static inline int add_template(struct sw842_param
         default:
         	fprintf(stderr, "Invalid template: %x\n", TEMPLATE_KEY);
         }
-
-		return 0;
 }
 
-static int add_repeat_template(struct sw842_param *p, uint8_t r)
-{
-
-	/* repeat param is 0-based */
-	if (!r || --r > REPEAT_BITS_MAX)
-		return -EINVAL;
-
+static inline void add_repeat_template(struct sw842_param *p, uint8_t r) {
 	uint64_t out =	(((uint64_t) OP_REPEAT) << (REPEAT_BITS))								|
-        		 	(((uint64_t) r));
+        		 	(((uint64_t) --r));
 
     stream_write_bits(p->stream, out, OP_BITS + REPEAT_BITS);
-
-	return 0;
 }
 
-static int add_zeros_template(struct sw842_param *p)
-{
+static inline void add_zeros_template(struct sw842_param *p) {
 	stream_write_bits(p->stream, OP_ZEROS, OP_BITS);
 
-	return 0;
 }
 
-static int add_end_template(struct sw842_param *p)
-{
+static inline void add_end_template(struct sw842_param *p) {
 	stream_write_bits(p->stream, OP_END, OP_BITS);
 
-	return 0;
 }
 
-static void get_next_data(struct sw842_param *p)
-{
-	p->data[6] = swap_endianness64(read64(p->in    ));
-	p->data[4] = swap_endianness32(read32(p->in    ));
-	p->data[5] = swap_endianness32(read32(p->in + 4));
-	p->data[0] = swap_endianness16(read16(p->in    ));
-	p->data[1] = swap_endianness16(read16(p->in + 2));
-	p->data[2] = swap_endianness16(read16(p->in + 4));
-	p->data[3] = swap_endianness16(read16(p->in + 6));
+static inline void get_next_data(struct sw842_param *p) {
+	p->data[6] = swap_be_to_native64(read64(p->in    ));
+	p->data[4] = swap_be_to_native32(read32(p->in    ));
+	p->data[5] = swap_be_to_native32(read32(p->in + 4));
+	p->data[0] = swap_be_to_native16(read16(p->in    ));
+	p->data[1] = swap_be_to_native16(read16(p->in + 2));
+	p->data[2] = swap_be_to_native16(read16(p->in + 4));
+	p->data[3] = swap_be_to_native16(read16(p->in + 6));
 }
 
 /* update the hashtable entries.
  * only call this after finding/adding the current template
  * the dataN fields for the current 8 byte block must be already updated
  */
-static void update_hashtables(struct sw842_param *p)
+static inline void update_hashtables(struct sw842_param *p)
 {
 
 	uint64_t pos = p->in - p->instart;
@@ -388,118 +371,121 @@ static void update_hashtables(struct sw842_param *p)
 /* find the next template to use, and add it
  * the p->dataN fields must already be set for the current 8 byte block
  */
-static int process_next(struct sw842_param *p)
+static inline void process_next(struct sw842_param *p)
 {
-	int ret;
-	uint8_t template_key;
+    uint8_t templateKey;
 
-	p->index8[0] = INDEX_NOT_CHECKED;
-	p->index4[0] = INDEX_NOT_CHECKED;
-	p->index4[1] = INDEX_NOT_CHECKED;
-	p->index2[0] = INDEX_NOT_CHECKED;
-	p->index2[1] = INDEX_NOT_CHECKED;
-	p->index2[2] = INDEX_NOT_CHECKED;
-	p->index2[3] = INDEX_NOT_CHECKED;
+    p->validity[0] = false;
+    p->validity[1] = false;
+    p->validity[2] = false;
+    p->validity[3] = false;
+    p->validity[4] = false;
+    p->validity[5] = false;
+    p->validity[6] = false;
+
+    p->templateKeys[0] = 0;
+    p->templateKeys[1] = 0;
+    p->templateKeys[2] = 0;
+    p->templateKeys[3] = 0;
+    p->templateKeys[4] = 0;
+    p->templateKeys[5] = 0;
+    p->templateKeys[6] = 0;
 
     hashVec(p->data, p->hashes);
 
-	find_index<uint16_t>(p, 0);
-	find_index<uint16_t>(p, 1);
-	find_index<uint16_t>(p, 2);
-	find_index<uint16_t>(p, 3);
-    find_index<uint32_t>(p, 0);
-    find_index<uint32_t>(p, 1);
-    find_index<uint64_t>(p, 0);
+	find_index<uint16_t,0>(p);
+	find_index<uint16_t,1>(p);
+	find_index<uint16_t,2>(p);
+	find_index<uint16_t,3>(p);
+    find_index<uint32_t,0>(p);
+    find_index<uint32_t,1>(p);
+    find_index<uint64_t,0>(p);
 
-	template_key = get_template(p);
+    templateKey = get_template(p);
 
-	switch(template_key) {
+
+    switch(templateKey) {
         case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
-    		ret = add_template<0x00>(p);
+    		add_template<0x00>(p);
     	    break;
         case 0x01:	// { D4, D2, I2, N0 }, 56 bits
-    		ret = add_template<0x01>(p);
+    		add_template<0x01>(p);
     	    break;
         case 0x02:	// { D4, I2, D2, N0 }, 56 bits
-    		ret = add_template<0x02>(p);
+    		add_template<0x02>(p);
     	    break;
 		case 0x03: 	// { D4, I2, I2, N0 }, 48 bits
-    		ret = add_template<0x03>(p);
+    		add_template<0x03>(p);
     	    break;
 		case 0x04:	// { D4, I4, N0, N0 }, 41 bits
-    		ret = add_template<0x04>(p);
+    		add_template<0x04>(p);
     	    break;
 		case 0x05:	// { D2, I2, D4, N0 }, 56 bits
-    		ret = add_template<0x05>(p);
+    		add_template<0x05>(p);
     	    break;
 		case 0x06:	// { D2, I2, D2, I2 }, 48 bits
-    		ret = add_template<0x06>(p);
+    		add_template<0x06>(p);
     	    break;
 		case 0x07:	// { D2, I2, I2, D2 }, 48 bits
-    		ret = add_template<0x07>(p);
+    		add_template<0x07>(p);
     	    break;
 		case 0x08:	// { D2, I2, I2, I2 }, 40 bits
-    		ret = add_template<0x08>(p);
+    		add_template<0x08>(p);
     	    break;
 		case 0x09:	// { D2, I2, I4, N0 }, 33 bits
-    		ret = add_template<0x09>(p);
+    		add_template<0x09>(p);
     	    break;
 		case 0x0a:	// { I2, D2, D4, N0 }, 56 bits
-    		ret = add_template<0x0a>(p);
+    		add_template<0x0a>(p);
     	    break;
 		case 0x0b:	// { I2, D4, I2, N0 }, 48 bits
-    		ret = add_template<0x0b>(p);
+    		add_template<0x0b>(p);
     	    break;
 		case 0x0c:	// { I2, D2, I2, D2 }, 48 bits
-    		ret = add_template<0x0c>(p);
+    		add_template<0x0c>(p);
     	    break;
 		case 0x0d:	// { I2, D2, I2, I2 }, 40 bits
-    		ret = add_template<0x0d>(p);
+    		add_template<0x0d>(p);
     	    break;
 		case 0x0e:	// { I2, D2, I4, N0 }, 33 bits
-    		ret = add_template<0x0e>(p);
+    		add_template<0x0e>(p);
     	    break;
 		case 0x0f:	// { I2, I2, D4, N0 }, 48 bits
-    		ret = add_template<0x0f>(p);
+    		add_template<0x0f>(p);
     	    break;
 		case 0x10:	// { I2, I2, D2, I2 }, 40 bits
-    		ret = add_template<0x10>(p);
+    		add_template<0x10>(p);
     	    break;
 		case 0x11:	// { I2, I2, I2, D2 }, 40 bits
-    		ret = add_template<0x11>(p);
+    		add_template<0x11>(p);
     	    break;
 		case 0x12:	// { I2, I2, I2, I2 }, 32 bits
-    		ret = add_template<0x12>(p);
+    		add_template<0x12>(p);
     	    break;
 		case 0x13:	// { I2, I2, I4, N0 }, 25 bits
-    		ret = add_template<0x13>(p);
+    		add_template<0x13>(p);
     	    break;
 		case 0x14:	// { I4, D4, N0, N0 }, 41 bits
-    		ret = add_template<0x14>(p);
+    		add_template<0x14>(p);
     	    break;
 		case 0x15:	// { I4, D2, I2, N0 }, 33 bits
-    		ret = add_template<0x15>(p);
+    		add_template<0x15>(p);
     	    break;
 		case 0x16:	// { I4, I2, D2, N0 }, 33 bits
-    		ret = add_template<0x16>(p);
+    		add_template<0x16>(p);
     	    break;
 		case 0x17:	// { I4, I2, I2, N0 }, 25 bits
-    		ret = add_template<0x17>(p);
+    		add_template<0x17>(p);
     	    break;
 		case 0x18:	// { I4, I4, N0, N0 }, 18 bits
-    		ret = add_template<0x18>(p);
+    		add_template<0x18>(p);
     	    break;
 		case 0x19:	// { I8, N0, N0, N0 }, 8 bits
-    		ret = add_template<0x19>(p);
+    		add_template<0x19>(p);
     	    break;
         default:
-        	fprintf(stderr, "Invalid template: %x\n", template_key);
+        	fprintf(stderr, "Invalid template: %x\n",  templateKey);
         }
-
-	if (ret)
-		return ret;
-
-	return 0;
 }
 
 /**
@@ -517,13 +503,10 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 {
 	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param)); 
 
-	int ret;
 	uint64_t last, next;
 	uint8_t repeat_count = 0;
-	uint32_t crc;
 
-
-	for(uint16_t i = 0; i < (1 << DICT16_BITS); i++) {
+    for(uint16_t i = 0; i < (1 << DICT16_BITS); i++) {
 		p->hashTable16[i] = NO_ENTRY;
 	}
 
@@ -571,19 +554,16 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 				goto repeat;
 		}
 		if (repeat_count) {
-			ret = add_repeat_template(p, repeat_count);
+			add_repeat_template(p, repeat_count);
 			repeat_count = 0;
 			if (next == last) /* reached max repeat bits */
 				goto repeat;
 		}
 
 		if (next == 0)
-			ret = add_zeros_template(p);
+			add_zeros_template(p);
 		else
-			ret = process_next(p);
-
-		if (ret)
-			return ret;
+			process_next(p);
 
 repeat:
 		last = next;
@@ -592,15 +572,11 @@ repeat:
 		p->ilen -= 8;
 	}
 
-	if (repeat_count) {
-		ret = add_repeat_template(p, repeat_count);
-		if (ret)
-			return ret;
-	}
+	if (repeat_count)
+		add_repeat_template(p, repeat_count);
 
-	ret = add_end_template(p);
-	if (ret)
-		return ret;
+
+	add_end_template(p);
 
 	/*
 	 * crc(0:31) is appended to target data starting with the next
@@ -609,9 +585,12 @@ repeat:
 	 * same here so that sw842 decompression can be used for both
 	 * compressed data.
 	 */
-	crc = crc32_be(0, (const unsigned char *) in, ilen);
+    #ifndef DISABLE_CRC
+    uint32_t crc = crc32_be(0, (const unsigned char *) in, ilen);
 
-	stream_write_bits(p->stream, swap_endianness32(crc), CRC_BITS);
+	stream_write_bits(p->stream, swap_be_to_native32(crc), CRC_BITS);
+    #endif
+
 	stream_flush(p->stream);
 
 	*olen = stream_size(p->stream);

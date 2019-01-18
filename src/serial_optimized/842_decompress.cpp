@@ -264,7 +264,6 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 	struct sw842_param_decomp p;
 	int ret;
 	uint64_t op, rep, total;
-	uint64_t crc;
 
 	p.in = (uint8_t *)in;
 	p.bit = 0;
@@ -332,6 +331,8 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 	 * crc(0:31) is saved in compressed data starting with the
 	 * next bit after End of stream template.
 	 */
+	#ifndef DISABLE_CRC
+	uint64_t crc;
 	ret = next_bits(&p, &crc, CRC_BITS);
 	crc = swap_endianness32(crc);
 	
@@ -345,6 +346,7 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		fprintf(stderr, "CRC mismatch for decompression\n");
 		return -EINVAL;
 	}
+	#endif
 
 	if ((total - p.olen) > UINT_MAX)
 		return -ENOSPC;

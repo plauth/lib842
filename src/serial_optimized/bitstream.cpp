@@ -31,7 +31,7 @@ static uint64_t stream_read_word(struct bitstream* s)
 /* write a single uint64_t to memory */
 static void stream_write_word(struct bitstream* s, uint64_t value)
 {
-  *s->ptr++ = swap_endianness64(value);
+  *s->ptr++ = swap_native_to_be64(value);
 }
 
 /* public functions -------------------------------------------------------- */
