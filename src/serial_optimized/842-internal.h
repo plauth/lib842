@@ -146,7 +146,7 @@ struct sw842_param {
 
 	uint64_t data[7];
 	uint64_t hashes[7];
-	uint8_t validity[7];
+	uint16_t validity[7];
 	uint16_t templateKeys[7];
 
 	int index8[1];
@@ -156,12 +156,12 @@ struct sw842_param {
 	uint64_t hash4[2];
 	uint16_t hash2[4];
 
-	int16_t hashTable16[1 << DICT16_BITS];
-	int16_t hashTable32[1 << DICT32_BITS];
-	int16_t hashTable64[1 << DICT64_BITS];
-	uint16_t ringBuffer16[1 << BUFFER16_BITS];
-	uint32_t ringBuffer32[1 << BUFFER32_BITS];
-	uint64_t ringBuffer64[1 << BUFFER64_BITS];
+	int16_t hashTable16[1 << DICT16_BITS]; // 1024 * 2 bytes =   2 KiB
+	int16_t hashTable32[1 << DICT32_BITS]; // 2048 * 2 bytes =   4 KiB
+	int16_t hashTable64[1 << DICT64_BITS]; // 1024 * 2 bytes =   2 KiB
+	uint16_t ringBuffer16[1 << I2_BITS];   // 256  * 2 bytes = 0.5 KiB
+	uint32_t ringBuffer32[1 << I4_BITS];   // 512  * 4 bytes =   2 KiB
+	uint64_t ringBuffer64[1 << I8_BITS];   // 256  * 8 bytes =   2 KiB
 
 
 };

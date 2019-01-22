@@ -39,49 +39,58 @@ template<typename T> static inline void replace_hash(struct sw842_param *p, uint
         }
 }
 
-template<typename T, uint8_t OFFSET> static inline void find_index(struct sw842_param *p) {
-		int16_t index;
+static inline void find_index(struct sw842_param *p) {
+		int16_t index[6];
+		uint16_t isIndexValid[6];
+		uint16_t isDataValid[6];
 
-        switch(sizeof(T)) {
-                case 2:
-                    index = p->hashTable16[p->hashes[OFFSET]];
-                    p->validity[OFFSET] = (index >= 0) && (p->ringBuffer16[index] == p->data[OFFSET]);
-           		    p->index2[OFFSET] = p->validity[OFFSET] * index;
-                    switch(OFFSET) {
-                        case 0:
-                            p->templateKeys[OFFSET] = (13 * 3) * p->validity[OFFSET];
-                            break;
-                        case 1:
-                            p->templateKeys[OFFSET] = (13 * 5) * p->validity[OFFSET];
-                            break;
-                        case 2:
-                            p->templateKeys[OFFSET] = (13 * 7) * p->validity[OFFSET];
-                            break;
-                        case 3:
-                            p->templateKeys[OFFSET] = (13 * 11) * p->validity[OFFSET];
-                            break;
-                    }
-                	break;
-                case 4:
-                	index = p->hashTable32[p->hashes[4+OFFSET]];
-                    p->validity[4+OFFSET] = (index >= 0) && (p->ringBuffer32[index] == p->data[4+OFFSET]);
-                    p->index4[OFFSET] = p->validity[4+OFFSET] * index;
-                    switch(OFFSET) {
-                        case 0:
-                            p->templateKeys[4+OFFSET] = (53 * 3) * p->validity[4+OFFSET];
-                            break;
-                        case 1:
-                            p->templateKeys[4+OFFSET] = (53 * 5) * p->validity[4+OFFSET];
-                            break;
-                    }
-                	break;
-                case 8:
-                	index = p->hashTable64[p->hashes[6+OFFSET]];
-                    p->validity[6+OFFSET] = (index >= 0) && (p->ringBuffer64[index] == p->data[6+OFFSET]);
-                    p->index8[OFFSET] = p->validity[6+OFFSET] * index;
-                    p->templateKeys[6+OFFSET] = (149 * 3) * p->validity[6+OFFSET];
-                    break;
-        }
+        index[0] = p->hashTable16[p->hashes[0]];
+        index[1] = p->hashTable16[p->hashes[1]];
+        index[2] = p->hashTable16[p->hashes[2]];
+        index[3] = p->hashTable16[p->hashes[3]];
+        index[4] = p->hashTable32[p->hashes[4]];
+        index[5] = p->hashTable32[p->hashes[5]];
+        index[6] = p->hashTable64[p->hashes[6]];
+
+        isIndexValid[0] = (index[0] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[1] = (index[1] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[2] = (index[2] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[3] = (index[3] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[4] = (index[4] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[5] = (index[5] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[6] = (index[6] >= 0) ? 0xFFFF : 0x0000;
+
+        isDataValid[0] = (p->ringBuffer16[index[0]] == p->data[0]) ? 0xFFFF : 0x0000;
+        isDataValid[1] = (p->ringBuffer16[index[1]] == p->data[1]) ? 0xFFFF : 0x0000;
+        isDataValid[2] = (p->ringBuffer16[index[2]] == p->data[2]) ? 0xFFFF : 0x0000;
+        isDataValid[3] = (p->ringBuffer16[index[3]] == p->data[3]) ? 0xFFFF : 0x0000;
+        isDataValid[4] = (p->ringBuffer32[index[4]] == p->data[4]) ? 0xFFFF : 0x0000;
+        isDataValid[5] = (p->ringBuffer32[index[5]] == p->data[5]) ? 0xFFFF : 0x0000;
+        isDataValid[6] = (p->ringBuffer64[index[6]] == p->data[6]) ? 0xFFFF : 0x0000;
+
+        p->validity[0] = isIndexValid[0] & isDataValid[0];
+        p->validity[1] = isIndexValid[1] & isDataValid[1];
+        p->validity[2] = isIndexValid[2] & isDataValid[2];
+        p->validity[3] = isIndexValid[3] & isDataValid[3];
+        p->validity[4] = isIndexValid[4] & isDataValid[4];
+        p->validity[5] = isIndexValid[5] & isDataValid[5];
+        p->validity[6] = isIndexValid[6] & isDataValid[6];
+
+	    p->index2[0] = p->validity[0] & index[0];
+	    p->index2[1] = p->validity[1] & index[1];
+	    p->index2[2] = p->validity[2] & index[2];
+	    p->index2[3] = p->validity[3] & index[3];
+	    p->index4[0] = p->validity[4] & index[4];
+	    p->index4[1] = p->validity[5] & index[5];
+	    p->index8[0] = p->validity[6] & index[6];
+
+	    p->templateKeys[0] = (13 *  3) & p->validity[0];
+	    p->templateKeys[1] = (13 *  5) & p->validity[1];
+	    p->templateKeys[2] = (13 *  7) & p->validity[2];
+	    p->templateKeys[3] = (13 * 11) & p->validity[3];
+        p->templateKeys[4] = (53 *  3) & p->validity[4];
+        p->templateKeys[5] = (53 *  5) & p->validity[5];
+        p->templateKeys[6] = (149 * 3) & p->validity[6];
 }
 
 static inline uint16_t max(uint16_t a, uint16_t b) {
@@ -327,9 +336,9 @@ static inline void update_hashtables(struct sw842_param *p)
 {
 
 	uint64_t pos = p->in - p->instart;
-    uint16_t i64 = (pos >> 3) % (1 << BUFFER64_BITS);
-    uint16_t i32 = (pos >> 2) % (1 << BUFFER32_BITS);
-    uint16_t i16 = (pos >> 1) % (1 << BUFFER16_BITS);
+    uint16_t i64 = (pos >> 3) % (1 << I8_BITS);
+    uint16_t i32 = (pos >> 2) % (1 << I4_BITS);
+    uint16_t i16 = (pos >> 1) % (1 << I2_BITS);
 
     replace_hash<uint16_t>(p, i16, 0);
     replace_hash<uint16_t>(p, i16, 1);
@@ -363,15 +372,9 @@ static inline void process_next(struct sw842_param *p)
     p->templateKeys[5] = 0;
     p->templateKeys[6] = 0;
 
-    hashVec(p->data, p->hashes);
+    hash(p->data, p->hashes);
 
-	find_index<uint16_t,0>(p);
-	find_index<uint16_t,1>(p);
-	find_index<uint16_t,2>(p);
-	find_index<uint16_t,3>(p);
-    find_index<uint32_t,0>(p);
-    find_index<uint32_t,1>(p);
-    find_index<uint64_t,0>(p);
+    find_index(p);
 
     templateKey = get_template(p);
 

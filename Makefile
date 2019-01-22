@@ -1,22 +1,28 @@
 CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
-CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopt-info-vec=vec.out -Wno-shift-count-overflow -fopenmp
+CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopenmp
 
 ifeq ($(shell uname),Darwin)
 CC=gcc-7
 CXX=g++-7
 LDFLAGS_OCL := -framework OpenCL
+CRYPTODEV_IS_LOADED=0
 else ifeq ($(shell uname),AIX)
 CC=gcc
 CXX=g++
 CC_FLAGS+=-maix64 -Wl,-b64
+CRYPTODEV_IS_LOADED=0
 else ifeq ($(shell uname -p),ppc64le)
 CC=/opt/at11.0/bin/gcc
 CXX=/opt/at11.0/bin/g++
 NVCC=nvcc
 LDFLAGS_OCL := -lOpenCL
+CRYPTODEV_IS_LOADED := $(shell lsmod | grep cryptodev)
 else ifeq ($(shell uname -p),x86_64)
 CC=gcc
 CXX=g++
+CRYPTODEV_IS_LOADED := $(shell lsmod | grep cryptodev)
+#CC=/opt/intel/compilers_and_libraries/linux/bin/intel64/icc
+#CXX=/opt/intel/compilers_and_libraries/linux/bin/intel64/icpc
 LDFLAGS_OCL := -lOpenCL 
 endif
 
@@ -44,6 +50,7 @@ OBJ_DIR_CRYPTODEV := obj/cryptodev
 
 SRC_FILES_CRYPTODEV := $(wildcard $(SRC_DIR_CRYPTODEV)/*.c)
 OBJ_FILES_CRYPTODEV := $(patsubst $(SRC_DIR_CRYPTODEV)/%.c,$(OBJ_DIR_CRYPTODEV)/%.o,$(SRC_FILES_CRYPTODEV))
+
 
 .PHONY: all checkdirs clean
 #.check-env:
@@ -109,7 +116,12 @@ test_aix_standalone: checkdirs test/compdecomp_aix.c
 ifeq ($(shell uname),Darwin)
 standalone: test_serial_standalone test_serial_optimized_standalone
 else
+ifeq ($(CRYPTODEV_IS_LOADED),)
+$(info cryptodev kernel module is not loaded, skipping cryptodev test)
+standalone: test_serial_standalone test_serial_optimized_standalone
+else
 standalone: test_serial_standalone test_serial_optimized_standalone test_cryptodev
+endif
 endif
 
 

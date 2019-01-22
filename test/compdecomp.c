@@ -110,9 +110,11 @@ int main( int argc, const char* argv[])
 			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
 		timeend_comp = timestamp();
+		
 		timestart_condense = timeend_comp;
 
 		uint64_t currentChunkPos = 0;
+		
 		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			compressedChunkPositions[chunk_num] = currentChunkPos;
 			currentChunkPos += compressedChunkSizes[chunk_num];
