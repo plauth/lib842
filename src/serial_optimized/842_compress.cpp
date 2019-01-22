@@ -18,6 +18,22 @@
 #include "842-internal.h"
 #include "../common/opcodes.h"
 
+#define PRIME16     (65521)
+#define PRIME32     (2654435761U)
+#define PRIME64     (11400714785074694791ULL)
+
+#define NO_ENTRY        (-1)
+
+static inline void hash(uint64_t* values, uint64_t* results) {
+        results[0] = (PRIME64 * values[0]) >> (64 - DICT16_BITS);   // 2
+        results[1] = (PRIME64 * values[1]) >> (64 - DICT16_BITS);   // 2
+        results[2] = (PRIME64 * values[2]) >> (64 - DICT16_BITS);   // 2
+        results[3] = (PRIME64 * values[3]) >> (64 - DICT16_BITS);   // 2
+        results[4] = (PRIME64 * values[4]) >> (64 - DICT32_BITS);   // 4
+        results[5] = (PRIME64 * values[5]) >> (64 - DICT32_BITS);   // 4
+        results[6] = (PRIME64 * values[6]) >> (64 - DICT64_BITS);   // 8
+}
+
 template<typename T> static inline void replace_hash(struct sw842_param *p, uint16_t index, uint16_t offset) {
 		uint16_t ringBufferIndex = index + offset;
 

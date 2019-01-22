@@ -87,7 +87,6 @@
 #include "../common/endianness.h"
 #include "../common/crc32.h"
 #include "kerneldeps.h"
-#include "../common/hash.hpp"
 
 //#define DEBUG 1
 
@@ -128,6 +127,10 @@
 #define I8		(OP_ACTION_INDEX | OP_AMOUNT_8)
 #define N0		(OP_ACTION_NOOP  | OP_AMOUNT_0)
 
+#define DICT16_BITS     (10)
+#define DICT32_BITS     (11)
+#define DICT64_BITS     (10)
+
 #define I2N (13)
 #define I4N (53)
 #define I8N (149)
@@ -156,6 +159,7 @@ struct sw842_param {
 	uint64_t hash4[2];
 	uint16_t hash2[4];
 
+	// L1D cache consumption: ~12.5 KiB
 	int16_t hashTable16[1 << DICT16_BITS]; // 1024 * 2 bytes =   2 KiB
 	int16_t hashTable32[1 << DICT32_BITS]; // 2048 * 2 bytes =   4 KiB
 	int16_t hashTable64[1 << DICT64_BITS]; // 1024 * 2 bytes =   2 KiB
