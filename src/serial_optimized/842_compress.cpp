@@ -39,15 +39,15 @@ template<typename T> static inline void replace_hash(struct sw842_param *p, uint
 
         switch(sizeof(T)) {
                 case 2:
-                        p->ringBuffer16[ringBufferIndex] = p->data[offset];
+                        p->ringBuffer16[ringBufferIndex] = p->dataAndIndices[offset];
                         p->hashTable16[p->hashes[offset]] = ringBufferIndex;
                         break;
                 case 4:
-                        p->ringBuffer32[ringBufferIndex] = p->data[4+offset];
+                        p->ringBuffer32[ringBufferIndex] = p->dataAndIndices[4+offset];
                         p->hashTable32[p->hashes[4+offset]] = ringBufferIndex;
                         break;
                 case 8:
-                        p->ringBuffer64[ringBufferIndex] = p->data[6+offset];
+                        p->ringBuffer64[ringBufferIndex] = p->dataAndIndices[6+offset];
                         p->hashTable64[p->hashes[6+offset]] = ringBufferIndex;
                         break;
                 default:
@@ -76,13 +76,13 @@ static inline void find_index(struct sw842_param *p) {
         isIndexValid[5] = (index[5] >= 0) ? 0xFFFF : 0x0000;
         isIndexValid[6] = (index[6] >= 0) ? 0xFFFF : 0x0000;
 
-        isDataValid[0] = (p->ringBuffer16[index[0]] == p->data[0]) ? 0xFFFF : 0x0000;
-        isDataValid[1] = (p->ringBuffer16[index[1]] == p->data[1]) ? 0xFFFF : 0x0000;
-        isDataValid[2] = (p->ringBuffer16[index[2]] == p->data[2]) ? 0xFFFF : 0x0000;
-        isDataValid[3] = (p->ringBuffer16[index[3]] == p->data[3]) ? 0xFFFF : 0x0000;
-        isDataValid[4] = (p->ringBuffer32[index[4]] == p->data[4]) ? 0xFFFF : 0x0000;
-        isDataValid[5] = (p->ringBuffer32[index[5]] == p->data[5]) ? 0xFFFF : 0x0000;
-        isDataValid[6] = (p->ringBuffer64[index[6]] == p->data[6]) ? 0xFFFF : 0x0000;
+        isDataValid[0] = (p->ringBuffer16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
+        isDataValid[1] = (p->ringBuffer16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
+        isDataValid[2] = (p->ringBuffer16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
+        isDataValid[3] = (p->ringBuffer16[index[3]] == p->dataAndIndices[3]) ? 0xFFFF : 0x0000;
+        isDataValid[4] = (p->ringBuffer32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
+        isDataValid[5] = (p->ringBuffer32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
+        isDataValid[6] = (p->ringBuffer64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
 
         p->validity[0] = isIndexValid[0] & isDataValid[0];
         p->validity[1] = isIndexValid[1] & isDataValid[1];
@@ -92,13 +92,13 @@ static inline void find_index(struct sw842_param *p) {
         p->validity[5] = isIndexValid[5] & isDataValid[5];
         p->validity[6] = isIndexValid[6] & isDataValid[6];
 
-	    p->index2[0] = p->validity[0] & index[0];
-	    p->index2[1] = p->validity[1] & index[1];
-	    p->index2[2] = p->validity[2] & index[2];
-	    p->index2[3] = p->validity[3] & index[3];
-	    p->index4[0] = p->validity[4] & index[4];
-	    p->index4[1] = p->validity[5] & index[5];
-	    p->index8[0] = p->validity[6] & index[6];
+	    p->dataAndIndices[ 7] = p->validity[0] & index[0];
+	    p->dataAndIndices[ 8] = p->validity[1] & index[1];
+	    p->dataAndIndices[ 9] = p->validity[2] & index[2];
+	    p->dataAndIndices[10] = p->validity[3] & index[3];
+	    p->dataAndIndices[11] = p->validity[4] & index[4];
+	    p->dataAndIndices[12] = p->validity[5] & index[5];
+	    p->dataAndIndices[13] = p->validity[6] & index[6];
 
 	    p->templateKeys[0] = (13 *  3) & p->validity[0];
 	    p->templateKeys[1] = (13 *  5) & p->validity[1];
@@ -132,184 +132,184 @@ template<uint8_t TEMPLATE_KEY> static inline void add_template(struct sw842_para
     switch(TEMPLATE_KEY) {
         case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
         	stream_write_bits(p->stream, TEMPLATE_KEY, OP_BITS);
-        	stream_write_bits(p->stream, p->data[6], D8_BITS);
+        	stream_write_bits(p->stream, p->dataAndIndices[6], D8_BITS);
     	    break;
         case 0x01:	// { D4, D2, I2, N0 }, 56 bits
         	out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + D2_BITS + I2_BITS))			|
-        		 	(((uint64_t) p->data[4])  << (D2_BITS + I2_BITS)) 						|
-        			(((uint64_t) p->data[2])  << (I2_BITS)) 								|
-        			(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[4])  << (D2_BITS + I2_BITS)) 						|
+        			(((uint64_t) p->dataAndIndices[2])  << (I2_BITS)) 								|
+        			(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + D4_BITS + D2_BITS + I2_BITS);
     	    break;
         case 0x02:	// { D4, I2, D2, N0 }, 56 bits
          	out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + I2_BITS + D2_BITS))			|
-        		 	(((uint64_t) p->data[4])  << (I2_BITS + D2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
-        		 	(((uint64_t) p->data[3]));
+        		 	(((uint64_t) p->dataAndIndices[4])  << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (D2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[3]));
         	stream_write_bits(p->stream, out, OP_BITS + D4_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x03: 	// { D4, I2, I2, N0 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + I2_BITS + I2_BITS))			|
-        		 	(((uint64_t) p->data[4])  << (I2_BITS + I2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
-        		 	(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[4])  << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (I2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + D4_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x04:	// { D4, I4, N0, N0 }, 41 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + I4_BITS))						|
-        		 	(((uint64_t) p->data[4])  << (I4_BITS))								    |
-        		 	(((uint64_t) p->index4[1]));
+        		 	(((uint64_t) p->dataAndIndices[4])  << (I4_BITS))								    |
+        		 	(((uint64_t) p->dataAndIndices[12]));
         	stream_write_bits(p->stream, out, OP_BITS + D4_BITS + I4_BITS);
     	    break;
 		case 0x05:	// { D2, I2, D4, N0 }, 56 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + D4_BITS))			|
-        		 	(((uint64_t) p->data[0])  << (I2_BITS + D4_BITS))						|
-        		 	(((uint64_t) p->index2[1]) << (D4_BITS))								|
-        		 	(((uint64_t) p->data[5]));
+        		 	(((uint64_t) p->dataAndIndices[0])  << (I2_BITS + D4_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[8]) << (D4_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[5]));
         	stream_write_bits(p->stream, out, OP_BITS + D2_BITS + I2_BITS + D4_BITS); 
     	    break;
 		case 0x06:	// { D2, I2, D2, I2 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + D2_BITS + I2_BITS))	|
-        		 	(((uint64_t) p->data[0])  << (I2_BITS + D2_BITS + I2_BITS))			    |
-        		 	(((uint64_t) p->index2[1]) << (D2_BITS + I2_BITS))						|
-        		 	(((uint64_t) p->data[2])  << (I2_BITS))								    |
-        		 	(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[0])  << (I2_BITS + D2_BITS + I2_BITS))			    |
+        		 	(((uint64_t) p->dataAndIndices[8]) << (D2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[2])  << (I2_BITS))								    |
+        		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + D2_BITS + I2_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x07:	// { D2, I2, I2, D2 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + I2_BITS + D2_BITS))	|
-        		 	(((uint64_t) p->data[0])  << (I2_BITS + I2_BITS + D2_BITS))			    |
-        		 	(((uint64_t) p->index2[1]) << (I2_BITS + D2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
-        		 	(((uint64_t) p->data[3]));
+        		 	(((uint64_t) p->dataAndIndices[0])  << (I2_BITS + I2_BITS + D2_BITS))			    |
+        		 	(((uint64_t) p->dataAndIndices[8]) << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (D2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[3]));
         	stream_write_bits(p->stream, out, OP_BITS + D2_BITS + I2_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x08:	// { D2, I2, I2, I2 }, 40 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + I2_BITS + I2_BITS))	|
-        		 	(((uint64_t) p->data[0])  << (I2_BITS + I2_BITS + I2_BITS))			    |
-        		 	(((uint64_t) p->index2[1]) << (I2_BITS + I2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
-        		 	(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[0])  << (I2_BITS + I2_BITS + I2_BITS))			    |
+        		 	(((uint64_t) p->dataAndIndices[8]) << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (I2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + D2_BITS + I2_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x09:	// { D2, I2, I4, N0 }, 33 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + I4_BITS))			|
-        		 	(((uint64_t) p->data[0])  << (I2_BITS + I4_BITS))						|
-        		 	(((uint64_t) p->index2[1]) << (I4_BITS))								|
-        		 	(((uint64_t) p->index4[1]));
+        		 	(((uint64_t) p->dataAndIndices[0])  << (I2_BITS + I4_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[8]) << (I4_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[12]));
         	stream_write_bits(p->stream, out, OP_BITS + D2_BITS + I2_BITS + I4_BITS);
     	    break;
 		case 0x0a:	// { I2, D2, D4, N0 }, 56 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + D4_BITS))			|
-        		 	(((uint64_t) p->index2[0]) << (D2_BITS + D4_BITS))						|
-        		 	(((uint64_t) p->data[1])  << (D4_BITS))								    |
-        		 	(((uint64_t) p->data[5]));
+        		 	(((uint64_t) p->dataAndIndices[7]) << (D2_BITS + D4_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[1])  << (D4_BITS))								    |
+        		 	(((uint64_t) p->dataAndIndices[5]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + D2_BITS + D4_BITS);
     	    break;
 		case 0x0b:	// { I2, D4, I2, N0 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D4_BITS + I2_BITS))			|
-        		 	(((uint64_t) p->index2[0]) << (D4_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[7]) << (D4_BITS + I2_BITS))						|
         		 	(((uint64_t) swap_be_to_native32(read32(p->in + 2))))  << (I2_BITS)		                    |
-        		 	(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + D4_BITS + I2_BITS);
     	    break;
 		case 0x0c:	// { I2, D2, I2, D2 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + I2_BITS + D2_BITS))	|
-        		 	(((uint64_t) p->index2[0]) << (D2_BITS + I2_BITS + D2_BITS))			|
-        		 	(((uint64_t) p->data[1])  << (I2_BITS + D2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
-        		 	(((uint64_t) p->data[3]));
+        		 	(((uint64_t) p->dataAndIndices[7]) << (D2_BITS + I2_BITS + D2_BITS))			|
+        		 	(((uint64_t) p->dataAndIndices[1])  << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (D2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[3]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + D2_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x0d:	// { I2, D2, I2, I2 }, 40 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + I2_BITS + I2_BITS))	|
-        		 	(((uint64_t) p->index2[0]) << (D2_BITS + I2_BITS + I2_BITS))			|
-        		 	(((uint64_t) p->data[1])  << (I2_BITS + I2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
-        		 	(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[7]) << (D2_BITS + I2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->dataAndIndices[1])  << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (I2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + D2_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x0e:	// { I2, D2, I4, N0 }, 33 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D2_BITS + I4_BITS))			|
-        		 	(((uint64_t) p->index2[0]) << (D2_BITS + I4_BITS))						|
-        		 	(((uint64_t) p->data[1])  << (I4_BITS))								    |
-        		 	(((uint64_t) p->index4[1]));
+        		 	(((uint64_t) p->dataAndIndices[7]) << (D2_BITS + I4_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[1])  << (I4_BITS))								    |
+        		 	(((uint64_t) p->dataAndIndices[12]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + D2_BITS + I4_BITS);
     	    break;
 		case 0x0f:	// { I2, I2, D4, N0 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + D4_BITS))			|
-        		 	(((uint64_t) p->index2[0]) << (I2_BITS + D4_BITS))						|
-        		 	(((uint64_t) p->index2[1]) << (D4_BITS))								|
-        		 	(((uint64_t) p->data[5]));
+        		 	(((uint64_t) p->dataAndIndices[7]) << (I2_BITS + D4_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[8]) << (D4_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[5]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + I2_BITS + D4_BITS);
     	    break;
 		case 0x10:	// { I2, I2, D2, I2 }, 40 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + D2_BITS + I2_BITS))	|
-        		 	(((uint64_t) p->index2[0]) << (I2_BITS + D2_BITS + I2_BITS))			|
-        		 	(((uint64_t) p->index2[1]) << (D2_BITS + I2_BITS))						|
-        		 	(((uint64_t) p->data[2])  << (I2_BITS))								    |
-        		 	(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[7]) << (I2_BITS + D2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->dataAndIndices[8]) << (D2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[2])  << (I2_BITS))								    |
+        		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + I2_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x11:	// { I2, I2, I2, D2 }, 40 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + I2_BITS + D2_BITS))	|
-        		 	(((uint64_t) p->index2[0]) << (I2_BITS + I2_BITS + D2_BITS))			|
-        		 	(((uint64_t) p->index2[1]) << (I2_BITS + D2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
-        		 	(((uint64_t) p->data[3]));
+        		 	(((uint64_t) p->dataAndIndices[7]) << (I2_BITS + I2_BITS + D2_BITS))			|
+        		 	(((uint64_t) p->dataAndIndices[8]) << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (D2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[3]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + I2_BITS + I2_BITS + D2_BITS);
     	    break;
 		case 0x12:	// { I2, I2, I2, I2 }, 32 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + I2_BITS + I2_BITS))	|
-        		 	(((uint64_t) p->index2[0]) << (I2_BITS + I2_BITS + I2_BITS))			|
-        		 	(((uint64_t) p->index2[1]) << (I2_BITS + I2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
-        		 	(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[7]) << (I2_BITS + I2_BITS + I2_BITS))			|
+        		 	(((uint64_t) p->dataAndIndices[8]) << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (I2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + I2_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x13:	// { I2, I2, I4, N0 }, 25 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + I2_BITS + I4_BITS))			|
-        		 	(((uint64_t) p->index2[0]) << (I2_BITS + I4_BITS))						|
-        		 	(((uint64_t) p->index2[1]) << (I4_BITS))								|
-        		 	(((uint64_t) p->index4[1]));
+        		 	(((uint64_t) p->dataAndIndices[7]) << (I2_BITS + I4_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[8]) << (I4_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[12]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + I2_BITS + I4_BITS);
     	    break;
 		case 0x14:	// { I4, D4, N0, N0 }, 41 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + D4_BITS))						|
-        		 	(((uint64_t) p->index4[0]) << (D4_BITS))								|
-        		 	(((uint64_t) p->data[5]));
+        		 	(((uint64_t) p->dataAndIndices[11]) << (D4_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[5]));
         	stream_write_bits(p->stream, out, OP_BITS + I4_BITS + D4_BITS);
     	    break;
 		case 0x15:	// { I4, D2, I2, N0 }, 33 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + D2_BITS + I2_BITS))			|
-        		 	(((uint64_t) p->index4[0]) << (D2_BITS + I2_BITS))						|
-        		 	(((uint64_t) p->data[2])  << (I2_BITS))								    |
-        		 	(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[11]) << (D2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[2])  << (I2_BITS))								    |
+        		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + I4_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x16:	// { I4, I2, D2, N0 }, 33 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + I2_BITS + D2_BITS))			|
-        		 	(((uint64_t) p->index4[0]) << (I2_BITS + D2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (D2_BITS))								|
-        		 	(((uint64_t) p->data[3]));
+        		 	(((uint64_t) p->dataAndIndices[11]) << (I2_BITS + D2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (D2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[3]));
         	stream_write_bits(p->stream, out, OP_BITS + I4_BITS + D2_BITS + I2_BITS);
     	    break;
 		case 0x17:	// { I4, I2, I2, N0 }, 25 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + I2_BITS + I2_BITS))			|
-        		 	(((uint64_t) p->index4[0]) << (I2_BITS + I2_BITS))						|
-        		 	(((uint64_t) p->index2[2]) << (I2_BITS))								|
-        		 	(((uint64_t) p->index2[3]));
+        		 	(((uint64_t) p->dataAndIndices[11]) << (I2_BITS + I2_BITS))						|
+        		 	(((uint64_t) p->dataAndIndices[9]) << (I2_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + I4_BITS + I2_BITS + I2_BITS);
     	    break;
 		case 0x18:	// { I4, I4, N0, N0 }, 18 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I4_BITS + I4_BITS))						|
-        		 	(((uint64_t) p->index4[0]) << (I4_BITS))								|
-        		 	(((uint64_t) p->index4[1]));
+        		 	(((uint64_t) p->dataAndIndices[11]) << (I4_BITS))								|
+        		 	(((uint64_t) p->dataAndIndices[12]));
         	stream_write_bits(p->stream, out, OP_BITS + I4_BITS + I4_BITS);
     	    break;
 		case 0x19:	// { I8, N0, N0, N0 }, 8 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (I8_BITS))								|
-        		 	(((uint64_t) p->index8[0]));
+        		 	(((uint64_t) p->dataAndIndices[13]));
         	stream_write_bits(p->stream, out, OP_BITS + I8_BITS);
     	    break;
         default:
@@ -335,13 +335,14 @@ static inline void add_end_template(struct sw842_param *p) {
 }
 
 static inline void get_next_data(struct sw842_param *p) {
-	p->data[6] = swap_be_to_native64(read64(p->in    ));
-	p->data[4] = swap_be_to_native32(read32(p->in    ));
-	p->data[5] = swap_be_to_native32(read32(p->in + 4));
-	p->data[0] = swap_be_to_native16(read16(p->in    ));
-	p->data[1] = swap_be_to_native16(read16(p->in + 2));
-	p->data[2] = swap_be_to_native16(read16(p->in + 4));
-	p->data[3] = swap_be_to_native16(read16(p->in + 6));
+    p->dataAndIndices[0] = swap_be_to_native16(read16(p->in    ));
+    p->dataAndIndices[1] = swap_be_to_native16(read16(p->in + 2));
+    p->dataAndIndices[2] = swap_be_to_native16(read16(p->in + 4));
+    p->dataAndIndices[3] = swap_be_to_native16(read16(p->in + 6));
+	p->dataAndIndices[4] = swap_be_to_native32(read32(p->in    ));
+	p->dataAndIndices[5] = swap_be_to_native32(read32(p->in + 4));
+    p->dataAndIndices[6] = swap_be_to_native64(read64(p->in    ));
+
 }
 
 /* update the hashtable entries.
@@ -388,7 +389,7 @@ static inline void process_next(struct sw842_param *p)
     p->templateKeys[5] = 0;
     p->templateKeys[6] = 0;
 
-    hash(p->data, p->hashes);
+    hash(p->dataAndIndices, p->hashes);
 
     find_index(p);
 

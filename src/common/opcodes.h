@@ -227,8 +227,8 @@ static const uint8_t ops_dict[224] = {
 /*	223	*/	0x19	
 };
 
-/*
-static uint8_t template_dict[26][4] = { // params size in bits
+
+static uint8_t ops[26][4] = { // params size in bits
 	{ D8, N0, N0, N0 }, // 0x00	64
 	{ D4, D2, I2, N0 }, // 0x01 56
 	{ D4, I2, D2, N0 }, // 0x02 56
@@ -261,5 +261,5 @@ static uint8_t template_dict[26][4] = { // params size in bits
 
 	{ I4, I4, N0, N0 }, // 0x18	18
 	{ I8, N0, N0, N0 }, // 0x19	8
-}; */
+};
 

@@ -147,14 +147,11 @@ struct sw842_param {
 	uint8_t *out;
 	uint64_t olen;
 
-	uint64_t data[7];
+	uint64_t dataAndIndices[15];
 	uint64_t hashes[7];
 	uint16_t validity[7];
 	uint16_t templateKeys[7];
 
-	int index8[1];
-	int index4[2];
-	int index2[4];
 	uint64_t hash8[1];
 	uint64_t hash4[2];
 	uint16_t hash2[4];
