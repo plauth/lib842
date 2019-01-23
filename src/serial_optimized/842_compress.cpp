@@ -35,9 +35,9 @@ static inline void hash(uint64_t* values, uint64_t* results) {
 }
 
 static inline void find_index(struct sw842_param *p) {
-		int16_t index[6];
-		uint16_t isIndexValid[6];
-		uint16_t isDataValid[6];
+		int32_t index[7];
+		uint32_t isIndexValid[7];
+		uint32_t isDataValid[7];
 
         index[0] = p->hashTable16[p->hashes[0]];
         index[1] = p->hashTable16[p->hashes[1]];
@@ -47,21 +47,21 @@ static inline void find_index(struct sw842_param *p) {
         index[5] = p->hashTable32[p->hashes[5]];
         index[6] = p->hashTable64[p->hashes[6]];
 
-        isIndexValid[0] = (index[0] >= 0) ? 0xFFFF : 0x0000;
-        isIndexValid[1] = (index[1] >= 0) ? 0xFFFF : 0x0000;
-        isIndexValid[2] = (index[2] >= 0) ? 0xFFFF : 0x0000;
-        isIndexValid[3] = (index[3] >= 0) ? 0xFFFF : 0x0000;
-        isIndexValid[4] = (index[4] >= 0) ? 0xFFFF : 0x0000;
-        isIndexValid[5] = (index[5] >= 0) ? 0xFFFF : 0x0000;
-        isIndexValid[6] = (index[6] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[0] = (index[0] >= 0) ? 0xFFFFFFFF : 0x00000000;
+        isIndexValid[1] = (index[1] >= 0) ? 0xFFFFFFFF : 0x00000000;
+        isIndexValid[2] = (index[2] >= 0) ? 0xFFFFFFFF : 0x00000000;
+        isIndexValid[3] = (index[3] >= 0) ? 0xFFFFFFFF : 0x00000000;
+        isIndexValid[4] = (index[4] >= 0) ? 0xFFFFFFFF : 0x00000000;
+        isIndexValid[5] = (index[5] >= 0) ? 0xFFFFFFFF : 0x00000000;
+        isIndexValid[6] = (index[6] >= 0) ? 0xFFFFFFFF : 0x00000000;
 
-        isDataValid[0] = (p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
-        isDataValid[1] = (p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
-        isDataValid[2] = (p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
-        isDataValid[3] = (p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ? 0xFFFF : 0x0000;
-        isDataValid[4] = (p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
-        isDataValid[5] = (p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
-        isDataValid[6] = (p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
+        isDataValid[0] = (p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFFFFFF : 0x00000000;
+        isDataValid[1] = (p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFFFFFF : 0x00000000;
+        isDataValid[2] = (p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFFFFFF : 0x00000000;
+        isDataValid[3] = (p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ? 0xFFFFFFFF : 0x00000000;
+        isDataValid[4] = (p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFFFFFF : 0x00000000;
+        isDataValid[5] = (p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFFFFFF : 0x00000000;
+        isDataValid[6] = (p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFFFFFF : 0x00000000;
 
         p->validity[0] = isIndexValid[0] & isDataValid[0];
         p->validity[1] = isIndexValid[1] & isDataValid[1];
@@ -318,14 +318,13 @@ static inline void add_end_template(struct sw842_param *p) {
 }
 
 static inline void get_next_data(struct sw842_param *p) {
-    p->dataAndIndices[0] = swap_be_to_native16(read16(p->in    ));
-    p->dataAndIndices[1] = swap_be_to_native16(read16(p->in + 2));
-    p->dataAndIndices[2] = swap_be_to_native16(read16(p->in + 4));
-    p->dataAndIndices[3] = swap_be_to_native16(read16(p->in + 6));
-	p->dataAndIndices[4] = swap_be_to_native32(read32(p->in    ));
-	p->dataAndIndices[5] = swap_be_to_native32(read32(p->in + 4));
-    p->dataAndIndices[6] = swap_be_to_native64(read64(p->in    ));
-
+    p->dataAndIndices[ 0] = swap_be_to_native16(read16(p->in    ));
+    p->dataAndIndices[ 1] = swap_be_to_native16(read16(p->in + 2));
+    p->dataAndIndices[ 2] = swap_be_to_native16(read16(p->in + 4));
+    p->dataAndIndices[ 3] = swap_be_to_native16(read16(p->in + 6));
+	p->dataAndIndices[ 4] = swap_be_to_native32(read32(p->in    ));
+	p->dataAndIndices[ 5] = swap_be_to_native32(read32(p->in + 4));
+    p->dataAndIndices[ 6] = swap_be_to_native64(read64(p->in    ));
     p->dataAndIndices[14] = swap_be_to_native32(read32(p->in + 2));
     p->dataAndIndices[15] = 0x0000000000000000;
 
