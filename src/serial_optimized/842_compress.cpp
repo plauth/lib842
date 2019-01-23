@@ -192,7 +192,7 @@ template<uint8_t TEMPLATE_KEY> static inline void add_template(struct sw842_para
             //printf("template 0x0b!\n")
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D4_BITS + I2_BITS))			|
         		 	(((uint64_t) p->dataAndIndices[7]) << (D4_BITS + I2_BITS))						|
-        		 	(((uint64_t) p->dataAndIndices[14]) << (I2_BITS))		                    |
+        		 	(((uint64_t) swap_be_to_native32(read32(p->in + 2))))  << (I2_BITS)	                    |
         		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + D4_BITS + I2_BITS);
     	    break;
@@ -325,8 +325,10 @@ static inline void get_next_data(struct sw842_param *p) {
 	p->dataAndIndices[ 4] = swap_be_to_native32(read32(p->in    ));
 	p->dataAndIndices[ 5] = swap_be_to_native32(read32(p->in + 4));
     p->dataAndIndices[ 6] = swap_be_to_native64(read64(p->in    ));
+    #if defined(BRANCH_FREE) && BRANCH_FREE == 1
     p->dataAndIndices[14] = swap_be_to_native32(read32(p->in + 2));
     p->dataAndIndices[15] = 0x0000000000000000;
+    #endif
 
 }
 
