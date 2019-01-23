@@ -87,7 +87,7 @@
 #include "../common/endianness.h"
 #include "../common/crc32.h"
 
-
+#define BRANCH_FREE (0)
 //#define DEBUG 1
 
 /* special templates */

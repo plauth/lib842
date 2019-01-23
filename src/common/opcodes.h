@@ -1,5 +1,6 @@
-//hash function: (I# value * prime(offset) / 4 
-// (offset: 0 -> 3, 1 -> 5, 2 -> 7, 3 -> 11)
+#ifndef __OPCODES_H__
+#define __OPCODES_H__
+
 static const uint8_t ops_dict[224] = {
 /*	0	*/	0x00,
 /*	1	*/	0	,
@@ -227,6 +228,7 @@ static const uint8_t ops_dict[224] = {
 /*	223	*/	0x19	
 };
 
+#if defined(BRANCH_FREE) && BRANCH_FREE == 1
 
 static uint8_t templates[26][4][2] = { // params size in bits
 	{ D80_OP, N0_OP,  N0_OP,  N0_OP }, // 0x00	64
@@ -262,4 +264,7 @@ static uint8_t templates[26][4][2] = { // params size in bits
 	{ I40_OP, I41_OP, N0_OP,  N0_OP }, // 0x18	18
 	{ I80_OP, N0_OP,  N0_OP,  N0_OP }, // 0x19	8
 };
+
+#endif
+#endif
 

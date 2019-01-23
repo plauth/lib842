@@ -386,12 +386,13 @@ static inline void process_next(struct sw842_param *p)
 
     templateKey = get_template(p);
 
+
+    #if defined(BRANCH_FREE) && BRANCH_FREE == 1
     stream_write_bits(p->stream, templateKey, OP_BITS);
     for(int opnum = 0; opnum < 4; opnum++) {
         stream_write_bits(p->stream, p->dataAndIndices[templates[templateKey][opnum][0]], templates[templateKey][opnum][1]);
     }
-    
-    /*
+    #else
     switch(templateKey) {
         case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
     		add_template<0x00>(p);
@@ -474,7 +475,7 @@ static inline void process_next(struct sw842_param *p)
         default:
         	fprintf(stderr, "Invalid template: %x\n",  templateKey);
         }
-    */
+    #endif
 }
 
 /**
