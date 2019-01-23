@@ -86,7 +86,7 @@
 #include "../common/memaccess.h"
 #include "../common/endianness.h"
 #include "../common/crc32.h"
-#include "kerneldeps.h"
+
 
 //#define DEBUG 1
 
@@ -135,6 +135,25 @@
 #define I4N (53)
 #define I8N (149)
 
+//1st value: position of payload in dataAndIndices
+//2nd value: number of bits 
+#define D20_OP	{0,  D2_BITS}
+#define D21_OP	{1,  D2_BITS}
+#define D22_OP	{2,  D2_BITS}
+#define D23_OP	{3,  D2_BITS}
+#define D40_OP	{4,  D4_BITS}
+#define D41_OP  {5,  D4_BITS}
+#define D80_OP	{6,  D8_BITS}
+#define I20_OP	{7,  I2_BITS}
+#define I21_OP	{8,  I2_BITS}
+#define I22_OP	{9,  I2_BITS}
+#define I23_OP	{10, I2_BITS}
+#define I40_OP	{11, I4_BITS}
+#define I41_OP	{12, I4_BITS}
+#define I80_OP	{13, I8_BITS}
+#define D4S_OP  {14, D4_BITS}
+#define N0_OP	{15, 0}
+
 /* the max of the regular templates - not including the special templates */
 #define OPS_MAX		(0x1a)
 
@@ -142,29 +161,24 @@ struct sw842_param {
 	struct bitstream* stream;
 
 	uint8_t *in;
-	uint8_t *instart;
+	const uint8_t *instart;
 	uint64_t ilen;
 	uint8_t *out;
 	uint64_t olen;
 
-	uint64_t dataAndIndices[15];
+	// 0-6: data; 7-13: indices; 14: 0
+	uint64_t dataAndIndices[16];
 	uint64_t hashes[7];
 	uint16_t validity[7];
 	uint16_t templateKeys[7];
-
-	uint64_t hash8[1];
-	uint64_t hash4[2];
-	uint16_t hash2[4];
 
 	// L1D cache consumption: ~12.5 KiB
 	int16_t hashTable16[1 << DICT16_BITS]; // 1024 * 2 bytes =   2 KiB
 	int16_t hashTable32[1 << DICT32_BITS]; // 2048 * 2 bytes =   4 KiB
 	int16_t hashTable64[1 << DICT64_BITS]; // 1024 * 2 bytes =   2 KiB
-	uint16_t ringBuffer16[1 << I2_BITS];   // 256  * 2 bytes = 0.5 KiB
-	uint32_t ringBuffer32[1 << I4_BITS];   // 512  * 4 bytes =   2 KiB
-	uint64_t ringBuffer64[1 << I8_BITS];   // 256  * 8 bytes =   2 KiB
-
-
+	uint16_t rollingFifo16[1 << I2_BITS];   // 256  * 2 bytes = 0.5 KiB
+	uint32_t rollingFifo32[1 << I4_BITS];   // 512  * 4 bytes =   2 KiB
+	uint64_t rollingFifo64[1 << I8_BITS];   // 256  * 8 bytes =   2 KiB
 };
 
 struct sw842_param_decomp {
@@ -175,10 +189,6 @@ struct sw842_param_decomp {
 	uint8_t *ostart;
 	uint64_t olen;
 };
-
-uint64_t static inline bytes_rounded_up(uint64_t bits) {
-	return (bits + 8 - 1) / 8;
-}
 
 struct bitstream* stream_open(void* buffer, size_t bytes);
 void stream_close(struct bitstream* s);

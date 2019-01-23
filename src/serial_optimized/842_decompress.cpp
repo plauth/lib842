@@ -17,6 +17,7 @@
  */
 
 #include "842-internal.h"
+#include "kerneldeps.h"
 
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE	(2 * (1 << I2_BITS))
@@ -51,6 +52,10 @@ static uint8_t decomp_ops[OPS_MAX][4] = {
 	{ I4, I4, N0, N0 },
 	{ I8, N0, N0, N0 }
 };
+
+uint64_t static inline bytes_rounded_up(uint64_t bits) {
+	return (bits + 8 - 1) / 8;
+}
 
 
 static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n);

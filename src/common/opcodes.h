@@ -228,38 +228,38 @@ static const uint8_t ops_dict[224] = {
 };
 
 
-static uint8_t ops[26][4] = { // params size in bits
-	{ D8, N0, N0, N0 }, // 0x00	64
-	{ D4, D2, I2, N0 }, // 0x01 56
-	{ D4, I2, D2, N0 }, // 0x02 56
-	{ D4, I2, I2, N0 }, // 0x03 48
+static uint8_t templates[26][4][2] = { // params size in bits
+	{ D80_OP, N0_OP,  N0_OP,  N0_OP }, // 0x00	64
+	{ D40_OP, D22_OP, I23_OP, N0_OP }, // 0x01 56
+	{ D40_OP, I22_OP, D23_OP, N0_OP }, // 0x02 56
+	{ D40_OP, I22_OP, I23_OP, N0_OP }, // 0x03 48
 
-	{ D4, I4, N0, N0 }, // 0x04 41
-	{ D2, I2, D4, N0 }, // 0x05	56
-	{ D2, I2, D2, I2 }, // 0x06	48
-	{ D2, I2, I2, D2 }, // 0x07	48
+	{ D40_OP, I41_OP, N0_OP,  N0_OP }, // 0x04 41
+	{ D20_OP, I21_OP, D41_OP, N0_OP }, // 0x05	56
+	{ D20_OP, I21_OP, D22_OP, I23_OP }, // 0x06	48
+	{ D20_OP, I21_OP, I22_OP, D23_OP }, // 0x07	48
 
-	{ D2, I2, I2, I2 }, // 0x08	40
-	{ D2, I2, I4, N0 }, // 0x09	33
-	{ I2, D2, D4, N0 }, // 0x0a	56
-	{ I2, D4, I2, N0 }, // 0x0b	48
+	{ D20_OP, I21_OP, I22_OP, I23_OP }, // 0x08	40
+	{ D20_OP, I21_OP, I41_OP, N0_OP }, // 0x09	33
+	{ I20_OP, D21_OP, D41_OP, N0_OP }, // 0x0a	56
+	{ I20_OP, D4S_OP, I23_OP, N0_OP }, // 0x0b	48
 
-	{ I2, D2, I2, D2 }, // 0x0c	48
-	{ I2, D2, I2, I2 }, // 0x0d	40
-	{ I2, D2, I4, N0 }, // 0x0e	33
-	{ I2, I2, D4, N0 }, // 0x0f	48
+	{ I20_OP, D21_OP, I22_OP, D23_OP }, // 0x0c	48
+	{ I20_OP, D21_OP, I22_OP, I23_OP }, // 0x0d	40
+	{ I20_OP, D21_OP, I41_OP, N0_OP }, // 0x0e	33
+	{ I20_OP, I21_OP, D41_OP, N0_OP }, // 0x0f	48
 
-	{ I2, I2, D2, I2 }, // 0x10 40
-	{ I2, I2, I2, D2 }, // 0x11	40
-	{ I2, I2, I2, I2 }, // 0x12	32
-	{ I2, I2, I4, N0 }, // 0x13	25
+	{ I20_OP, I21_OP, D22_OP, I23_OP }, // 0x10 40
+	{ I20_OP, I21_OP, I22_OP, D23_OP }, // 0x11	40
+	{ I20_OP, I21_OP, I22_OP, I23_OP }, // 0x12	32
+	{ I20_OP, I21_OP, I41_OP, N0_OP }, // 0x13	25
 
-	{ I4, D4, N0, N0 }, // 0x14	41
-	{ I4, D2, I2, N0 }, // 0x15	33
-	{ I4, I2, D2, N0 }, // 0x16	33
-	{ I4, I2, I2, N0 }, // 0x17	25
+	{ I40_OP, D41_OP, N0_OP,  N0_OP }, // 0x14	41
+	{ I40_OP, D22_OP, I23_OP, N0_OP }, // 0x15	33
+	{ I40_OP, I22_OP, D23_OP, N0_OP }, // 0x16	33
+	{ I40_OP, I22_OP, I23_OP, N0_OP }, // 0x17	25
 
-	{ I4, I4, N0, N0 }, // 0x18	18
-	{ I8, N0, N0, N0 }, // 0x19	8
+	{ I40_OP, I41_OP, N0_OP,  N0_OP }, // 0x18	18
+	{ I80_OP, N0_OP,  N0_OP,  N0_OP }, // 0x19	8
 };
 

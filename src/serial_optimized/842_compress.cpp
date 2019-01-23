@@ -34,27 +34,6 @@ static inline void hash(uint64_t* values, uint64_t* results) {
         results[6] = (PRIME64 * values[6]) >> (64 - DICT64_BITS);   // 8
 }
 
-template<typename T> static inline void replace_hash(struct sw842_param *p, uint16_t index, uint16_t offset) {
-		uint16_t ringBufferIndex = index + offset;
-
-        switch(sizeof(T)) {
-                case 2:
-                        p->ringBuffer16[ringBufferIndex] = p->dataAndIndices[offset];
-                        p->hashTable16[p->hashes[offset]] = ringBufferIndex;
-                        break;
-                case 4:
-                        p->ringBuffer32[ringBufferIndex] = p->dataAndIndices[4+offset];
-                        p->hashTable32[p->hashes[4+offset]] = ringBufferIndex;
-                        break;
-                case 8:
-                        p->ringBuffer64[ringBufferIndex] = p->dataAndIndices[6+offset];
-                        p->hashTable64[p->hashes[6+offset]] = ringBufferIndex;
-                        break;
-                default:
-                        fprintf(stderr, "Invalid template parameter T for function replace_hash(...)\n");
-        }
-}
-
 static inline void find_index(struct sw842_param *p) {
 		int16_t index[6];
 		uint16_t isIndexValid[6];
@@ -76,13 +55,13 @@ static inline void find_index(struct sw842_param *p) {
         isIndexValid[5] = (index[5] >= 0) ? 0xFFFF : 0x0000;
         isIndexValid[6] = (index[6] >= 0) ? 0xFFFF : 0x0000;
 
-        isDataValid[0] = (p->ringBuffer16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
-        isDataValid[1] = (p->ringBuffer16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
-        isDataValid[2] = (p->ringBuffer16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
-        isDataValid[3] = (p->ringBuffer16[index[3]] == p->dataAndIndices[3]) ? 0xFFFF : 0x0000;
-        isDataValid[4] = (p->ringBuffer32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
-        isDataValid[5] = (p->ringBuffer32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
-        isDataValid[6] = (p->ringBuffer64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
+        isDataValid[0] = (p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
+        isDataValid[1] = (p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
+        isDataValid[2] = (p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
+        isDataValid[3] = (p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ? 0xFFFF : 0x0000;
+        isDataValid[4] = (p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
+        isDataValid[5] = (p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
+        isDataValid[6] = (p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
 
         p->validity[0] = isIndexValid[0] & isDataValid[0];
         p->validity[1] = isIndexValid[1] & isDataValid[1];
@@ -133,6 +112,9 @@ template<uint8_t TEMPLATE_KEY> static inline void add_template(struct sw842_para
         case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
         	stream_write_bits(p->stream, TEMPLATE_KEY, OP_BITS);
         	stream_write_bits(p->stream, p->dataAndIndices[6], D8_BITS);
+            stream_write_bits(p->stream, p->dataAndIndices[15], 0);
+            stream_write_bits(p->stream, p->dataAndIndices[15], 0);
+            stream_write_bits(p->stream, p->dataAndIndices[15], 0);
     	    break;
         case 0x01:	// { D4, D2, I2, N0 }, 56 bits
         	out =	(((uint64_t) TEMPLATE_KEY) << (D4_BITS + D2_BITS + I2_BITS))			|
@@ -207,9 +189,10 @@ template<uint8_t TEMPLATE_KEY> static inline void add_template(struct sw842_para
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + D2_BITS + D4_BITS);
     	    break;
 		case 0x0b:	// { I2, D4, I2, N0 }, 48 bits
+            //printf("template 0x0b!\n")
 			out =	(((uint64_t) TEMPLATE_KEY) << (I2_BITS + D4_BITS + I2_BITS))			|
         		 	(((uint64_t) p->dataAndIndices[7]) << (D4_BITS + I2_BITS))						|
-        		 	(((uint64_t) swap_be_to_native32(read32(p->in + 2))))  << (I2_BITS)		                    |
+        		 	(((uint64_t) p->dataAndIndices[14]) << (I2_BITS))		                    |
         		 	(((uint64_t) p->dataAndIndices[10]));
         	stream_write_bits(p->stream, out, OP_BITS + I2_BITS + D4_BITS + I2_BITS);
     	    break;
@@ -343,27 +326,35 @@ static inline void get_next_data(struct sw842_param *p) {
 	p->dataAndIndices[5] = swap_be_to_native32(read32(p->in + 4));
     p->dataAndIndices[6] = swap_be_to_native64(read64(p->in    ));
 
+    p->dataAndIndices[14] = swap_be_to_native32(read32(p->in + 2));
+    p->dataAndIndices[15] = 0x0000000000000000;
+
 }
 
 /* update the hashtable entries.
  * only call this after finding/adding the current template
- * the dataN fields for the current 8 byte block must be already updated
  */
-static inline void update_hashtables(struct sw842_param *p)
-{
-
+static inline void update_hashtables(struct sw842_param *p) {
 	uint64_t pos = p->in - p->instart;
     uint16_t i64 = (pos >> 3) % (1 << I8_BITS);
     uint16_t i32 = (pos >> 2) % (1 << I4_BITS);
     uint16_t i16 = (pos >> 1) % (1 << I2_BITS);
 
-    replace_hash<uint16_t>(p, i16, 0);
-    replace_hash<uint16_t>(p, i16, 1);
-    replace_hash<uint16_t>(p, i16, 2);
-    replace_hash<uint16_t>(p, i16, 3);
-    replace_hash<uint32_t>(p, i32, 0);
-    replace_hash<uint32_t>(p, i32, 1);
-    replace_hash<uint64_t>(p, i64, 0);
+    p->rollingFifo16[i16  ] = p->dataAndIndices[0];
+    p->rollingFifo16[i16+1] = p->dataAndIndices[1];
+    p->rollingFifo16[i16+2] = p->dataAndIndices[2];
+    p->rollingFifo16[i16+3] = p->dataAndIndices[3];
+    p->rollingFifo32[i32  ] = p->dataAndIndices[4];
+    p->rollingFifo32[i32+1] = p->dataAndIndices[5];
+    p->rollingFifo64[i64  ] = p->dataAndIndices[6];
+
+    p->hashTable16[p->hashes[0]] = i16;    
+    p->hashTable16[p->hashes[1]] = i16+1;
+    p->hashTable16[p->hashes[2]] = i16+2;
+    p->hashTable16[p->hashes[3]] = i16+3;
+    p->hashTable32[p->hashes[4]] = i32;
+    p->hashTable32[p->hashes[5]] = i32+1;
+    p->hashTable64[p->hashes[6]] = i64;
 }
 
 /* find the next template to use, and add it
@@ -395,7 +386,12 @@ static inline void process_next(struct sw842_param *p)
 
     templateKey = get_template(p);
 
-
+    stream_write_bits(p->stream, templateKey, OP_BITS);
+    for(int opnum = 0; opnum < 4; opnum++) {
+        stream_write_bits(p->stream, p->dataAndIndices[templates[templateKey][opnum][0]], templates[templateKey][opnum][1]);
+    }
+    
+    /*
     switch(templateKey) {
         case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
     		add_template<0x00>(p);
@@ -478,6 +474,7 @@ static inline void process_next(struct sw842_param *p)
         default:
         	fprintf(stderr, "Invalid template: %x\n",  templateKey);
         }
+    */
 }
 
 /**
@@ -510,8 +507,8 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
             p->hashTable64[i] = NO_ENTRY;
     }
 
-	p->in = (uint8_t *)in;
-	p->instart = p->in;
+	p->in = (uint8_t *) in;
+	p->instart = in;
 	p->ilen = ilen;
 
 	p->stream = stream_open(out, *olen);

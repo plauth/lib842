@@ -16,7 +16,7 @@ static inline uint16_t swap_endianness16(uint16_t input) {
 }
 
 static inline uint16_t swap_be_to_native16(uint16_t input){
-	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness16(input);
 	#else
 		return input;
@@ -24,7 +24,7 @@ static inline uint16_t swap_be_to_native16(uint16_t input){
 }
 
 static inline uint16_t swap_native_to_be16(uint16_t input){
-	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness16(input);
 	#else
 		return input;
@@ -46,7 +46,7 @@ static inline uint32_t swap_endianness32(uint32_t input) {
 }
 
 static inline uint32_t swap_be_to_native32(uint32_t input){
-	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness32(input);
 	#else
 		return input;
@@ -54,7 +54,7 @@ static inline uint32_t swap_be_to_native32(uint32_t input){
 }
 
 static inline uint32_t swap_native_to_be32(uint32_t input){
-	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness32(input);
 	#else
 		return input;
@@ -80,7 +80,7 @@ static inline uint64_t swap_endianness64(uint64_t input) {
 }
 
 static inline uint64_t swap_be_to_native64(uint64_t input){
-	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness64(input);
 	#else
 		return input;
@@ -88,7 +88,7 @@ static inline uint64_t swap_be_to_native64(uint64_t input){
 }
 
 static inline uint64_t swap_native_to_be64(uint64_t input){
-	#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness64(input);
 	#else
 		return input;
