@@ -45,21 +45,21 @@ static inline void find_index(struct sw842_param *p) {
         index[5] = p->hashTable32[p->hashes[5]];
         index[6] = p->hashTable64[p->hashes[6]];
 
-        isIndexValid[0] = (index[0] >= 0) ? 0xFFFFFFFF : 0x00000000;
-        isIndexValid[1] = (index[1] >= 0) ? 0xFFFFFFFF : 0x00000000;
-        isIndexValid[2] = (index[2] >= 0) ? 0xFFFFFFFF : 0x00000000;
-        isIndexValid[3] = (index[3] >= 0) ? 0xFFFFFFFF : 0x00000000;
-        isIndexValid[4] = (index[4] >= 0) ? 0xFFFFFFFF : 0x00000000;
-        isIndexValid[5] = (index[5] >= 0) ? 0xFFFFFFFF : 0x00000000;
-        isIndexValid[6] = (index[6] >= 0) ? 0xFFFFFFFF : 0x00000000;
+        isIndexValid[0] = (index[0] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[1] = (index[1] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[2] = (index[2] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[3] = (index[3] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[4] = (index[4] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[5] = (index[5] >= 0) ? 0xFFFF : 0x0000;
+        isIndexValid[6] = (index[6] >= 0) ? 0xFFFF : 0x0000;
 
-        isDataValid[0] = (p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFFFFFF : 0x00000000;
-        isDataValid[1] = (p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFFFFFF : 0x00000000;
-        isDataValid[2] = (p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFFFFFF : 0x00000000;
-        isDataValid[3] = (p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ? 0xFFFFFFFF : 0x00000000;
-        isDataValid[4] = (p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFFFFFF : 0x00000000;
-        isDataValid[5] = (p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFFFFFF : 0x00000000;
-        isDataValid[6] = (p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFFFFFF : 0x00000000;
+        isDataValid[0] = (p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
+        isDataValid[1] = (p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
+        isDataValid[2] = (p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
+        isDataValid[3] = (p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ? 0xFFFF : 0x0000;
+        isDataValid[4] = (p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
+        isDataValid[5] = (p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
+        isDataValid[6] = (p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
 
         p->validity[0] = isIndexValid[0] & isDataValid[0];
         p->validity[1] = isIndexValid[1] & isDataValid[1];
