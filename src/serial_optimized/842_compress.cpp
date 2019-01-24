@@ -35,9 +35,9 @@ static inline void hash(uint64_t* values, uint64_t* results) {
 }
 
 static inline void find_index(struct sw842_param *p) {
-		int32_t index[7];
-		uint32_t isIndexValid[7];
-		uint32_t isDataValid[7];
+		int16_t index[7];
+		uint16_t isIndexValid[7];
+		uint16_t isDataValid[7];
 
         index[0] = p->hashTable16[p->hashes[0]];
         index[1] = p->hashTable16[p->hashes[1]];
