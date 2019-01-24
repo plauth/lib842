@@ -18,8 +18,6 @@
 #include "842-internal.h"
 #include "../common/opcodes.h"
 
-#define PRIME16     (65521)
-#define PRIME32     (2654435761U)
 #define PRIME64     (11400714785074694791ULL)
 
 #define NO_ENTRY        (-1)
