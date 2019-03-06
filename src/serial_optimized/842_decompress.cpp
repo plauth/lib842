@@ -169,23 +169,23 @@ static int do_op(struct sw842_param_decomp *p, uint8_t o)
 int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		     uint8_t *out, unsigned int *olen)
 {
-	struct sw842_param_decomp p;
+	struct sw842_param_decomp *p = (struct sw842_param_decomp *) malloc(sizeof(struct sw842_param_decomp)); 
 	uint64_t op, rep, total;
 
-	p.in = (uint8_t *)in;
-	p.ilen = ilen;
-	p.out = out;
-	p.ostart = out;
-	p.olen = *olen;
+	p->in = (uint8_t *)in;
+	p->ilen = ilen;
+	p->out = out;
+	p->ostart = out;
+	p->olen = *olen;
 
-	p.stream = stream_open((uint8_t *)in, ilen);
+	p->stream = stream_open((uint8_t *)in, ilen);
 
-	total = p.olen;
+	total = p->olen;
 
 	*olen = 0;
 
 	do {
-		op = stream_read_bits(p.stream, OP_BITS);
+		op = stream_read_bits(p->stream, OP_BITS);
 
 		#ifdef DEBUG
 		printf("template is %lx\n", (unsigned long)op);
@@ -193,28 +193,28 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 
 		switch (op) {
 		case OP_REPEAT:
-			rep = stream_read_bits(p.stream, REPEAT_BITS);
+			rep = stream_read_bits(p->stream, REPEAT_BITS);
 			/* copy rep + 1 */
 			rep++;
 
 			while (rep-- > 0) {
-				memcpy(p.out, p.out - 8, 8);
-				p.out += 8;
-				p.olen -= 8;
+				memcpy(p->out, p->out - 8, 8);
+				p->out += 8;
+				p->olen -= 8;
 			}
 
 			break;
 		case OP_ZEROS:
-			memset(p.out, 0, 8);
-			p.out += 8;
-			p.olen -= 8;
+			memset(p->out, 0, 8);
+			p->out += 8;
+			p->olen -= 8;
 
 			break;
 		case OP_END:
 
 			break;
 		default: /* use template */
-			do_op(&p, op);
+			do_op(p, op);
 			break;
 		}
 	} while (op != OP_END);
@@ -224,20 +224,21 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 	 * next bit after End of stream template.
 	 */
 	#ifndef DISABLE_CRC
-	uint64_t crc;
-	crc = stream_read_bits(p.stream, CRC_BITS);
-	crc = swap_be_to_native32(crc);
+	uint64_t crc = swap_be_to_native32(stream_read_bits(p->stream, CRC_BITS));
 	
 	/*
 	 * Validate CRC saved in compressed data.
 	 */
-	if (crc != (uint64_t) crc32_be(0, out, total - p.olen)) {
+	if (crc != (uint64_t) crc32_be(0, out, total - p->olen)) {
 		fprintf(stderr, "CRC mismatch for decompression\n");
 		return -EINVAL;
 	}
 	#endif
 
-	*olen = total - p.olen;
+	*olen = total - p->olen;
+
+	stream_close(p->stream);
+	free(p);
 
 	return 0;
 }
