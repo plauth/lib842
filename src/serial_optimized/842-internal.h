@@ -154,9 +154,6 @@
 #define D4S_OP  {14, D4_BITS}
 #define N0_OP	{15, 0}
 
-/* the max of the regular templates - not including the special templates */
-#define OPS_MAX		(0x1a)
-
 struct sw842_param {
 	struct bitstream* stream;
 
@@ -197,6 +194,5 @@ size_t stream_size(const struct bitstream* s);
 void stream_write_bits(struct bitstream* s, uint64_t value, uint8_t n);
 uint64_t stream_read_bits(struct bitstream* s, uint8_t n);
 size_t stream_flush(struct bitstream* s);
-size_t stream_rtell(const bitstream* s);
 
 #endif
