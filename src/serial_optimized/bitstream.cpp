@@ -3,9 +3,6 @@
 #include <stdint.h>
 
 #include "../common/endianness.h"
-#include <stdio.h>
-//#include <string.h>
-#include <inttypes.h>
 
 /* number of bits in a buffered word */
 #define wsize 64

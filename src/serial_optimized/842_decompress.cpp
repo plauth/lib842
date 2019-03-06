@@ -110,7 +110,7 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		op = stream_read_bits(p->stream, OP_BITS);
 
 		#ifdef DEBUG
-		printf("template is %lx\n", (unsigned long)op);
+		printf("template is %llx\n", op);
 		#endif
 
 		switch (op) {
@@ -264,7 +264,7 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 			case OP_END:
 				break;
 	        default:
-	        	fprintf(stderr, "Invalid op template: %x\n", op);
+	        	fprintf(stderr, "Invalid op template: %llx\n", op);
 	        	return -EINVAL;
 	    }
 	} while (op != OP_END);
