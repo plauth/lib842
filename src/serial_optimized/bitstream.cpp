@@ -3,9 +3,9 @@
 #include <stdint.h>
 
 #include "../common/endianness.h"
-//#include <stdio.h>
+#include <stdio.h>
 //#include <string.h>
-//#include <inttypes.h>
+#include <inttypes.h>
 
 /* number of bits in a buffered word */
 #define wsize 64
@@ -24,7 +24,7 @@ struct bitstream {
 /* read a single uint64_t from memory */
 static uint64_t stream_read_word(struct bitstream* s)
 {
-  uint64_t w = *s->ptr++;
+  uint64_t w = swap_be_to_native64(*s->ptr++);
   return w;
 }
 
@@ -45,34 +45,18 @@ size_t stream_size(const struct bitstream* s)
 /* read 0 <= n <= 64 bits */
 uint64_t stream_read_bits(struct bitstream* s, uint8_t n)
 {
-  //TODO: stream_read_bits is not yet ported to MSB-first bitstream layout, hence it will return garbage!
-  uint64_t value = s->buffer;
+  uint64_t value = s->buffer >> (wsize - n);
+
   if (s->bits < n) {
-    /* keep fetching wsize bits until enough bits are buffered */
-    do {
-      /* assert: 0 <= s->bits < n <= 64 */
-      s->buffer = stream_read_word(s);
-      value += (uint64_t)s->buffer << s->bits;
-      s->bits += wsize;
-    } while (sizeof(s->buffer) < sizeof(value) && s->bits < n);
-    /* assert: 1 <= n <= s->bits < n + wsize */
+    /* fetch wsize bits  */
+    s->buffer = stream_read_word(s);
+    value |= s->buffer >> (wsize - (n - s->bits));
+    s->buffer <<= n - s->bits;
+    s->bits += wsize - n;
+    s->buffer *= (s->bits > 0);
+  }  else {
     s->bits -= n;
-    if (!s->bits) {
-      /* value holds exactly n bits; no need for masking */
-      s->buffer = 0;
-    }
-    else {
-      /* assert: 1 <= s->bits < wsize */
-      s->buffer >>= wsize - s->bits;
-      /* assert: 1 <= n <= 64 */
-      value &= ((uint64_t)2 << (n - 1)) - 1;
-    }
-  }
-  else {
-    /* assert: 0 <= n <= s->bits < wsize <= 64 */
-    s->bits -= n;
-    s->buffer >>= n;
-    value &= ((uint64_t)1 << n) - 1;
+    s->buffer <<= n;
   }
   return value;
 }
@@ -134,6 +118,7 @@ struct bitstream* stream_open(void* buffer, size_t bytes)
     s->begin = (uint64_t*)buffer;
     s->end = s->begin + bytes / sizeof(uint64_t);
     stream_rewind(s);
+    s->buffer = 0;
   }
   return s;
 }
@@ -142,6 +127,11 @@ struct bitstream* stream_open(void* buffer, size_t bytes)
 void stream_close(struct bitstream* s)
 {
   free(s);
+}
+
+size_t stream_rtell(const bitstream* s)
+{
+  return wsize * (s->ptr - s->begin) - s->bits;
 }
 
 /*

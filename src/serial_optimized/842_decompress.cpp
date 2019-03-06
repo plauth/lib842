@@ -53,88 +53,9 @@ static uint8_t decomp_ops[OPS_MAX][4] = {
 	{ I8, N0, N0, N0 }
 };
 
-uint64_t static inline bytes_rounded_up(uint64_t bits) {
-	return (bits + 8 - 1) / 8;
-}
-
-
-static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n);
-
-static int __split_next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n, uint8_t s)
-{
-	uint64_t tmp = 0;
-	int ret;
-
-	if (n <= s) {
-		fprintf(stderr, "split_next_bits invalid n %u s %u\n", n, s);
-		return -EINVAL;
-	}
-
-	ret = next_bits(p, &tmp, n - s);
-	if (ret)
-		return ret;
-	ret = next_bits(p, d, s);
-	if (ret)
-		return ret;
-	*d |= tmp << s;
-	return 0;
-}
-
-static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n)
-{
-	uint8_t *in = p->in, b = p->bit, bits = b + n;
-
-	if (n > 64) {
-		fprintf(stderr, "next_bits invalid n %u\n", n);
-		return -EINVAL;
-	}
-
-	/* split this up if reading > 8 bytes, or if we're at the end of
-	 * the input buffer and would read past the end
-	 */
-	if (bits > 64)
-		return __split_next_bits(p, d, n, 32);
-	else if (p->ilen < 8 && bits > 32 && bits <= 56)
-		return __split_next_bits(p, d, n, 16);
-	else if (p->ilen < 4 && bits > 16 && bits <= 24)
-		return __split_next_bits(p, d, n, 8);
-
-	if (bytes_rounded_up(bits) > p->ilen)
-		return -EOVERFLOW;
-
-	if (bits <= 8)
-		*d = *in >> (8 - bits);
-	else if (bits <= 16)
-		*d = swap_endianness16(read16(in)) >> (16 - bits);
-	else if (bits <= 32)
-		*d = swap_endianness32(read32(in)) >> (32 - bits);
-	else
-		*d = swap_endianness64(read64(in)) >> (64 - bits);
-
-	*d &= GENMASK_ULL(n - 1, 0);
-
-	p->bit += n;
-
-	if (p->bit > 7) {
-		p->in += p->bit / 8;
-		p->ilen -= p->bit / 8;
-		p->bit %= 8;
-	}
-
-	return 0;
-}
-
 static int do_data(struct sw842_param_decomp *p, uint8_t n)
 {
-	uint64_t v;
-	int ret;
-
-	if (n > p->olen)
-		return -ENOSPC;
-
-	ret = next_bits(p, &v, n * 8);
-	if (ret)
-		return ret;
+	uint64_t v = stream_read_bits(p->stream, n*8);
 
 	switch (n) {
 	case 2:
@@ -159,11 +80,8 @@ static int do_data(struct sw842_param_decomp *p, uint8_t n)
 static int __do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, uint64_t fsize)
 {
 	uint64_t index, offset, total = round_down(p->out - p->ostart, 8);
-	int ret;
 
-	ret = next_bits(p, &index, bits);
-	if (ret)
-		return ret;
+	index = stream_read_bits(p->stream, bits);
 
 	offset = index * size;
 
@@ -189,9 +107,6 @@ static int __do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, 
 		return -EINVAL;
 	}
 
-	if (size != 2 && size != 4 && size != 8)
-		printf("__do_index invalid size %x\n", size);
-
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;
 	p->olen -= size;
@@ -215,36 +130,24 @@ static int do_index(struct sw842_param_decomp *p, uint8_t n)
 
 static int do_op(struct sw842_param_decomp *p, uint8_t o)
 {
-	int i, ret = 0;
-
-	if (o >= OPS_MAX)
-		return -EINVAL;
-
-	for (i = 0; i < 4; i++) {
+	for (int i = 0; i < 4; i++) {
 		uint8_t op = decomp_ops[o][i];
 
-		#ifdef DEBUG
-		printf("op is %x\n", op);
-		#endif
 
 		switch (op & OP_ACTION) {
 		case OP_ACTION_DATA:
-			ret = do_data(p, op & OP_AMOUNT);
+			do_data(p, op & OP_AMOUNT);
 			break;
 		case OP_ACTION_INDEX:
-			ret = do_index(p, op & OP_AMOUNT);
+			do_index(p, op & OP_AMOUNT);
 			break;
 		case OP_ACTION_NOOP:
 			break;
 		default:
 			fprintf(stderr, "Internal error, invalid op %x\n", op);
-			return -EINVAL;
+			exit(-EINVAL);
 		}
-
-		if (ret)
-			return ret;
 	}
-
 	return 0;
 }
 
@@ -267,24 +170,22 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		     uint8_t *out, unsigned int *olen)
 {
 	struct sw842_param_decomp p;
-	int ret;
 	uint64_t op, rep, total;
 
 	p.in = (uint8_t *)in;
-	p.bit = 0;
 	p.ilen = ilen;
 	p.out = out;
 	p.ostart = out;
 	p.olen = *olen;
+
+	p.stream = stream_open((uint8_t *)in, ilen);
 
 	total = p.olen;
 
 	*olen = 0;
 
 	do {
-		ret = next_bits(&p, &op, OP_BITS);
-		if (ret)
-			return ret;
+		op = stream_read_bits(p.stream, OP_BITS);
 
 		#ifdef DEBUG
 		printf("template is %lx\n", (unsigned long)op);
@@ -292,18 +193,9 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 
 		switch (op) {
 		case OP_REPEAT:
-			ret = next_bits(&p, &rep, REPEAT_BITS);
-			if (ret)
-				return ret;
-
-			if (p.out == out) /* no previous bytes */
-				return -EINVAL;
-
+			rep = stream_read_bits(p.stream, REPEAT_BITS);
 			/* copy rep + 1 */
 			rep++;
-
-			if (rep * 8 > p.olen)
-				return -ENOSPC;
 
 			while (rep-- > 0) {
 				memcpy(p.out, p.out - 8, 8);
@@ -313,9 +205,6 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 
 			break;
 		case OP_ZEROS:
-			if (8 > p.olen)
-				return -ENOSPC;
-
 			memset(p.out, 0, 8);
 			p.out += 8;
 			p.olen -= 8;
@@ -325,9 +214,7 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 
 			break;
 		default: /* use template */
-			ret = do_op(&p, op);
-			if (ret)
-				return ret;
+			do_op(&p, op);
 			break;
 		}
 	} while (op != OP_END);
@@ -338,12 +225,9 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 	 */
 	#ifndef DISABLE_CRC
 	uint64_t crc;
-	ret = next_bits(&p, &crc, CRC_BITS);
+	crc = stream_read_bits(p.stream, CRC_BITS);
 	crc = swap_endianness32(crc);
 	
-	if (ret)
-		return ret;
-
 	/*
 	 * Validate CRC saved in compressed data.
 	 */
@@ -352,9 +236,6 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		return -EINVAL;
 	}
 	#endif
-
-	if ((total - p.olen) > UINT_MAX)
-		return -ENOSPC;
 
 	*olen = total - p.olen;
 

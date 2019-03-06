@@ -183,11 +183,11 @@ struct sw842_param {
 
 struct sw842_param_decomp {
 	uint8_t *in;
-	uint8_t bit;
 	uint64_t ilen;
 	uint8_t *out;
 	uint8_t *ostart;
 	uint64_t olen;
+	struct bitstream* stream;
 };
 
 struct bitstream* stream_open(void* buffer, size_t bytes);
@@ -195,6 +195,8 @@ void stream_close(struct bitstream* s);
 size_t stream_size(const struct bitstream* s);
 //uint64_t stream_read_bits(struct bitstream* s, uint8_t n);
 void stream_write_bits(struct bitstream* s, uint64_t value, uint8_t n);
+uint64_t stream_read_bits(struct bitstream* s, uint8_t n);
 size_t stream_flush(struct bitstream* s);
+size_t stream_rtell(const bitstream* s);
 
 #endif
