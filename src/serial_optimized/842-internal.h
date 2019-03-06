@@ -179,11 +179,8 @@ struct sw842_param {
 };
 
 struct sw842_param_decomp {
-	uint8_t *in;
-	uint64_t ilen;
 	uint8_t *out;
 	uint8_t *ostart;
-	uint64_t olen;
 	struct bitstream* stream;
 };
 

@@ -41,7 +41,6 @@ template<uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
 	}
 
 	p->out += N;
-	p->olen -= N;
 }
 
 static inline void do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, uint64_t fsize)
@@ -70,7 +69,6 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t 
 
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;
-	p->olen -= size;
 }
 
 /**
@@ -91,19 +89,12 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t 
 int sw842_decompress(const uint8_t *in, unsigned int ilen,
 		     uint8_t *out, unsigned int *olen)
 {
-	struct sw842_param_decomp *p = (struct sw842_param_decomp *) malloc(sizeof(struct sw842_param_decomp)); 
-	uint64_t op, rep, total;
-
-	p->in = (uint8_t *)in;
-	p->ilen = ilen;
+	uint64_t op, rep;
+	struct sw842_param_decomp *p = (struct sw842_param_decomp *) malloc(sizeof(struct sw842_param_decomp));
+	p->stream = stream_open((uint8_t *)in, ilen); 
 	p->out = out;
 	p->ostart = out;
-	p->olen = *olen;
-
-	p->stream = stream_open((uint8_t *)in, ilen);
-
-	total = p->olen;
-
+	
 	*olen = 0;
 
 	do {
@@ -253,13 +244,11 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 				while (rep-- > 0) {
 					memcpy(p->out, p->out - 8, 8);
 					p->out += 8;
-					p->olen -= 8;
 				}
 				break;
 			case OP_ZEROS:
 				memset(p->out, 0, 8);
 				p->out += 8;
-				p->olen -= 8;
 				break;
 			case OP_END:
 				break;
@@ -279,13 +268,13 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 	/*
 	 * Validate CRC saved in compressed data.
 	 */
-	if (crc != (uint64_t) crc32_be(0, out, total - p->olen)) {
+	if (crc != (uint64_t) crc32_be(0, out, p->out - p->ostart)) {
 		fprintf(stderr, "CRC mismatch for decompression\n");
 		return -EINVAL;
 	}
 	#endif
 
-	*olen = total - p->olen;
+	*olen = p->out - p->ostart;
 
 	stream_close(p->stream);
 	free(p);
