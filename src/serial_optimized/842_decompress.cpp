@@ -59,13 +59,13 @@ static int do_data(struct sw842_param_decomp *p, uint8_t n)
 
 	switch (n) {
 	case 2:
-		write16(p->out, swap_endianness16(v));
+		write16(p->out, swap_be_to_native16(v));
 		break;
 	case 4:
-		write32(p->out, swap_endianness32(v));
+		write32(p->out, swap_be_to_native32(v));
 		break;
 	case 8:
-		write64(p->out, swap_endianness64(v));
+		write64(p->out, swap_be_to_native64(v));
 		break;
 	default:
 		return -EINVAL;
@@ -226,7 +226,7 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 	#ifndef DISABLE_CRC
 	uint64_t crc;
 	crc = stream_read_bits(p.stream, CRC_BITS);
-	crc = swap_endianness32(crc);
+	crc = swap_be_to_native32(crc);
 	
 	/*
 	 * Validate CRC saved in compressed data.
