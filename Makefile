@@ -19,6 +19,8 @@ LDFLAGS_OCL := -lOpenCL
 CRYPTODEV_IS_LOADED := $(shell lsmod | grep cryptodev)
 else ifeq ($(shell uname -p),ppc)
 CXX_FLAGS += -DDISABLE_CRC
+else ifeq ($(shell uname -p),s390x)
+CXX_FLAGS += -DDISABLE_CRC
 else ifeq ($(shell uname -p),x86_64)
 CC=gcc
 CXX=g++
@@ -118,6 +120,8 @@ test_aix_standalone: checkdirs test/compdecomp_aix.c
 ifeq ($(shell uname),Darwin)
 standalone: test_serial_standalone test_serial_optimized_standalone
 else ifeq ($(shell uname -p),ppc)
+standalone: test_serial_optimized_standalone
+else ifeq ($(shell uname -p),s390x)
 standalone: test_serial_optimized_standalone
 else ifeq ($(CRYPTODEV_IS_LOADED),)
 $(info cryptodev kernel module is not loaded, skipping cryptodev test)
