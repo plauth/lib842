@@ -1,4 +1,3 @@
-#include <limits.h>
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -18,13 +17,6 @@ struct bitstream {
 
 /* private functions ------------------------------------------------------- */
 
-/* read a single uint64_t from memory */
-static uint64_t stream_read_word(struct bitstream* s)
-{
-  uint64_t w = swap_be_to_native64(*s->ptr++);
-  return w;
-}
-
 /* write a single uint64_t to memory */
 static void stream_write_word(struct bitstream* s, uint64_t value)
 {
@@ -37,25 +29,6 @@ static void stream_write_word(struct bitstream* s, uint64_t value)
 size_t stream_size(const struct bitstream* s)
 {
   return sizeof(uint64_t) * (s->ptr - s->begin);
-}
-
-/* read 0 <= n <= 64 bits */
-uint64_t stream_read_bits(struct bitstream* s, uint8_t n)
-{
-  uint64_t value = s->buffer >> (wsize - n);
-
-  if (s->bits < n) {
-    /* fetch wsize bits  */
-    s->buffer = stream_read_word(s);
-    value |= s->buffer >> (wsize - (n - s->bits));
-    s->buffer <<= n - s->bits;
-    s->bits += wsize - n;
-    s->buffer *= (s->bits > 0);
-  }  else {
-    s->bits -= n;
-    s->buffer <<= n;
-  }
-  return value;
 }
 
 /* write 0 <= n <= 64 low bits of value and return remaining bits */
