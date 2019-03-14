@@ -87,7 +87,7 @@
 #include "../common/endianness.h"
 #include "../common/crc32.h"
 
-#define BRANCH_FREE (0)
+#define BRANCH_FREE (1)
 //#define DEBUG 1
 
 /* special templates */
@@ -154,9 +154,6 @@
 #define D4S_OP  {14, D4_BITS}
 #define N0_OP	{15, 0}
 
-/* the max of the regular templates - not including the special templates */
-#define OPS_MAX		(0x1a)
-
 struct sw842_param {
 	struct bitstream* stream;
 
@@ -181,20 +178,13 @@ struct sw842_param {
 	uint64_t rollingFifo64[1 << I8_BITS];   // 256  * 8 bytes =   2 KiB
 };
 
-struct sw842_param_decomp {
-	uint8_t *in;
-	uint8_t bit;
-	uint64_t ilen;
-	uint8_t *out;
-	uint8_t *ostart;
-	uint64_t olen;
-};
-
-struct bitstream* stream_open(void* buffer, size_t bytes);
-void stream_close(struct bitstream* s);
-size_t stream_size(const struct bitstream* s);
-//uint64_t stream_read_bits(struct bitstream* s, uint8_t n);
-void stream_write_bits(struct bitstream* s, uint64_t value, uint8_t n);
-size_t stream_flush(struct bitstream* s);
+ struct sw842_param_decomp {
+ 	uint8_t *out;
+ 	const uint8_t *ostart;
+ 	uint64_t* in;
+ 	const uint64_t* istart;
+ 	uint8_t bits;
+ 	uint64_t buffer;
+ };
 
 #endif

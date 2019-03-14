@@ -22,6 +22,14 @@
 
 #define NO_ENTRY        (-1)
 
+struct bitstream* stream_open(void* buffer, size_t bytes);
+void stream_close(struct bitstream* s);
+size_t stream_size(const struct bitstream* s);
+//uint64_t stream_read_bits(struct bitstream* s, uint8_t n);
+void stream_write_bits(struct bitstream* s, uint64_t value, uint8_t n);
+//uint64_t stream_read_bits(struct bitstream* s, uint8_t n);
+size_t stream_flush(struct bitstream* s);
+
 static inline void hash(uint64_t* values, uint64_t* results) {
         results[0] = (PRIME64 * values[0]) >> (64 - DICT16_BITS);   // 2
         results[1] = (PRIME64 * values[1]) >> (64 - DICT16_BITS);   // 2

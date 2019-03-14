@@ -1,8 +1,13 @@
 #ifndef __ENDIANNESS_H__
 #define __ENDIANNESS_H__
 
+#if defined __CUDA_ARCH__
+#define FUNC_DEF __host__ __device__ static inline
+#else
+#define FUNC_DEF static inline
+#endif
 
-static inline uint16_t swap_endianness16(uint16_t input) {
+FUNC_DEF uint16_t swap_endianness16(uint16_t input) {
 	#ifdef __x86_64__
 		asm("xchgb %b0,%h0" : "=Q" (input) :  "0" (input));
 		return input;
@@ -15,7 +20,7 @@ static inline uint16_t swap_endianness16(uint16_t input) {
 
 }
 
-static inline uint16_t swap_be_to_native16(uint16_t input){
+FUNC_DEF uint16_t swap_be_to_native16(uint16_t input){
 	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness16(input);
 	#else
@@ -23,7 +28,7 @@ static inline uint16_t swap_be_to_native16(uint16_t input){
 	#endif
 }
 
-static inline uint16_t swap_native_to_be16(uint16_t input){
+FUNC_DEF uint16_t swap_native_to_be16(uint16_t input){
 	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness16(input);
 	#else
@@ -31,7 +36,7 @@ static inline uint16_t swap_native_to_be16(uint16_t input){
 	#endif
 }
 
-static inline uint32_t swap_endianness32(uint32_t input) {
+FUNC_DEF uint32_t swap_endianness32(uint32_t input) {
 	#ifdef __x86_64__
 		asm("bswap %0" : "=r" (input) : "0" (input));
 		return input;
@@ -45,7 +50,7 @@ static inline uint32_t swap_endianness32(uint32_t input) {
 	#endif
 }
 
-static inline uint32_t swap_be_to_native32(uint32_t input){
+FUNC_DEF uint32_t swap_be_to_native32(uint32_t input){
 	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness32(input);
 	#else
@@ -53,7 +58,7 @@ static inline uint32_t swap_be_to_native32(uint32_t input){
 	#endif
 }
 
-static inline uint32_t swap_native_to_be32(uint32_t input){
+FUNC_DEF uint32_t swap_native_to_be32(uint32_t input){
 	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness32(input);
 	#else
@@ -61,7 +66,7 @@ static inline uint32_t swap_native_to_be32(uint32_t input){
 	#endif
 }
 
-static inline uint64_t swap_endianness64(uint64_t input) {
+FUNC_DEF uint64_t swap_endianness64(uint64_t input) {
 	#ifdef __x86_64__
 		asm("bswap %0" : "=r" (input) : "0" (input));
 		return input;
@@ -79,7 +84,7 @@ static inline uint64_t swap_endianness64(uint64_t input) {
 	#endif
 }
 
-static inline uint64_t swap_be_to_native64(uint64_t input){
+FUNC_DEF uint64_t swap_be_to_native64(uint64_t input){
 	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness64(input);
 	#else
@@ -87,7 +92,7 @@ static inline uint64_t swap_be_to_native64(uint64_t input){
 	#endif
 }
 
-static inline uint64_t swap_native_to_be64(uint64_t input){
+FUNC_DEF uint64_t swap_native_to_be64(uint64_t input){
 	#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 		return swap_endianness64(input);
 	#else

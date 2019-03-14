@@ -8,8 +8,16 @@
 
 //#define CHUNK_SIZE 32768
 #define CHUNK_SIZE 4096
+#define THREADS_PER_BLOCK 1
 #define STRLEN 32
 
+__global__ void cuda842_decompress(const uint8_t *in, unsigned int ilen, uint8_t *out);
+
+#define CHECK_ERROR( err ) \
+  if( err != cudaSuccess ) { \
+    printf("Error: %s\n", cudaGetErrorString(err)); \
+    exit( -1 ); \
+  }
 
 long long timestamp() {
 	struct timeval te;
@@ -19,36 +27,46 @@ long long timestamp() {
 }
 
 int nextMultipleOfChunkSize(unsigned int input) {
-	return (input + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
+	unsigned int size = CHUNK_SIZE * THREADS_PER_BLOCK;
+	return (input + (size-1)) & ~(size-1);
 } 
 
 int main( int argc, const char* argv[])
 {
-	uint8_t *in, *out, *decompressed;
-	in = out = decompressed = NULL;
+	uint8_t *inH, *compressedH, *decompressedH;
+	uint8_t *inD, *compressedD, *decompressedD;
+	inH = compressedH = decompressedH = NULL;
 	unsigned int ilen, olen, dlen;
 	ilen = olen = dlen = 0;
 	long long timestart_comp, timeend_comp;
 	long long timestart_decomp, timeend_decomp;
-	long long timestart_condense, timeend_condense;
+	cudaError_t cuda_error;
+	int count = 0;
+	cudaGetDeviceCount(&count);
+  	printf(" %d CUDA devices found\n", count);
+  	if(!count)
+    		::exit(EXIT_FAILURE);
+
 
 	if(argc <= 1) {
 		ilen = STRLEN;
 		olen = ilen * 2;
 		dlen = ilen;
-		in = (uint8_t*) malloc(ilen);
-		out = (uint8_t*) malloc(olen);
-		decompressed = (uint8_t*) malloc(dlen);
+		inH = (uint8_t*) malloc(ilen);
+		cudaMalloc((void**) &inD, ilen);
+		compressedH = (uint8_t*) malloc(olen);
+		cudaMalloc((void**) &compressedD, olen);
+		decompressedH = (uint8_t*) malloc(dlen);
+		cudaMalloc((void**) &decompressedD, dlen);
+		memset(inH, 0, ilen);
+		cudaMemset(inD, 0, ilen);
+		memset(compressedH, 0, olen);
+		cudaMemset(compressedD, 0, olen);
+		memset(decompressedH, 0, dlen);
+		cudaMemset(decompressedD, 0, dlen);
 
 		uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
-		//tmp[0] = 0xff;
-		//tmp[1] = 0x00;
-
-		memset(in, 0, ilen);
-		memset(out, 0, olen);
-		memset(decompressed, 0, dlen);
-
-		strncpy((char *) in, (const char *) tmp, STRLEN);
+		strncpy((char *) inH, (const char *) tmp, STRLEN);
 
 	} else if (argc == 2) {
 		FILE *fp;
@@ -63,120 +81,101 @@ int main( int argc, const char* argv[])
 		dlen = ilen;
 		fseek(fp, 0, SEEK_SET);
 
-		in = (uint8_t*) malloc(ilen);
-		out = (uint8_t*) malloc(olen);
-		decompressed = (uint8_t*) malloc(dlen);
-		memset(in, 0, ilen);
-		memset(out, 0, olen);
-		memset(decompressed, 0, dlen);
+		inH = (uint8_t*) malloc(ilen);
+		cudaMalloc((void**) &inD, ilen);
+		compressedH = (uint8_t*) malloc(olen);
+		cudaMalloc((void**) &compressedD, olen);
+		decompressedH = (uint8_t*) malloc(dlen);
+		cudaMalloc((void**) &decompressedD, dlen);
+		memset(inH, 0, ilen);
+		cudaMemset(inD, 0, ilen);
+		memset(compressedH, 0, olen);
+		cudaMemset(compressedD, 0, olen);
+		memset(decompressedH, 0, dlen);
+		cudaMemset(decompressedD, 0, dlen);
 
-		if(!fread(in, flen, 1, fp)) {
+
+		if(!fread(inH, flen, 1, fp)) {
 			fprintf(stderr, "FAIL: Reading file content to memory failed.\n");
 		}
 		fclose(fp);
 	}
 
+	unsigned int * dlenD;
+	cudaMalloc((void**) &dlenD, sizeof(unsigned int));
+
 	if(ilen > CHUNK_SIZE) {
 		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
 	
-		int num_chunks = ilen / CHUNK_SIZE;
-		uint64_t *compressedChunkPositions = (uint64_t*) malloc(sizeof(uint64_t) * num_chunks);
-		uint32_t *compressedChunkSizes = (uint32_t*) malloc(sizeof(uint32_t) * num_chunks);
-
 		timestart_comp = timestamp();
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(int chunk_num = 0; chunk_num < ilen / CHUNK_SIZE; chunk_num++) {
 			
 			unsigned int chunk_olen = CHUNK_SIZE * 2;
-			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
-			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
+			uint8_t* chunk_in = inH + (CHUNK_SIZE * chunk_num);
+			uint8_t* chunk_out = compressedH + ((CHUNK_SIZE * 2) * chunk_num);
 			
 			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
-			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
 		timeend_comp = timestamp();
-		
-		timestart_condense = timeend_comp;
 
-		uint64_t currentChunkPos = 0;
-		
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			compressedChunkPositions[chunk_num] = currentChunkPos;
-			currentChunkPos += compressedChunkSizes[chunk_num];
-		}
-
-		uint8_t *out_condensed = (uint8_t *) malloc(currentChunkPos);
-
-		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			uint8_t * chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
-			uint8_t * chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
-			memcpy(chunk_condensed, chunk_out, compressedChunkSizes[chunk_num]);
-		}
-		timeend_condense = timestamp();
-		
+		cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
+		CHECK_ERROR(cuda_error);
 
 		timestart_decomp = timestamp();
-		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			unsigned int chunk_dlen = CHUNK_SIZE;
 
-			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
-			uint8_t* chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
-			uint8_t* chunk_decomp = in + (CHUNK_SIZE * chunk_num);
-			
-			sw842_decompress(chunk_condensed, compressedChunkSizes[chunk_num], chunk_decomp, &chunk_dlen);
+		printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
 
-			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) == 0)) {
-				fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
-				//return -1;
-			}
-		}
+		cuda842_decompress<<<(ilen / CHUNK_SIZE) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(compressedD, ilen, decompressedD);
+		cudaDeviceSynchronize();
+		cuda_error = cudaGetLastError();
+		CHECK_ERROR(cuda_error);
+
 		timeend_decomp = timestamp();
 
-		free(compressedChunkPositions);
-		free(compressedChunkSizes);
+		cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
+		cudaDeviceSynchronize();
+        CHECK_ERROR(cuda_error);
 
-		printf("Input: %d bytes\n", ilen);
-		printf("Output: %lld bytes\n", currentChunkPos);
-		printf("Compression factor: %f\n", (float) currentChunkPos / (float) ilen);
 		printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
-		printf("Condensation performance: %lld ms / %f MiB/s\n", timeend_condense - timestart_condense, (currentChunkPos / 1024 / 1024) / ((float) (timeend_condense - timestart_condense) / 1000));
 		printf("Decompression performance: %lld ms / %f MiB/s\n", timeend_decomp - timestart_decomp, (ilen / 1024 / 1024) / ((float) (timeend_decomp - timestart_decomp) / 1000));
 
-		printf("Compression- and decompression was successful!\n");
+
 	} else {
 
-		sw842_compress(in, ilen, out, &olen);
-		sw842_decompress(out, olen, decompressed, &dlen);
-
-		printf("Input: %d bytes\n", ilen);
-		printf("Output: %d bytes\n", olen);
-		printf("Compression factor: %f\n", (float) olen / (float) ilen);
-
-		
-		//if(argc <= 1) {
-			for (int i = 0; i < 64; i++) {
-				printf("%02x:", out[i]);
-			}
-
-			printf("\n\n");
-
-			for (int i = 0; i < 32; i++) {
-				printf("%02x:", decompressed[i]);
-			}
-		//}
-
-		printf("\n\n");
-		
-		
-		if (memcmp(in, decompressed, ilen) == 0) {
-			printf("Compression- and decompression was successful!\n");
-		} else {
-			fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
-			return -1;
-		}
+		sw842_compress(inH, ilen, compressedH, &olen);
+		printf("copying compressed data to device\n");
+		cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
+		cudaDeviceSynchronize();
+        CHECK_ERROR(cuda_error);
+        printf("starting with device-based decompression\n");
+        cuda842_decompress<<<1,1>>>(compressedD, olen, decompressedD);
+        printf("copying decompressed data back to the host\n");
+		cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
+		cudaDeviceSynchronize();
+        CHECK_ERROR(cuda_error);
 
 	}
 	
+	if (memcmp(inH, decompressedH, ilen) == 0) {
+		printf("Compression- and decompression was successful!\n");
+	} else {
+		fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
+		free(inH);
+		free(compressedH);
+		free(decompressedH);
+		cudaFree(inD);
+		cudaFree(compressedD);
+		cudaFree(decompressedD);
+		return -1;
+	}
+	free(inH);
+	free(compressedH);
+	free(decompressedH);
+	cudaFree(inD);
+	cudaFree(compressedD);
+	cudaFree(decompressedD);
+
+	printf("\n\n");
+	return 0;
 }

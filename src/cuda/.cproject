@@ -84,6 +84,10 @@
 								<option id="nvcc.compiler.option.level.1192628479" name="Generate host debug information (-g)" superClass="nvcc.compiler.option.level"/>
 								<option defaultValue="nvcc.compiler.optimization.level.most" id="nvcc.compiler.optimization.level.374967105" name="Optimization Level" superClass="nvcc.compiler.optimization.level" valueType="enumerated"/>
 								<option id="nvcc.compiler.pic.385375501" name="Position Independent Code (-fPIC)" superClass="nvcc.compiler.pic"/>
+								<option id="nvcc.compiler.include.paths.1991998204" superClass="nvcc.compiler.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="/home/max.plauth/lib842/include"/>
+									<listOptionValue builtIn="false" value="/home/max.plauth/lib842/src/common"/>
+								</option>
 								<inputType id="nvcc.compiler.input.cu.2101178528" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.541685432" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.337994449" superClass="nvcc.compiler.input.c"/>
@@ -114,18 +118,29 @@
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
 		<project id="lib842.com.nvidia.cuda.ide.nine_zero.exe.841767200" name="Executable" projectType="com.nvidia.cuda.ide.nine_zero.exe"/>
 	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+	<storageModule moduleId="refreshScope"/>
+	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.nine_zero.configuration.release.567854335;com.nvidia.cuda.ide.nine_zero.configuration.release.567854335.;nvcc.compiler.base.1994224292;nvcc.compiler.input.cu.2101178528">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.nine_zero.configuration.release.567854335;com.nvidia.cuda.ide.nine_zero.configuration.release.567854335.;nvcc.compiler.base.1994224292;nvcc.compiler.input.cpp.541685432">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
+		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.nine_zero.configuration.debug.1454348322;com.nvidia.cuda.ide.nine_zero.configuration.debug.1454348322.;nvcc.compiler.base.65068640;nvcc.compiler.input.c.1184452627">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.nine_zero.configuration.debug.1454348322;com.nvidia.cuda.ide.nine_zero.configuration.debug.1454348322.;nvcc.compiler.base.65068640;nvcc.compiler.input.cpp.789278275">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.nine_zero.configuration.release.567854335;com.nvidia.cuda.ide.nine_zero.configuration.release.567854335.;nvcc.compiler.base.1994224292;nvcc.compiler.input.c.337994449">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
+		</scannerConfigBuildInfo>
 		<scannerConfigBuildInfo instanceId="com.nvidia.cuda.ide.nine_zero.configuration.debug.1454348322;com.nvidia.cuda.ide.nine_zero.configuration.debug.1454348322.;nvcc.compiler.base.65068640;nvcc.compiler.input.cu.2145404726">
 			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.nvidia.cuda.ide.build.NVCCPerProjectProfile"/>
 		</scannerConfigBuildInfo>
 	</storageModule>
-	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
-	<storageModule moduleId="refreshScope"/>
+	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cproject>
