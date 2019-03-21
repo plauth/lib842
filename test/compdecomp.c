@@ -138,7 +138,7 @@ int main( int argc, const char* argv[])
 
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
-			uint8_t* chunk_decomp = in + (CHUNK_SIZE * chunk_num);
+			uint8_t* chunk_decomp = decompressed + (CHUNK_SIZE * chunk_num);
 			
 			
 			#ifdef USEHW

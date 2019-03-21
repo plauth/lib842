@@ -17,6 +17,7 @@
  */
 
 #include "842-internal.h"
+#include "inttypes.h"
 
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE	(2 * (1 << I2_BITS))
@@ -29,8 +30,59 @@
 /* number of bits in a buffered word */
 #define WSIZE 64 //sizeof(uint64_t)
 
+#if defined(BRANCH_FREE) && BRANCH_FREE == 1
+static uint16_t fifo_sizes[9] = {
+	0, 
+	0,
+	I2_FIFO_SIZE,
+	0,
+	I4_FIFO_SIZE,
+	0,
+	0,
+	0,
+	I8_FIFO_SIZE
+};
+
+
+static uint8_t dec_templates[26][4][2] = { // params size in bits
+	{OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x00: { D8, N0, N0, N0 }, 64 bits
+	{OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x01: { D4, D2, I2, N0 }, 56 bits
+	{OP_DEC_D4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0}, // 0x02: { D4, I2, D2, N0 }, 56 bits
+	{OP_DEC_D4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0}, // 0x03: { D4, I2, I2, N0 }, 48 bits
+
+	{OP_DEC_D4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0}, // 0x04: { D4, I4, N0, N0 }, 41 bits
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0}, // 0x05: { D2, I2, D4, N0 }, 56 bits
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2}, // 0x06: { D2, I2, D2, I2 }, 48 bits
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2}, // 0x07: { D2, I2, I2, D2 }, 48 bits
+
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2}, // 0x08: { D2, I2, I2, I2 }, 40 bits
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0}, // 0x09: { D2, I2, I4, N0 }, 33 bits
+	{OP_DEC_I2, OP_DEC_D2, OP_DEC_D4, OP_DEC_N0}, // 0x0a: { I2, D2, D4, N0 }, 56 bits
+	{OP_DEC_I2, OP_DEC_D4, OP_DEC_I2, OP_DEC_N0}, // 0x0b: { I2, D4, I2, N0 }, 48 bits
+
+	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_D2}, // 0x0c: { I2, D2, I2, D2 }, 48 bits
+	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2}, // 0x0d: { I2, D2, I2, I2 }, 40 bits
+	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0}, // 0x0e: { I2, D2, I4, N0 }, 33 bits
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0}, // 0x0f: { I2, I2, D4, N0 }, 48 bits
+	
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2}, // 0x10: { I2, I2, D2, I2 }, 40 bits
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2}, // 0x11: { I2, I2, I2, D2 }, 40 bits
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2}, // 0x12: { I2, I2, I2, I2 }, 32 bits
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0}, // 0x13: { I2, I2, I4, N0 }, 25 bits
+	
+	{OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0}, // 0x14: { I4, D4, N0, N0 }, 41 bits
+	{OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x15: { I4, D2, I2, N0 }, 33 bits
+	{OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0}, // 0x16: { I4, I2, D2, N0 }, 33 bits
+	{OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0}, // 0x17: { I4, I2, I2, N0 }, 25 bits
+	
+
+	{OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0}, // 0x18: { I4, I4, N0, N0 }, 18 bits
+	{OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x19: { I8, N0, N0, N0 }, 8 bits
+};
+#endif
+
 /* read a single uint64_t from memory */
-static inline uint64_t stream_read_word(struct sw842_param_decomp *p)
+static inline uint64_t read_word(struct sw842_param_decomp *p)
 {
   uint64_t w = swap_be_to_native64(*p->in++);
   return w;
@@ -40,10 +92,11 @@ static inline uint64_t stream_read_word(struct sw842_param_decomp *p)
 static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 {
   uint64_t value = p->buffer >> (WSIZE - n);
+  value &= (n > 0) ? 0xFFFFFFFFFFFFFFFF : 0x0000000000000000;
 
   if (p->bits < n) {
     /* fetch WSIZE bits  */
-    p->buffer = stream_read_word(p);
+    p->buffer = read_word(p);
     value |= p->buffer >> (WSIZE - (n - p->bits));
     p->buffer <<= n - p->bits;
     p->bits += WSIZE - n;
@@ -55,6 +108,7 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
   return value;
 }
 
+#if (defined(BRANCH_FREE) && BRANCH_FREE == 0) || not defined(BRANCH_FREE)
 template<uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
 {
 	switch (N) {
@@ -99,6 +153,34 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t 
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;
 }
+#endif
+
+#if defined(BRANCH_FREE) && BRANCH_FREE == 1
+static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uint64_t index, uint64_t fsize)
+{
+	uint64_t offset, total = round_down(p->out - p->ostart, 8);
+
+	offset = index * size;
+
+	/* a ring buffer of fsize is used; correct the offset */
+	if (total > fsize) {
+		/* this is where the current fifo is */
+		uint64_t section = round_down(total, fsize);
+		/* the current pos in the fifo */
+		uint64_t pos = total - section;
+
+		/* if the offset is past/at the pos, we need to
+		 * go back to the last fifo section
+		 */
+		if (offset >= pos)
+			section -= fsize;
+
+		offset += section;
+	}
+
+	return offset;
+}
+#endif
 
 /**
  * sw842_decompress
@@ -129,14 +211,28 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 	p.bits = 0;
 
 	uint64_t op, rep;
+
+	#if defined(BRANCH_FREE) && BRANCH_FREE == 1
+	uint64_t output_word;
+	uint64_t values[8];
+	uint8_t bits;
+	#endif
+
 	do {
 		op = read_bits(&p, OP_BITS);
 
 		#ifdef DEBUG
 		printf("template is %llx\n", op);
 		#endif
+		
+		#if defined(BRANCH_FREE) && BRANCH_FREE == 1
+		output_word = 0;
+		bits = 0;
+		memset(values, 0, 64);
+		#endif
 
 		switch (op) {
+			#if (defined(BRANCH_FREE) && BRANCH_FREE == 0) || not defined(BRANCH_FREE)
 			case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
 	        	do_data<8>(&p);
 	    	    break;
@@ -268,6 +364,7 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 			case 0x19:	// { I8, N0, N0, N0 }, 8 bits
 				do_index(&p, 8, I8_BITS, I8_FIFO_SIZE);
 	    	    break;
+	    	#endif
 	    	case OP_REPEAT:
 				rep = read_bits(&p, REPEAT_BITS);
 				/* copy rep + 1 */
@@ -285,8 +382,33 @@ int sw842_decompress(const uint8_t *in, unsigned int ilen,
 			case OP_END:
 				break;
 	        default:
-	        	fprintf(stderr, "Invalid op template: %llx\n", op);
+	        #if defined(BRANCH_FREE) && BRANCH_FREE == 1
+				for(int i = 0; i < 4; i++) {
+					// 0-initialize all values-fields
+					values[i] = 0;
+					values[4 + i] = 0; 
+
+					uint8_t dec_template = dec_templates[op][i][0];
+					uint8_t is_index = (dec_template >> 7); 
+					uint8_t num_bits = dec_template & 0x7F;
+					uint8_t dst_size = dec_templates[op][i][1];
+
+					values[(4 * is_index) + i] = read_bits(&p, num_bits);
+					
+					uint64_t offset = get_index(&p, dst_size, values[4 + i], fifo_sizes[dst_size]);
+					memcpy(&values[4 + i], &p.ostart[offset], dst_size);
+					values[4 + i] = swap_be_to_native64(values[4 + i] << (WSIZE - (dst_size << 3)));
+					
+					values[i] = values[4 + i] * is_index | values[i];
+					output_word |= values[i] << (64 - (dst_size<<3) - bits);
+					bits += dst_size<<3;
+				}
+				write64(p.out, swap_native_to_be64(output_word));
+				p.out += 8;
+			#else
+				fprintf(stderr, "Invalid op template: %llx\n", op);
 	        	return -EINVAL;
+			#endif
 	    }
 	} while (op != OP_END);
 
