@@ -62,11 +62,30 @@ __constant__ uint8_t dec_templates[26][4][2] = { // params size in bits
 	{OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
 
+/* read a single uint64_t from memory */
+__device__ static inline uint64_t read_word(struct sw842_param_decomp *p)
+{
+  uint64_t w;
+  asm("{\n\t"
+	"	.reg .b32 %li,%lo,%hi,%ho;\n\t"
+	// swap_be_to_native64(p->in)
+	"	mov.b64 {%li,%hi}, %2;\n\t"
+	"	prmt.b32 %lo, %li, %hi, 0x4567;\n\t"
+	"	prmt.b32 %ho, %li, %hi, 0x0123;\n\t"
+	"	mov.b64 %0, {%lo,%ho};\n\t"
+	// p->in++
+	"	add.u64 %1, %1, 8;\n\t"
+	"}"
+	: "=l"(w), "+l"(p->in) : "l"(*p->in)
+  );
+  return w;
+}
+
 __device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 {
   uint64_t value = p->buffer >> (WSIZE - n);
-  uint8_t else_condition = (p->bits >= n);
 
+  /*
   asm("{\n\t"
 	"		.reg .pred %p, %q;\n\t"
 	"		.reg .b32 %li,%lo,%hi,%ho;\n\t"
@@ -108,7 +127,19 @@ __device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 	"@!%p	shl.b64 %1, %1, %5;\n\t"
 	"}"
 	: "+l"(value), "+l"(p->buffer), "+l"(p->in), "+r"(p->bits) : "l"(*p->in), "r"(n)
-  );
+  );*/
+
+  if (p->bits < n) {
+    /* fetch WSIZE bits  */
+    p->buffer = read_word(p);
+    value |= p->buffer >> (WSIZE - (n - p->bits));
+    p->buffer <<= n - p->bits;
+    p->bits += WSIZE - n;
+    p->buffer *= (p->bits > 0);
+  }  else {
+    p->bits -= n;
+    p->buffer <<= n;
+  }
 
   return value;
 }
