@@ -13,54 +13,130 @@
 
 #define CHUNK_SIZE 4096
 
-/* read a single uint64_t from memory */
-__device__ static inline uint64_t stream_read_word(struct sw842_param_decomp *p)
-{
-  uint64_t w = swap_be_to_native64(*p->in++);
-  return w;
-}
+__constant__ uint16_t fifo_sizes[9] = {
+	0,
+	0,
+	I2_FIFO_SIZE,
+	0,
+	I4_FIFO_SIZE,
+	0,
+	0,
+	0,
+	I8_FIFO_SIZE
+};
 
-/* read 0 <= n <= 64 bits */
-__device__ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
+
+__constant__ uint8_t dec_templates[26][4][2] = { // params size in bits
+	{OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x00: { D8, N0, N0, N0 }, 64 bits
+	{OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x01: { D4, D2, I2, N0 }, 56 bits
+	{OP_DEC_D4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0}, // 0x02: { D4, I2, D2, N0 }, 56 bits
+	{OP_DEC_D4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0}, // 0x03: { D4, I2, I2, N0 }, 48 bits
+
+	{OP_DEC_D4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0}, // 0x04: { D4, I4, N0, N0 }, 41 bits
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0}, // 0x05: { D2, I2, D4, N0 }, 56 bits
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2}, // 0x06: { D2, I2, D2, I2 }, 48 bits
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2}, // 0x07: { D2, I2, I2, D2 }, 48 bits
+
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2}, // 0x08: { D2, I2, I2, I2 }, 40 bits
+	{OP_DEC_D2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0}, // 0x09: { D2, I2, I4, N0 }, 33 bits
+	{OP_DEC_I2, OP_DEC_D2, OP_DEC_D4, OP_DEC_N0}, // 0x0a: { I2, D2, D4, N0 }, 56 bits
+	{OP_DEC_I2, OP_DEC_D4, OP_DEC_I2, OP_DEC_N0}, // 0x0b: { I2, D4, I2, N0 }, 48 bits
+
+	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_D2}, // 0x0c: { I2, D2, I2, D2 }, 48 bits
+	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2}, // 0x0d: { I2, D2, I2, I2 }, 40 bits
+	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0}, // 0x0e: { I2, D2, I4, N0 }, 33 bits
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0}, // 0x0f: { I2, I2, D4, N0 }, 48 bits
+
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2}, // 0x10: { I2, I2, D2, I2 }, 40 bits
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2}, // 0x11: { I2, I2, I2, D2 }, 40 bits
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2}, // 0x12: { I2, I2, I2, I2 }, 32 bits
+	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0}, // 0x13: { I2, I2, I4, N0 }, 25 bits
+
+	{OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0}, // 0x14: { I4, D4, N0, N0 }, 41 bits
+	{OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x15: { I4, D2, I2, N0 }, 33 bits
+	{OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0}, // 0x16: { I4, I2, D2, N0 }, 33 bits
+	{OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0}, // 0x17: { I4, I2, I2, N0 }, 25 bits
+
+
+	{OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0}, // 0x18: { I4, I4, N0, N0 }, 18 bits
+	{OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x19: { I8, N0, N0, N0 }, 8 bits
+};
+
+__device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 {
   uint64_t value = p->buffer >> (WSIZE - n);
+  uint8_t else_condition = (p->bits >= n);
 
-  if (p->bits < n) {
-    /* fetch WSIZE bits  */
-    p->buffer = stream_read_word(p);
-    value |= p->buffer >> (WSIZE - (n - p->bits));
-    p->buffer <<= n - p->bits;
-    p->bits += WSIZE - n;
-    p->buffer *= (p->bits > 0);
-  }  else {
-    p->bits -= n;
-    p->buffer <<= n;
-  }
+  asm("{\n\t"
+	"		.reg .pred %p, %q;\n\t"
+	"		.reg .b32 %li,%lo,%hi,%ho;\n\t"
+	"		.reg .b64 %tmp;\n\t"
+	"		.reg .u32 %n;\n\t"
+	// value = (n > 0) ? value : 0
+	"		setp.hi.u32 %p, %5, 0;\n\t"		// n > 0?
+	"		selp.u64 %0, %0, 0, %p;\n\t"	// set value to value if predicate is true, otherwise to 0
+	// if (p->bits < n)
+	"		setp.lo.u32 %p, %3, %5;\n\t"
+	// begin: p->buffer = read_word(p)
+	// swap_be_to_native64(p->in)
+	"@%p	mov.b64 {%li,%hi}, %4;\n\t"
+	"@%p	prmt.b32 %lo, %li, %hi, 0x4567;\n\t"
+	"@%p	prmt.b32 %ho, %li, %hi, 0x0123;\n\t"
+	"@%p	mov.b64 %1, {%lo,%ho};\n\t"
+	// p->in++
+	"@%p	add.u64 %2, %2, 8;\n\t"
+	// end: p->buffer = read_word(p)
+
+	// n = WSIZE - (n - p->bits)
+	"@%p	sub.u32 %n, %5, %3;\n\t"
+	"@%p	sub.u32 %n, 0x40, %n;\n\t"
+	// value |= p->buffer >> n
+	"		shr.b64 %tmp, %1, %n;\n\t"
+	"@%p	or.b64 %0, %0, %tmp;\n\t"
+	// p->buffer <<= n - p->bits
+	"		sub.u32 %n, %5, %3;\n\t"
+	"@%p	shl.b64 %1, %1, %n;\n\t"
+	// p->bits += WSIZE - n
+	"@%p	add.u32 %3, %3, 0x40;\n\t"
+	"@%p	sub.u32 %3, %3, %5;\n\t"
+	// p->buffer *= (p->bits > 0)
+	"@%p	setp.hi.u32 %q, %3, 0;\n\t"
+	"@%p	selp.u64 %1, %1, 0, %q;\n\t"
+	// else
+    // p->bits -=n; p->buffer <<=n;
+	"@!%p	sub.u32 %3, %3, %5;\n\t"
+	"@!%p	shl.b64 %1, %1, %5;\n\t"
+	"}"
+	: "+l"(value), "+l"(p->buffer), "+l"(p->in), "+r"(p->bits) : "l"(*p->in), "r"(n)
+  );
+
   return value;
 }
 
-template<uint8_t N> __device__ static inline void do_data(struct sw842_param_decomp *p)
+/* read 0 <= n <= 64 bits
+__device__ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 {
-	switch (N) {
-	case 2:
-		write16(p->out, swap_be_to_native16(read_bits(p, 16)));
-		break;
-	case 4:
-		write32(p->out, swap_be_to_native32(read_bits(p, 32)));
-		break;
-	case 8:
-		write64(p->out, swap_be_to_native64(read_bits(p, 64)));
-		break;
-	}
+  uint64_t value = p->buffer >> (WSIZE - n);
+  value &= (n > 0) * 0xFFFFFFFFFFFFFFFF;
 
-	p->out += N;
-}
+  uint8_t additional_bits_required = p->bits < n;
+  uint8_t no_additional_bits_required = 1 - additional_bits_required;
 
-__device__ static inline void do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, uint64_t fsize)
+  uint64_t new_buffer = read_word(p, additional_bits_required);
+  p->buffer = new_buffer * additional_bits_required | p->buffer * no_additional_bits_required;
+
+  value |= (p->buffer >> (WSIZE - (n - p->bits))) * additional_bits_required;
+  p->buffer <<= n - (p->bits * additional_bits_required);
+  p->bits += (WSIZE - n) * additional_bits_required;
+  p->buffer *= (p->bits > 0 || no_additional_bits_required);
+  p->bits -= n * no_additional_bits_required;
+
+  return value;
+}*/
+
+__device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uint64_t index, uint64_t fsize)
 {
-	uint64_t index, offset, total = round_down(p->out - p->ostart, 8);
-
-	index = read_bits(p, bits);
+	uint64_t offset, total = round_down(p->out - p->ostart, 8);
 
 	offset = index * size;
 
@@ -80,8 +156,7 @@ __device__ static inline void do_index(struct sw842_param_decomp *p, uint8_t siz
 		offset += section;
 	}
 
-	memcpy(p->out, &p->ostart[offset], size);
-	p->out += size;
+	return offset;
 }
 
 __global__ void cuda842_decompress(const uint8_t *in, unsigned int ilen, uint8_t *out)
@@ -97,6 +172,11 @@ __global__ void cuda842_decompress(const uint8_t *in, unsigned int ilen, uint8_t
 	p.bits = 0;
 
 	uint64_t op, rep;
+
+	uint64_t output_word;
+	uint64_t values[8];
+	uint8_t bits;
+
 	do {
 		op = read_bits(&p, OP_BITS);
 
@@ -104,138 +184,11 @@ __global__ void cuda842_decompress(const uint8_t *in, unsigned int ilen, uint8_t
 		printf("template is %llx\n", op);
 		#endif
 
+		output_word = 0;
+		bits = 0;
+		memset(values, 0, 64);
+
 		switch (op) {
-			case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
-	        	do_data<8>(&p);
-	    	    break;
-	        case 0x01:	// { D4, D2, I2, N0 }, 56 bits
-	        	do_data<4>(&p);
-	        	do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-	        case 0x02:	// { D4, I2, D2, N0 }, 56 bits
-	        	do_data<4>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_data<2>(&p);
-	    	    break;
-			case 0x03: 	// { D4, I2, I2, N0 }, 48 bits
-	        	do_data<4>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x04:	// { D4, I4, N0, N0 }, 41 bits
-	        	do_data<4>(&p);
-	        	do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x05:	// { D2, I2, D4, N0 }, 56 bits
-				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_data<4>(&p);
-	    	    break;
-			case 0x06:	// { D2, I2, D2, I2 }, 48 bits
-				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x07:	// { D2, I2, I2, D2 }, 48 bits
-				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-	    	    break;
-			case 0x08:	// { D2, I2, I2, I2 }, 40 bits
-				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x09:	// { D2, I2, I4, N0 }, 33 bits
-				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x0a:	// { I2, D2, D4, N0 }, 56 bits
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_data<2>(&p);
-	        	do_data<4>(&p);
-	    	    break;
-			case 0x0b:	// { I2, D4, I2, N0 }, 48 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<4>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x0c:	// { I2, D2, I2, D2 }, 48 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-	    	    break;
-			case 0x0d:	// { I2, D2, I2, I2 }, 40 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x0e:	// { I2, D2, I4, N0 }, 33 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x0f:	// { I2, I2, D4, N0 }, 48 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<4>(&p);
-	    	    break;
-			case 0x10:	// { I2, I2, D2, I2 }, 40 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x11:	// { I2, I2, I2, D2 }, 40 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-	    	    break;
-			case 0x12:	// { I2, I2, I2, I2 }, 32 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x13:	// { I2, I2, I4, N0 }, 25 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x14:	// { I4, D4, N0, N0 }, 41 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_data<4>(&p);
-	    	    break;
-			case 0x15:	// { I4, D2, I2, N0 }, 33 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x16:	// { I4, I2, D2, N0 }, 33 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-	    	    break;
-			case 0x17:	// { I4, I2, I2, N0 }, 25 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x18:	// { I4, I4, N0, N0 }, 18 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x19:	// { I8, N0, N0, N0 }, 8 bits
-				do_index(&p, 8, I8_BITS, I8_FIFO_SIZE);
-	    	    break;
 	    	case OP_REPEAT:
 				rep = read_bits(&p, REPEAT_BITS);
 				/* copy rep + 1 */
@@ -253,8 +206,48 @@ __global__ void cuda842_decompress(const uint8_t *in, unsigned int ilen, uint8_t
 			case OP_END:
 				break;
 	        default:
-	        	printf("Invalid op template: %llx\n", op);
-	        	return;
+				for(int i = 0; i < 4; i++) {
+					// 0-initialize all values-fields
+					values[i] = 0;
+					values[4 + i] = 0;
+
+					uint8_t dec_template = dec_templates[op][i][0];
+					uint8_t is_index = (dec_template >> 7);
+					uint8_t num_bits = dec_template & 0x7F;
+					uint8_t dst_size = dec_templates[op][i][1];
+
+					values[(4 * is_index) + i] = read_bits(&p, num_bits);
+
+					uint64_t offset = get_index(&p, dst_size, values[4 + i], fifo_sizes[dst_size]);
+					memcpy(&values[4 + i], &p.ostart[offset], dst_size);
+					values[4 + i] = values[4 + i] << (WSIZE - (dst_size << 3));
+					asm("{\n\t"
+						"		.reg .b32 %li,%lo,%hi,%ho;\n\t"
+						"		mov.b64 {%li,%hi}, %0;\n\t"
+						"		prmt.b32 %lo, %li, %hi, 0x4567;\n\t"
+						" 		prmt.b32 %ho, %li, %hi, 0x0123;\n\t"
+						"		mov.b64 %0, {%lo,%ho};\n\t"
+						"}"
+						: "+l"(values[4 + i])
+					);
+
+					values[i] = values[4 + i] * is_index | values[i];
+					output_word |= values[i] << (64 - (dst_size<<3) - bits);
+					bits += dst_size<<3;
+				}
+
+				asm("{\n\t"
+					"		.reg .b32 %li,%lo,%hi,%ho;\n\t"
+					// p.out = swap_native_to_be64(p->in)
+					"		mov.b64 {%li,%hi}, %2;\n\t"
+					"		prmt.b32 %lo, %li, %hi, 0x4567;\n\t"
+					" 		prmt.b32 %ho, %li, %hi, 0x0123;\n\t"
+					"		mov.b64 %0, {%lo,%ho};\n\t"
+					// p.out += 8
+					"		add.u64 %1, %1, 8;\n\t"
+					"}"
+					: "=l"(*((uint64_t*)p.out)), "+l"(p.out) : "l"(output_word)
+				);
 	    }
 	} while (op != OP_END);
 

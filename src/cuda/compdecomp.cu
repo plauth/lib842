@@ -8,7 +8,7 @@
 
 //#define CHUNK_SIZE 32768
 #define CHUNK_SIZE 4096
-#define THREADS_PER_BLOCK 1
+#define THREADS_PER_BLOCK 256
 #define STRLEN 32
 
 __global__ void cuda842_decompress(const uint8_t *in, unsigned int ilen, uint8_t *out);
@@ -161,13 +161,20 @@ int main( int argc, const char* argv[])
 		printf("Compression- and decompression was successful!\n");
 	} else {
 		fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
+		//FILE *fpIn, *fpOut;
+		//fpIn=fopen("original.bin", "w");
+		//fwrite(inH, ilen, 1, fpIn);
+		//fclose(fpIn);
+		//fpOut=fopen("decompressed.bin", "w");
+		//fwrite(decompressedH, dlen, 1, fpOut);
+		//fclose(fpOut);
 		free(inH);
 		free(compressedH);
 		free(decompressedH);
 		cudaFree(inD);
 		cudaFree(compressedD);
 		cudaFree(decompressedD);
-		return -1;
+		return 0;
 	}
 	free(inH);
 	free(compressedH);

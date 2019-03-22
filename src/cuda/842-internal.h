@@ -105,6 +105,7 @@
 #define D4_BITS 	(32)
 #define D8_BITS 	(64)
 #define CRC_BITS	(32)
+#define N0_BITS		(0)
 
 #define REPEAT_BITS_MAX		(0x3f)
 
@@ -154,6 +155,18 @@
 #define D4S_OP  {14, D4_BITS}
 #define N0_OP	{15, 0}
 
+#define OP_DEC_NOOP  (0x00)
+#define OP_DEC_DATA	 (0x00)
+#define OP_DEC_INDEX (0x80)
+
+#define OP_DEC_N0	{(N0_BITS | OP_DEC_NOOP),  0}
+#define OP_DEC_D2	{(D2_BITS | OP_DEC_DATA),  2}
+#define OP_DEC_D4	{(D4_BITS | OP_DEC_DATA),  4}
+#define OP_DEC_D8	{(D8_BITS | OP_DEC_DATA),  8}
+#define OP_DEC_I2	{(I2_BITS | OP_DEC_INDEX), 2}
+#define OP_DEC_I4	{(I4_BITS | OP_DEC_INDEX), 4}
+#define OP_DEC_I8	{(I8_BITS | OP_DEC_INDEX), 8}
+
 struct sw842_param {
 	struct bitstream* stream;
 
@@ -183,7 +196,7 @@ struct sw842_param {
  	const uint8_t *ostart;
  	uint64_t* in;
  	const uint64_t* istart;
- 	uint8_t bits;
+ 	uint32_t bits;
  	uint64_t buffer;
  };
 
