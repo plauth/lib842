@@ -192,10 +192,9 @@ struct sw842_param {
 };
 
  struct sw842_param_decomp {
- 	uint8_t *out;
- 	const uint8_t *ostart;
+ 	uint64_t *out;
+ 	const uint64_t *ostart;
  	uint64_t* in;
- 	const uint64_t* istart;
  	uint32_t bits;
  	uint64_t buffer;
  };

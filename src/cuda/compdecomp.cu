@@ -7,11 +7,11 @@
 #include "sw842.h"
 
 //#define CHUNK_SIZE 32768
-#define CHUNK_SIZE 4096
-#define THREADS_PER_BLOCK 256
+#define CHUNK_SIZE 1024
+#define THREADS_PER_BLOCK 32
 #define STRLEN 32
 
-__global__ void cuda842_decompress(const uint8_t *in, unsigned int ilen, uint8_t *out);
+__global__ void cuda842_decompress(uint64_t *in, unsigned int ilen, uint64_t *out);
 
 #define CHECK_ERROR( err ) \
   if( err != cudaSuccess ) { \
@@ -33,8 +33,8 @@ int nextMultipleOfChunkSize(unsigned int input) {
 
 int main( int argc, const char* argv[])
 {
-	uint8_t *inH, *compressedH, *decompressedH;
-	uint8_t *inD, *compressedD, *decompressedD;
+	uint8_t *inH, *compressedH, *decompressedH, *transposedH;
+	uint64_t *inD, *compressedD, *decompressedD;
 	inH = compressedH = decompressedH = NULL;
 	unsigned int ilen, olen, dlen;
 	ilen = olen = dlen = 0;
@@ -84,6 +84,7 @@ int main( int argc, const char* argv[])
 		inH = (uint8_t*) malloc(ilen);
 		cudaMalloc((void**) &inD, ilen);
 		compressedH = (uint8_t*) malloc(olen);
+		transposedH = (uint8_t*) malloc(olen);
 		cudaMalloc((void**) &compressedD, olen);
 		decompressedH = (uint8_t*) malloc(dlen);
 		cudaMalloc((void**) &decompressedD, dlen);
@@ -101,9 +102,6 @@ int main( int argc, const char* argv[])
 		fclose(fp);
 	}
 
-	unsigned int * dlenD;
-	cudaMalloc((void**) &dlenD, sizeof(unsigned int));
-
 	if(ilen > CHUNK_SIZE) {
 		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
 	
@@ -116,8 +114,15 @@ int main( int argc, const char* argv[])
 			uint8_t* chunk_out = compressedH + ((CHUNK_SIZE * 2) * chunk_num);
 			
 			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
+
+			for(int i = 0; i < 256; i++){
+				memcpy(transposedH + (i*(CHUNK_SIZE*2)) + (chunk_num*8), chunk_out + (i*8), 8);
+			}
 		}
 		timeend_comp = timestamp();
+
+
+
 
 		cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
 		CHECK_ERROR(cuda_error);
@@ -161,13 +166,13 @@ int main( int argc, const char* argv[])
 		printf("Compression- and decompression was successful!\n");
 	} else {
 		fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
-		//FILE *fpIn, *fpOut;
-		//fpIn=fopen("original.bin", "w");
-		//fwrite(inH, ilen, 1, fpIn);
-		//fclose(fpIn);
-		//fpOut=fopen("decompressed.bin", "w");
-		//fwrite(decompressedH, dlen, 1, fpOut);
-		//fclose(fpOut);
+		FILE *fpIn, *fpOut;
+		fpIn=fopen("original.bin", "w");
+		fwrite(inH, ilen, 1, fpIn);
+		fclose(fpIn);
+		fpOut=fopen("decompressed.bin", "w");
+		fwrite(decompressedH, dlen, 1, fpOut);
+		fclose(fpOut);
 		free(inH);
 		free(compressedH);
 		free(decompressedH);
