@@ -135,7 +135,8 @@ __device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
   */
 
   if (p->bits < n) {
-    p->buffer = bswap(*p->in++);
+    p->buffer = bswap(*p->in);
+    p->in += p->nchunks;
     value |= p->buffer >> (WSIZE - (n - p->bits));
     p->buffer <<= n - p->bits;
     p->bits += WSIZE - n;
@@ -176,13 +177,15 @@ __device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 	return offset;
 }
 
-__global__ void cuda842_decompress(uint64_t *in, unsigned int ilen, uint64_t *out)
+__global__ void cuda842_decompress(uint64_t *in, unsigned int ilen, uint64_t *out, unsigned int num_chunks)
 {
 	unsigned int chunk_num = blockIdx.x * blockDim.x + threadIdx.x;
 
 	struct sw842_param_decomp p;
 	p.ostart = p.out = out + ((CHUNK_SIZE / 8) * chunk_num);
-  	p.in = (in + ((CHUNK_SIZE / 8 * 2) * chunk_num));
+  	//p.in = (in + ((CHUNK_SIZE / 8 * 2) * chunk_num));
+  	p.in = in + chunk_num;
+  	p.nchunks = num_chunks;
 
 	p.buffer = 0;
 	p.bits = 0;
