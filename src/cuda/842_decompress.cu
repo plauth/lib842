@@ -13,6 +13,7 @@
 
 #define CHUNK_SIZE 1024
 
+#ifdef STRICT
 __constant__ uint16_t fifo_sizes[9] = {
 	0,
 	0,
@@ -24,6 +25,7 @@ __constant__ uint16_t fifo_sizes[9] = {
 	0,
 	I8_FIFO_SIZE
 };
+#endif
 
 
 __constant__ uint8_t dec_templates[26][4][2] = { // params size in bits
@@ -150,11 +152,11 @@ __device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t num_
   return value;
 }
 
+#ifdef STRICT
 __device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uint64_t index, uint64_t fsize)
 {
-	uint64_t offset, tmp;
-	tmp = ((uint8_t*)p->out) - ((const uint8_t *)p->ostart);
-	uint64_t total = round_down(tmp, 8);
+	uint64_t offset;
+	uint64_t total = round_down(((uint8_t*)p->out) - ((const uint8_t *)p->ostart), 8);
 
 	offset = index * size;
 
@@ -176,6 +178,7 @@ __device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 
 	return offset;
 }
+#endif
 
 __global__ void cuda842_decompress(uint64_t *in, uint32_t ilen, uint64_t *out, uint32_t num_chunks)
 {
@@ -229,28 +232,55 @@ __global__ void cuda842_decompress(uint64_t *in, uint32_t ilen, uint64_t *out, u
 					value = read_bits(&p, num_chunks, num_bits);
 
 					if(is_index) {
+#ifdef STRICT
 						uint64_t offset = get_index(&p, dst_size, value, fifo_sizes[dst_size]);
+#else
+						//uint32_t offset = value * dst_size;
+#endif
 
 						asm("{\n\t"
 						"		.reg .pred %pr4, %pr8;\n\t"
 						"		.reg .u16 %val16_0, %val16_1, %val16_2, %val16_3;\n\t"
 						"		.reg .u32 %val32;\n\t"
+						"		.reg .u64 %addr, %result;\n\t"
+
 						"		setp.hi.u32 %pr4, %2, 2;\n\t"
 						"		setp.eq.u32 %pr8, %2, 8;\n\t"
-						"		ld.global.b16 %val16_0, [%1];\n\t"
-						"@%pr4	ld.global.b16 %val16_1, [%1+2];\n\t"
-						"@%pr8	ld.global.b16 %val16_2, [%1+4];\n\t"
-						"@%pr8	ld.global.b16 %val16_3, [%1+6];\n\t"
-						"		cvt.u64.u16 %0, %val16_0;\n\t"
+#ifdef STRICT
+						"		add.u64 %addr, %1, %3;\n\t"
+#else
+						"		cvt.u64.u32 %addr, %2;\n\t"
+						"		mul.lo.u64 %addr, %0, %addr;\n\t"
+						"		add.u64 %addr, %addr, %1;\n\t"
+#endif
+
+						"		ld.global.b16 %val16_0, [%addr];\n\t"
+						"@%pr4	ld.global.b16 %val16_1, [%addr+2];\n\t"
+						"@%pr8	ld.global.b16 %val16_2, [%addr+4];\n\t"
+						"@%pr8	ld.global.b16 %val16_3, [%addr+6];\n\t"
+						"		cvt.u64.u16 %result, %val16_0;\n\t"
 						"@%pr4	mov.b32 %val32, {%val16_0, %val16_1};\n\t"
-						"@%pr4	cvt.u64.u32 %0, %val32;\n\t"
-						"@%pr8	mov.b64 %0, {%val16_0, %val16_1, %val16_2, %val16_3};\n\t"
+						"@%pr4	cvt.u64.u32 %result, %val32;\n\t"
+						"@%pr8	mov.b64 %result, {%val16_0, %val16_1, %val16_2, %val16_3};\n\t"
+						"		shl.b32 %val32, %2, 3;\n\t"
+						"		sub.u32 %val32, 64, %val32;\n\t"
+						"		shl.b64 %result, %result, %val32;\n\t"
+
+						"		.reg .b32 %li,%lo,%hi,%ho;\n\t"
+						"		mov.b64 {%li,%hi}, %result;\n\t"
+						"		prmt.b32 %lo, %li, %hi, 0x4567;\n\t"
+						" 		prmt.b32 %ho, %li, %hi, 0x0123;\n\t"
+						"		mov.b64 %result, {%lo,%ho};\n\t"
+						"		mov.b64 %0, %result;\n\t"
+
 						"}"
-						: "=l"(value) : "l"(((uint8_t*) p.ostart) + offset), "r"(dst_size)
+#ifdef STRICT
+						: "+l"(value) : "l"(p.ostart), "r"(dst_size), "l"(offset)
+#else
+						: "+l"(value) : "l"(p.ostart), "r"(dst_size)
+#endif
+
 						 );
-
-
-						value = bswap(value << (WSIZE - (dst_size << 3)));
 					}
 
 					output_word |= value << (64 - (dst_size<<3) - bits);

@@ -31,6 +31,7 @@
 									<listOptionValue builtIn="false" value="/home/max.plauth/lib842/src/common"/>
 									<listOptionValue builtIn="false" value="/home/max.plauth/lib842/include"/>
 								</option>
+								<option id="nvcc.compiler.maxregcount.145089595" superClass="nvcc.compiler.maxregcount" value="64" valueType="string"/>
 								<inputType id="nvcc.compiler.input.cu.2145404726" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.789278275" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.1184452627" superClass="nvcc.compiler.input.c"/>
@@ -84,10 +85,11 @@
 								<option id="nvcc.compiler.option.level.1192628479" name="Generate host debug information (-g)" superClass="nvcc.compiler.option.level"/>
 								<option defaultValue="nvcc.compiler.optimization.level.most" id="nvcc.compiler.optimization.level.374967105" name="Optimization Level" superClass="nvcc.compiler.optimization.level" valueType="enumerated"/>
 								<option id="nvcc.compiler.pic.385375501" name="Position Independent Code (-fPIC)" superClass="nvcc.compiler.pic"/>
-								<option id="nvcc.compiler.include.paths.1991998204" superClass="nvcc.compiler.include.paths" valueType="includePath">
+								<option id="nvcc.compiler.include.paths.1991998204" name="Include paths (-I)" superClass="nvcc.compiler.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/home/max.plauth/lib842/include"/>
 									<listOptionValue builtIn="false" value="/home/max.plauth/lib842/src/common"/>
 								</option>
+								<option id="nvcc.compiler.maxregcount.1405889440" superClass="nvcc.compiler.maxregcount" value="64" valueType="string"/>
 								<inputType id="nvcc.compiler.input.cu.2101178528" superClass="nvcc.compiler.input.cu"/>
 								<inputType id="nvcc.compiler.input.cpp.541685432" superClass="nvcc.compiler.input.cpp"/>
 								<inputType id="nvcc.compiler.input.c.337994449" superClass="nvcc.compiler.input.c"/>
@@ -111,6 +113,7 @@
 					<sass major="3" minor="7"/>
 					<ptx major="3" minor="7"/>
 				</executable>
+				<editor-arch major="3" minor="7"/>
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 		</cconfiguration>
