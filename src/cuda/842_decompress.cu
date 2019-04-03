@@ -77,7 +77,7 @@ __device__ inline uint64_t bswap(uint64_t value)
 }
 
 
-__device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
+__device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t num_chunks, uint32_t n)
 {
   uint64_t value = p->buffer >> (WSIZE - n);
   //value &= (n > 0) ? 0xFFFFFFFFFFFFFFFF : 0x0000000000000000;
@@ -136,7 +136,7 @@ __device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 
   if (p->bits < n) {
     p->buffer = bswap(*p->in);
-    p->in += p->nchunks;
+    p->in += num_chunks;
     value |= p->buffer >> (WSIZE - (n - p->bits));
     p->buffer <<= n - p->bits;
     p->bits += WSIZE - n;
@@ -177,7 +177,7 @@ __device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 	return offset;
 }
 
-__global__ void cuda842_decompress(uint64_t *in, unsigned int ilen, uint64_t *out, unsigned int num_chunks)
+__global__ void cuda842_decompress(uint64_t *in, uint32_t ilen, uint64_t *out, uint32_t num_chunks)
 {
 	unsigned int chunk_num = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -185,31 +185,28 @@ __global__ void cuda842_decompress(uint64_t *in, unsigned int ilen, uint64_t *ou
 	p.ostart = p.out = out + ((CHUNK_SIZE / 8) * chunk_num);
   	//p.in = (in + ((CHUNK_SIZE / 8 * 2) * chunk_num));
   	p.in = in + chunk_num;
-  	p.nchunks = num_chunks;
 
 	p.buffer = 0;
 	p.bits = 0;
 
-	uint64_t op, rep;
+	uint64_t op;
 
 	uint64_t output_word;
-	uint64_t values[8];
 	uint8_t bits;
 
 	do {
-		op = read_bits(&p, OP_BITS);
+		op = read_bits(&p, num_chunks, OP_BITS);
 
 		output_word = 0;
 		bits = 0;
-		memset(values, 0, 64);
 
 		switch (op) {
 	    	case OP_REPEAT:
-				rep = read_bits(&p, REPEAT_BITS);
-				/* copy rep + 1 */
-				rep++;
+				op = read_bits(&p, num_chunks, REPEAT_BITS);
+				/* copy op + 1 */
+				op++;
 
-				while (rep-- > 0) {
+				while (op-- > 0) {
 					*p.out = *(p.out -1);
 					p.out++;
 				}
@@ -222,19 +219,41 @@ __global__ void cuda842_decompress(uint64_t *in, unsigned int ilen, uint64_t *ou
 				break;
 	        default:
 				for(int i = 0; i < 4; i++) {
-					uint8_t dec_template = dec_templates[op][i][0];
-					uint8_t is_index = (dec_template >> 7);
-					uint8_t num_bits = dec_template & 0x7F;
-					uint8_t dst_size = dec_templates[op][i][1];
+					uint64_t value;
 
-					values[(4 * is_index) + i] = read_bits(&p, num_bits);
+					uint32_t dec_template = dec_templates[op][i][0];
+					uint32_t is_index = (dec_template >> 7);
+					uint32_t num_bits = dec_template & 0x7F;
+					uint32_t dst_size = dec_templates[op][i][1];
 
-					uint64_t offset = get_index(&p, dst_size, values[4 + i], fifo_sizes[dst_size]);
-					memcpy(&values[4 + i], ((uint8_t*) p.ostart) + offset, dst_size);
-					values[4 + i] = bswap(values[4 + i] << (WSIZE - (dst_size << 3)));
+					value = read_bits(&p, num_chunks, num_bits);
 
-					values[i] = values[4 + i] * is_index | values[i];
-					output_word |= values[i] << (64 - (dst_size<<3) - bits);
+					if(is_index) {
+						uint64_t offset = get_index(&p, dst_size, value, fifo_sizes[dst_size]);
+
+						asm("{\n\t"
+						"		.reg .pred %pr4, %pr8;\n\t"
+						"		.reg .u16 %val16_0, %val16_1, %val16_2, %val16_3;\n\t"
+						"		.reg .u32 %val32;\n\t"
+						"		setp.hi.u32 %pr4, %2, 2;\n\t"
+						"		setp.eq.u32 %pr8, %2, 8;\n\t"
+						"		ld.global.b16 %val16_0, [%1];\n\t"
+						"@%pr4	ld.global.b16 %val16_1, [%1+2];\n\t"
+						"@%pr8	ld.global.b16 %val16_2, [%1+4];\n\t"
+						"@%pr8	ld.global.b16 %val16_3, [%1+6];\n\t"
+						"		cvt.u64.u16 %0, %val16_0;\n\t"
+						"@%pr4	mov.b32 %val32, {%val16_0, %val16_1};\n\t"
+						"@%pr4	cvt.u64.u32 %0, %val32;\n\t"
+						"@%pr8	mov.b64 %0, {%val16_0, %val16_1, %val16_2, %val16_3};\n\t"
+						"}"
+						: "=l"(value) : "l"(((uint8_t*) p.ostart) + offset), "r"(dst_size)
+						 );
+
+
+						value = bswap(value << (WSIZE - (dst_size << 3)));
+					}
+
+					output_word |= value << (64 - (dst_size<<3) - bits);
 					bits += dst_size<<3;
 				}
 				*p.out++ = bswap(output_word);

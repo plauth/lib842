@@ -195,7 +195,6 @@ struct sw842_param {
  	uint64_t *out;
  	const uint64_t *ostart;
  	uint64_t* in;
- 	uint32_t nchunks;
  	uint32_t bits;
  	uint64_t buffer;
  };
