@@ -454,6 +454,8 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 		 */
 		get_next_data(p);
 
+#ifdef STRICT
+
 		/* we don't care about endianness in last or next;
 		 * we're just comparing 8 bytes to another 8 bytes,
 		 * they're both the same endianness
@@ -477,6 +479,9 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 
 repeat:
 		last = next;
+#else
+		process_next(p);
+#endif
 		update_hashtables(p);
 		p->in += 8;
 		p->ilen -= 8;
