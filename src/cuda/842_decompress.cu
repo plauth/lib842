@@ -3,7 +3,7 @@
 /* number of bits in a buffered word */
 #define WSIZE 64 //sizeof(uint64_t)
 
-#define CHUNK_SIZE 128
+#define CHUNK_SIZE 1024
 
 #ifdef STRICT
 /* rolling fifo sizes */
@@ -137,25 +137,7 @@ __device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 
 __global__ void cuda842_decompress(__restrict__ uint64_t *in, uint32_t ilen, __restrict__ uint64_t *out, uint32_t num_chunks)
 {
-	asm("\n\t"
-	"		.shared .align 8 .b8 out_shared[4096];\n\t"
-	"		.reg .b32 %shared, %current;\n\t"
-	"		mov.u32 %shared, out_shared;\n\t"
-	//*current = shared + threadIdx.x * CHUNK_SIZE;
-	"		mov.u32 %current, %tid.x;\n\t"
-	"		shl.b32 %current, %current, 7;\n\t"
-	"		add.s32 %current, %shared, %current;\n\t"
-	"		mov.u32 %shared, %current;\n\t"
-	//"st.shared.u64 [%current], %0;\n\t"
-	//"ld.shared.u64 %0, [%offset];\n\t"
-	);
-
 	unsigned int chunk_num = blockIdx.x * blockDim.x + threadIdx.x;
-
-
-
-	//asm("ld.shared.u64 %0, [%current];" : "=l"(shared_value));
-
 
 	struct sw842_param_decomp p;
 	p.ostart = p.out = out + ((CHUNK_SIZE / 8) * chunk_num);
@@ -254,8 +236,8 @@ __global__ void cuda842_decompress(__restrict__ uint64_t *in, uint32_t ilen, __r
 					asm("{\n\t"
 					"		.reg .pred %pr2, %pr4, %pr8, %pi;\n\t"
 					"		.reg .u16 %val16_0, %val16_1, %val16_2, %val16_3;\n\t"
-					"		.reg .u32 %val32, %nbits, %addr;\n\t"
-					"		.reg .u64 %result;\n\t"
+					"		.reg .u32 %val32, %nbits;\n\t"
+					"		.reg .u64 %addr, %result;\n\t"
 
 					"		setp.eq.u32 %pi, %4, 1;\n\t"
 					"@%pi	setp.hs.u32 %pr2, %3, 2;\n\t"
@@ -265,14 +247,14 @@ __global__ void cuda842_decompress(__restrict__ uint64_t *in, uint32_t ilen, __r
 					"@!%pi	setp.eq.u32 %pr4, 0, 1;\n\t"
 					"@!%pi	setp.eq.u32 %pr8, 0, 1;\n\t"
 
-					"		cvt.u32.u64 %addr, %5;\n\t"
-					"		mul.lo.u32 %addr, %3, %addr;\n\t"
-					"		add.s32 %addr, %addr, %shared;\n\t"
+					"		cvt.u64.u32 %addr, %3;\n\t"
+					"		mul.lo.u64 %addr, %5, %addr;\n\t"
+					"		add.u64 %addr, %addr, %2;\n\t"
 
-					"@%pr2	ld.shared.b16 %val16_0, [%addr];\n\t"
-					"@%pr4	ld.shared.b16 %val16_1, [%addr+2];\n\t"
-					"@%pr8	ld.shared.b16 %val16_2, [%addr+4];\n\t"
-					"@%pr8	ld.shared.b16 %val16_3, [%addr+6];\n\t"
+					"@%pr2	ld.global.b16 %val16_0, [%addr];\n\t"
+					"@%pr4	ld.global.b16 %val16_1, [%addr+2];\n\t"
+					"@%pr8	ld.global.b16 %val16_2, [%addr+4];\n\t"
+					"@%pr8	ld.global.b16 %val16_3, [%addr+6];\n\t"
 					"		cvt.u64.u16 %result, %val16_0;\n\t"
 					"@%pr4	mov.b32 %val32, {%val16_0, %val16_1};\n\t"
 					"@%pr4	cvt.u64.u32 %result, %val32;\n\t"
@@ -303,12 +285,7 @@ __global__ void cuda842_decompress(__restrict__ uint64_t *in, uint32_t ilen, __r
 #endif
 
 				}
-				output_word = bswap(output_word);
-				asm("\n\t"
-				"		st.shared.u64 [%current], %0;\n\t"
-				"		add.u32 %current, %current, 8;\n\t"
-						//"ld.shared.u64 %0, [%offset];\n\t"
-				: : "l"(output_word));
+				*p.out++ = bswap(output_word);
 
 #ifdef STRICT
 	    }
@@ -316,55 +293,6 @@ __global__ void cuda842_decompress(__restrict__ uint64_t *in, uint32_t ilen, __r
 #else
 	}
 #endif
-
-	__syncthreads();
-
-	asm("\n\t"
-	"		mov.u32 %shared, out_shared;\n\t"
-	"		mov.u32 %current, %tid.x;\n\t"
-	"		shl.b32 %current, %current, 3;\n\t"
-	"		add.s32 %current, %shared, %current;\n\t"
-	);
-
-
-	//asm("		mov.u32 %shared, out_shared;\n\t");
-	/*
-	asm("\n\t"
-	"		mov.u32 %current, %tid.x;\n\t"
-	"		shl.b32 %current, %current, 10;\n\t"
-	"		add.s32 %current, %shared, %current;\n\t"
-	);
-	*/
-
-	/*
-	p.out = out + ((CHUNK_SIZE / 8) * chunk_num);
-	for(int i = 0; i < (CHUNK_SIZE/8); i++){
-		asm("\n\t"
-		"		.reg .b64 %value;\n\t"
-		"		ld.shared.u64 %value, [%current];\n\t"
-		"		st.global.u64 [%0], %value;\n\t"
-		"		add.u32 %current, %current, 8;\n\t"
-				//"ld.shared.u64 %0, [%offset];\n\t"
-		: : "l"(p.out));
-		p.out++;
-	}
-	*/
-
-
-
-	p.out = out + ((CHUNK_SIZE / 8) * 32 * blockIdx.x) + threadIdx.x;
-	//output_segment[i + threadIdx.x] = shared_out[i + threadIdx.x];
-	for(int i = 0; i < (CHUNK_SIZE/8)*32; i+=32){
-		asm("{\n\t"
-		"		.reg .b64 %value;\n\t"
-		"		ld.shared.u64 %value, [%current];\n\t"
-		"		st.global.u64 [%0], %value;\n\t"
-		"		add.u32 %current, %current, 256;\n\t"
-				//"ld.shared.u64 %0, [%offset];\n\t"
-		"}"
-		: : "l"(p.out));
-		p.out += 32;
-	}
 
 
 	return;

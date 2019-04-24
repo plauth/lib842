@@ -7,7 +7,7 @@
 #include "sw842.h"
 
 //#define CHUNK_SIZE 32768
-#define CHUNK_SIZE 128
+#define CHUNK_SIZE 1024
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32
 
