@@ -7,7 +7,7 @@
 #include "sw842.h"
 
 //#define CHUNK_SIZE 32768
-#define CHUNK_SIZE 1024
+#define CHUNK_SIZE 128
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32
 
@@ -154,6 +154,9 @@ int main( int argc, const char* argv[])
 		CHECK_ERROR(cuda_error);
 
 		cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
+		CHECK_ERROR(cuda_error);
+
+		cuda_error = cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
 		CHECK_ERROR(cuda_error);
 
 		timestart_decomp = timestamp();
