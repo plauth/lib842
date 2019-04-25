@@ -104,9 +104,11 @@
 #define I4_BITS		(9)
 #define I8_BITS		(8)
 #else
-#define I2_BITS		(9)
-#define I4_BITS		(9)
-#define I8_BITS		(8)
+#define STATIC_LOG2_ARG CHUNK_SIZE
+#include "../common/static_log2.h"
+#define I2_BITS		(STATIC_LOG2_VALUE-1)
+#define I4_BITS		(STATIC_LOG2_VALUE-2)
+#define I8_BITS		(STATIC_LOG2_VALUE-3)
 #endif
 #define D2_BITS 	(16)
 #define D4_BITS 	(32)

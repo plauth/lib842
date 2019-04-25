@@ -3,8 +3,6 @@
 /* number of bits in a buffered word */
 #define WSIZE 64 //sizeof(uint64_t)
 
-#define CHUNK_SIZE 1024
-
 #ifdef STRICT
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE	(2 * (1 << I2_BITS))
@@ -79,7 +77,7 @@ __device__ inline uint64_t bswap(uint64_t value)
 }
 
 
-__device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t num_chunks, uint32_t n)
+__device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 {
   uint64_t value = p->buffer >> (WSIZE - n);
   //value = 0; if (n <= 0)
@@ -93,7 +91,7 @@ __device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t num_
 
   if (p->bits < n) {
     p->buffer = bswap(*p->in);
-    p->in += num_chunks;
+    p->in++;
     value |= p->buffer >> (WSIZE - (n - p->bits));
     p->buffer <<= n - p->bits;
     p->bits += WSIZE - n;
@@ -141,9 +139,8 @@ __global__ void cuda842_decompress(__restrict__ uint64_t *in, __restrict__ uint6
 
 	struct sw842_param_decomp p;
 	p.ostart = p.out = out + ((CHUNK_SIZE / 8) * chunk_num);
+  	p.in = (in + ((CHUNK_SIZE / 8 * 2) * chunk_num));
 
-  	//p.in = (in + ((CHUNK_SIZE / 8 * 2) * chunk_num));
-  	p.in = in + chunk_num;
 
 	p.buffer = 0;
 	p.bits = 0;
@@ -155,14 +152,14 @@ __global__ void cuda842_decompress(__restrict__ uint64_t *in, __restrict__ uint6
 
 #ifdef STRICT
 	do {
-		op = read_bits(&p, num_chunks, OP_BITS);
+		op = read_bits(&p, OP_BITS);
 
 		output_word = 0;
 		bits = 0;
 
 		switch (op) {
 	    	case OP_REPEAT:
-				op = read_bits(&p, num_chunks, REPEAT_BITS);
+				op = read_bits(&p, REPEAT_BITS);
 				/* copy op + 1 */
 				op++;
 
@@ -179,7 +176,7 @@ __global__ void cuda842_decompress(__restrict__ uint64_t *in, __restrict__ uint6
 				break;
 	        default:
 #else
-	while(op = read_bits(&p, num_chunks, OP_BITS), op != OP_END) {
+	while(op = read_bits(&p, OP_BITS), op != OP_END) {
 		output_word = 0;
 		bits = 0;
 #endif
@@ -190,7 +187,7 @@ __global__ void cuda842_decompress(__restrict__ uint64_t *in, __restrict__ uint6
 					uint32_t is_index = (dec_template >> 7);
 					uint32_t dst_size = dec_templates[op][i][1];
 
-					value = read_bits(&p, num_chunks, dec_template & 0x7F);
+					value = read_bits(&p, dec_template & 0x7F);
 #ifdef STRICT
 					if(is_index) {
 						uint64_t offset = get_index(&p, dst_size, value, fifo_sizes[dst_size]);

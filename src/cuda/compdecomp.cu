@@ -6,8 +6,6 @@
 
 #include "sw842.h"
 
-//#define CHUNK_SIZE 32768
-#define CHUNK_SIZE 1024
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32
 
@@ -31,22 +29,15 @@ int nextMultipleOfChunkSize(unsigned int input) {
 	return (input + (size-1)) & ~(size-1);
 } 
 
-int row_major_from_column_major(int column_major, int width, int height) {
-    int row = column_major % height;
-    int column = column_major / height;
-    return row * width + column;
-}
-
-int column_major_from_row_major(int row_major, int width, int height) {
-    return row_major_from_column_major(row_major, height, width);
-}
-
 int main( int argc, const char* argv[])
 {
-	uint8_t *inH, *compressedH, *compressedTransH, *decompressedH;
+	#ifdef STRICT
+	printf("Running in strict mode (i.e. fully compatible to the hardware-based nx842 unit).\n");
+	#endif
+	uint8_t *inH, *compressedH, *decompressedH;
 	uint64_t *compressedD, *decompressedD;
-	inH = compressedH = compressedTransH = decompressedH = NULL;
-	unsigned int num_chunks;
+	cudaStream_t stream;
+	cudaStreamCreate(&stream);
 	unsigned int ilen, olen, dlen;
 	ilen = olen = dlen = 0;
 	long long timestart_comp, timeend_comp;
@@ -63,13 +54,11 @@ int main( int argc, const char* argv[])
 		ilen = STRLEN;
 		olen = ilen * 2;
 		dlen = ilen;
-		inH = (uint8_t*) malloc(ilen);
-		compressedH = (uint8_t*) malloc(olen);
-		compressedTransH = (uint8_t*) malloc(olen);
-		decompressedH = (uint8_t*) malloc(dlen);
+		cudaHostAlloc((void**) &inH, ilen, cudaHostAllocPortable);
+		cudaHostAlloc((void**) &compressedH, olen, cudaHostAllocPortable);
+		cudaHostAlloc((void**) &decompressedH, dlen, cudaHostAllocPortable);
 		memset(inH, 0, ilen);
 		memset(compressedH, 0, olen);
-		memset(compressedTransH, 0, olen);
 		memset(decompressedH, 0, dlen);
 
 		cudaMalloc((void**) &compressedD, olen);
@@ -91,16 +80,13 @@ int main( int argc, const char* argv[])
 		printf("original file length (padded): %d\n", ilen);
 		olen = ilen * 2;
 		dlen = ilen;
-		num_chunks = ilen / CHUNK_SIZE;
 		fseek(fp, 0, SEEK_SET);
 
-		inH = (uint8_t*) malloc(ilen);
-		compressedH = (uint8_t*) malloc(olen);
-		compressedTransH = (uint8_t*) malloc(olen);
-		decompressedH = (uint8_t*) malloc(dlen);
+		cudaHostAlloc((void**) &inH, ilen, cudaHostAllocPortable);
+		cudaHostAlloc((void**) &compressedH, olen, cudaHostAllocPortable);
+		cudaHostAlloc((void**) &decompressedH, dlen, cudaHostAllocPortable);
 		memset(inH, 0, ilen);
 		memset(compressedH, 0, olen);
-		memset(compressedTransH, 0, olen);
 		memset(decompressedH, 0, dlen);
 
 		cudaMalloc((void**) &compressedD, olen);
@@ -135,16 +121,7 @@ int main( int argc, const char* argv[])
 		}
 		timeend_comp = timestamp();
 
-		uint64_t *compressedH64, *compressedTransH64;
-		compressedH64 = (uint64_t*) compressedH;
-		compressedTransH64 = (uint64_t*) compressedTransH;
-
-		for(int i = 0; i < olen/8;i++) {
-			compressedTransH64[column_major_from_row_major(i, (CHUNK_SIZE*2)/8 , num_chunks)] = compressedH64[i];
-		}
-
-
-		cuda_error = cudaMemcpy(compressedD, compressedTransH, olen, cudaMemcpyHostToDevice);
+		cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
 		CHECK_ERROR(cuda_error);
 
 		timestart_decomp = timestamp();
@@ -187,14 +164,13 @@ int main( int argc, const char* argv[])
 	} else {
 		fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
 	}
-	free(inH);
-	free(compressedH);
-	free(compressedTransH);
-	free(decompressedH);
+	cudaFreeHost(inH);
+	cudaFreeHost(compressedH);
+	cudaFreeHost(decompressedH);
 
 	cudaFree(compressedD);
 	cudaFree(decompressedD);
-
+	cudaStreamDestroy(stream);
 	printf("\n\n");
 	return 0;
 }
