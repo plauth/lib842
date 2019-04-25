@@ -8,6 +8,8 @@
 
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32
+#define STREAM_COUNT 3
+#define CHUNKS_PER_THREAD 1024
 
 __global__ void cuda842_decompress(uint64_t *in, uint64_t *out);
 
@@ -25,7 +27,7 @@ long long timestamp() {
 }
 
 int nextMultipleOfChunkSize(unsigned int input) {
-	unsigned int size = CHUNK_SIZE * THREADS_PER_BLOCK;
+	unsigned int size = CHUNK_SIZE * CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
 	return (input + (size-1)) & ~(size-1);
 } 
 
@@ -36,8 +38,10 @@ int main( int argc, const char* argv[])
 	#endif
 	uint8_t *inH, *compressedH, *decompressedH;
 	uint64_t *compressedD, *decompressedD;
-	cudaStream_t stream;
-	cudaStreamCreate(&stream);
+	cudaStream_t streams[STREAM_COUNT];
+	for(int i = 0; i < STREAM_COUNT; i++) {
+		cudaStreamCreate(&streams[i]);
+	}
 	unsigned int ilen, olen, dlen;
 	ilen = olen = dlen = 0;
 	long long timestart_comp, timeend_comp;
@@ -121,29 +125,27 @@ int main( int argc, const char* argv[])
 		}
 		timeend_comp = timestamp();
 
+		const int chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
+
 		printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
+		printf("Number of Chunks: %d\n", num_chunks);
+		printf("Number of Blocks: %d\n", num_chunks / 1024 / THREADS_PER_BLOCK);
+		printf("Chunks per Kernel: %d\n", chunks_per_kernel);
 
-
-
-
-
-		cudaMemcpyAsync(compressedD, compressedH, olen, cudaMemcpyHostToDevice, stream);
-		cudaDeviceSynchronize();
-		cuda_error = cudaGetLastError();
-		CHECK_ERROR(cuda_error);
-
+		int stream_counter = 0;
 		timestart_decomp = timestamp();
-
-		cuda842_decompress<<<num_chunks / THREADS_PER_BLOCK, THREADS_PER_BLOCK, 0, stream>>>(compressedD, decompressedD);
+		for(int i = 0; i < num_chunks; i += chunks_per_kernel) {
+			cudaMemcpyAsync(compressedD + ((i * CHUNK_SIZE * 2)/8), compressedH + (i * CHUNK_SIZE * 2), chunks_per_kernel * CHUNK_SIZE * 2, cudaMemcpyHostToDevice, streams[stream_counter%STREAM_COUNT]);
+			cuda842_decompress<<<chunks_per_kernel / THREADS_PER_BLOCK, THREADS_PER_BLOCK, 0, streams[stream_counter%STREAM_COUNT]>>>(compressedD + (i * (CHUNK_SIZE/8) * 2), decompressedD + (i * (CHUNK_SIZE/8)));
+			cudaMemcpyAsync(decompressedH + (i * CHUNK_SIZE), decompressedD + (i * (CHUNK_SIZE/8)), chunks_per_kernel * CHUNK_SIZE, cudaMemcpyDeviceToHost, streams[stream_counter%STREAM_COUNT]);
+			stream_counter++;
+		}
 		cudaDeviceSynchronize();
 		cuda_error = cudaGetLastError();
 		CHECK_ERROR(cuda_error);
 		timeend_decomp = timestamp();
 
-		cudaMemcpyAsync(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost, stream);
-		cudaDeviceSynchronize();
-		cuda_error = cudaGetLastError();
-		CHECK_ERROR(cuda_error);
+
 
 
 		printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
@@ -177,7 +179,9 @@ int main( int argc, const char* argv[])
 
 	cudaFree(compressedD);
 	cudaFree(decompressedD);
-	cudaStreamDestroy(stream);
+	for(int i = 1; i < STREAM_COUNT; i++) {
+		cudaStreamDestroy(streams[i]);
+	}
 	printf("\n\n");
 	return 0;
 }
