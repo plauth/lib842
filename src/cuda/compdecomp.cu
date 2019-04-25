@@ -11,7 +11,7 @@
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32
 
-__global__ void cuda842_decompress(uint64_t *in, unsigned int ilen, uint64_t *out, unsigned int num_chunks);
+__global__ void cuda842_decompress(uint64_t *in, uint64_t *out, uint32_t num_chunks);
 
 #define CHECK_ERROR( err ) \
   if( err != cudaSuccess ) { \
@@ -44,7 +44,7 @@ int column_major_from_row_major(int row_major, int width, int height) {
 int main( int argc, const char* argv[])
 {
 	uint8_t *inH, *compressedH, *compressedTransH, *decompressedH;
-	uint64_t *inD, *compressedD, *compressedTransD, *decompressedD;
+	uint64_t *compressedD, *decompressedD;
 	inH = compressedH = compressedTransH = decompressedH = NULL;
 	unsigned int num_chunks;
 	unsigned int ilen, olen, dlen;
@@ -64,16 +64,17 @@ int main( int argc, const char* argv[])
 		olen = ilen * 2;
 		dlen = ilen;
 		inH = (uint8_t*) malloc(ilen);
-		cudaMalloc((void**) &inD, ilen);
 		compressedH = (uint8_t*) malloc(olen);
-		cudaMalloc((void**) &compressedD, olen);
+		compressedTransH = (uint8_t*) malloc(olen);
 		decompressedH = (uint8_t*) malloc(dlen);
-		cudaMalloc((void**) &decompressedD, dlen);
 		memset(inH, 0, ilen);
-		cudaMemset(inD, 0, ilen);
 		memset(compressedH, 0, olen);
-		cudaMemset(compressedD, 0, olen);
+		memset(compressedTransH, 0, olen);
 		memset(decompressedH, 0, dlen);
+
+		cudaMalloc((void**) &compressedD, olen);
+		cudaMalloc((void**) &decompressedD, dlen);
+		cudaMemset(compressedD, 0, olen);
 		cudaMemset(decompressedD, 0, dlen);
 
 		uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
@@ -94,18 +95,17 @@ int main( int argc, const char* argv[])
 		fseek(fp, 0, SEEK_SET);
 
 		inH = (uint8_t*) malloc(ilen);
-		cudaMalloc((void**) &inD, ilen);
 		compressedH = (uint8_t*) malloc(olen);
-		cudaMalloc((void**) &compressedD, olen);
 		compressedTransH = (uint8_t*) malloc(olen);
-		cudaMalloc((void**) &compressedTransD, olen);
 		decompressedH = (uint8_t*) malloc(dlen);
-		cudaMalloc((void**) &decompressedD, dlen);
 		memset(inH, 0, ilen);
-		cudaMemset(inD, 0, ilen);
 		memset(compressedH, 0, olen);
-		cudaMemset(compressedD, 0, olen);
+		memset(compressedTransH, 0, olen);
 		memset(decompressedH, 0, dlen);
+
+		cudaMalloc((void**) &compressedD, olen);
+		cudaMalloc((void**) &decompressedD, dlen);
+		cudaMemset(compressedD, 0, olen);
 		cudaMemset(decompressedD, 0, dlen);
 
 
@@ -117,16 +117,21 @@ int main( int argc, const char* argv[])
 
 	if(ilen > CHUNK_SIZE) {
 		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
+
+		uint32_t num_chunks = ilen / CHUNK_SIZE;
+		uint64_t *compressedChunkPositions = (uint64_t*) malloc(sizeof(uint64_t) * num_chunks);
+		uint32_t *compressedChunkSizes = (uint32_t*) malloc(sizeof(uint32_t) * num_chunks);
 	
 		timestart_comp = timestamp();
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < ilen / CHUNK_SIZE; chunk_num++) {
+		for(uint32_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			
-			unsigned int chunk_olen = CHUNK_SIZE * 2;
+			uint32_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = inH + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = compressedH + ((CHUNK_SIZE * 2) * chunk_num);
 			
 			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
+			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
 		timeend_comp = timestamp();
 
@@ -135,35 +140,18 @@ int main( int argc, const char* argv[])
 		compressedTransH64 = (uint64_t*) compressedTransH;
 
 		for(int i = 0; i < olen/8;i++) {
-			//printf("compressedTransH64[%d] = compressedH[%d];\n", column_major_from_row_major(i, (CHUNK_SIZE*2)/8 , num_chunks), i);
-			//printf("compressedH[%d] = compressedTransH64[%d]\n", row_major_from_column_major(i,(CHUNK_SIZE*2)/8 , num_chunks), i );
 			compressedTransH64[column_major_from_row_major(i, (CHUNK_SIZE*2)/8 , num_chunks)] = compressedH64[i];
 		}
 
-		memset(compressedH, 0, olen);
 
-		for(int i = 0; i < olen/8;i++) {
-			//row_major_from_column_major(i,(CHUNK_SIZE*2)/8 , num_chunks);
-			//printf("row major = %d, col major = %d\n", row_major_from_column_major(i,(CHUNK_SIZE*2)/8 , num_chunks), i );
-			compressedH64[row_major_from_column_major(i,(CHUNK_SIZE*2)/8 , num_chunks)] = compressedTransH64[i];
-		}
-
-
-
-		cuda_error = cudaMemcpy(compressedTransD, compressedTransH, olen, cudaMemcpyHostToDevice);
-		CHECK_ERROR(cuda_error);
-
-		cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
-		CHECK_ERROR(cuda_error);
-
-		cuda_error = cudaDeviceSetSharedMemConfig(cudaSharedMemBankSizeEightByte);
+		cuda_error = cudaMemcpy(compressedD, compressedTransH, olen, cudaMemcpyHostToDevice);
 		CHECK_ERROR(cuda_error);
 
 		timestart_decomp = timestamp();
 
 		printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
 
-		cuda842_decompress<<<(ilen / CHUNK_SIZE) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(compressedTransD, ilen, decompressedD, num_chunks);
+		cuda842_decompress<<<num_chunks / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(compressedD, decompressedD, num_chunks);
 		cudaDeviceSynchronize();
 		cuda_error = cudaGetLastError();
 		CHECK_ERROR(cuda_error);
@@ -186,7 +174,7 @@ int main( int argc, const char* argv[])
 		cudaDeviceSynchronize();
         CHECK_ERROR(cuda_error);
         printf("starting with device-based decompression\n");
-        cuda842_decompress<<<1,1>>>(compressedD, olen, decompressedD, 1);
+        cuda842_decompress<<<1,1>>>(compressedD, decompressedD, 1);
         printf("copying decompressed data back to the host\n");
 		cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();
@@ -198,30 +186,13 @@ int main( int argc, const char* argv[])
 		printf("Compression- and decompression was successful!\n");
 	} else {
 		fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
-		//FILE *fpIn, *fpOut;
-		//fpIn=fopen("original.bin", "w");
-		//fwrite(inH, ilen, 1, fpIn);
-		//fclose(fpIn);
-		//fpOut=fopen("decompressed.bin", "w");
-		//fwrite(decompressedH, dlen, 1, fpOut);
-		//fclose(fpOut);
-		free(inH);
-		free(compressedH);
-		free(compressedTransH);
-		free(decompressedH);
-		cudaFree(inD);
-		cudaFree(compressedD);
-		cudaFree(compressedTransD);
-		cudaFree(decompressedD);
-		return 0;
 	}
 	free(inH);
 	free(compressedH);
 	free(compressedTransH);
 	free(decompressedH);
-	cudaFree(inD);
+
 	cudaFree(compressedD);
-	cudaFree(compressedTransD);
 	cudaFree(decompressedD);
 
 	printf("\n\n");
