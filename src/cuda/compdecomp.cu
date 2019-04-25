@@ -9,7 +9,7 @@
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32
 
-__global__ void cuda842_decompress(uint64_t *in, uint64_t *out, uint32_t num_chunks);
+__global__ void cuda842_decompress(uint64_t *in, uint64_t *out);
 
 #define CHECK_ERROR( err ) \
   if( err != cudaSuccess ) { \
@@ -121,23 +121,30 @@ int main( int argc, const char* argv[])
 		}
 		timeend_comp = timestamp();
 
-		cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
-		CHECK_ERROR(cuda_error);
-
-		timestart_decomp = timestamp();
-
 		printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
 
-		cuda842_decompress<<<num_chunks / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(compressedD, decompressedD, num_chunks);
+
+
+
+
+		cudaMemcpyAsync(compressedD, compressedH, olen, cudaMemcpyHostToDevice, stream);
 		cudaDeviceSynchronize();
 		cuda_error = cudaGetLastError();
 		CHECK_ERROR(cuda_error);
 
+		timestart_decomp = timestamp();
+
+		cuda842_decompress<<<num_chunks / THREADS_PER_BLOCK, THREADS_PER_BLOCK, 0, stream>>>(compressedD, decompressedD);
+		cudaDeviceSynchronize();
+		cuda_error = cudaGetLastError();
+		CHECK_ERROR(cuda_error);
 		timeend_decomp = timestamp();
 
-		cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
+		cudaMemcpyAsync(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost, stream);
 		cudaDeviceSynchronize();
-        CHECK_ERROR(cuda_error);
+		cuda_error = cudaGetLastError();
+		CHECK_ERROR(cuda_error);
+
 
 		printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
 		printf("Decompression performance: %lld ms / %f MiB/s\n", timeend_decomp - timestart_decomp, (ilen / 1024 / 1024) / ((float) (timeend_decomp - timestart_decomp) / 1000));
@@ -151,7 +158,7 @@ int main( int argc, const char* argv[])
 		cudaDeviceSynchronize();
         CHECK_ERROR(cuda_error);
         printf("starting with device-based decompression\n");
-        cuda842_decompress<<<1,1>>>(compressedD, decompressedD, 1);
+        cuda842_decompress<<<1,1>>>(compressedD, decompressedD);
         printf("copying decompressed data back to the host\n");
 		cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();

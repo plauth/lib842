@@ -133,7 +133,7 @@ __device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 }
 #endif
 
-__global__ void cuda842_decompress(__restrict__ uint64_t *in, __restrict__ uint64_t *out, uint32_t num_chunks)
+__global__ void cuda842_decompress(__restrict__ uint64_t *in, __restrict__ uint64_t *out)
 {
 	unsigned int chunk_num = blockIdx.x * blockDim.x + threadIdx.x;
 
