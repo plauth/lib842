@@ -1,6 +1,12 @@
 CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
 CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopenmp
+NVCC_FLAGS	:= -O3 -maxrregcount 64 -gencode arch=compute_37,code=sm_37 --compile
+NVLINKER_FLAGS 	:= --cudart static --relocatable-device-code=false -gencode arch=compute_37,code=compute_37 -gencode arch=compute_37,code=sm_37 -link
 
+NVCC_TEST := $(shell which nvcc 2> /dev/null)
+NVCC_AVAILABLE := $(notdir $(NVCC_TEST))
+
+NVCC=nvcc
 ifeq ($(shell uname),Darwin)
 CC=gcc-7
 CXX=g++-7
@@ -14,7 +20,6 @@ CRYPTODEV_IS_LOADED=0
 else ifeq ($(shell uname -p),ppc64le)
 CC=/opt/at11.0/bin/gcc
 CXX=/opt/at11.0/bin/g++
-NVCC=nvcc
 LDFLAGS_OCL := -lOpenCL
 CRYPTODEV_IS_LOADED := $(shell lsmod | grep cryptodev)
 else ifeq ($(shell uname -p),ppc)
@@ -31,9 +36,7 @@ LDFLAGS_OCL := -lOpenCL
 endif
 
 
-
-
-MODULES   := serial serial_optimized cryptodev aix
+MODULES   := serial serial_optimized cryptodev aix cuda
 OBJ_DIR := $(addprefix obj/,$(MODULES))
 BIN_DIR := $(addprefix bin/,$(MODULES))
 
@@ -55,6 +58,12 @@ OBJ_DIR_CRYPTODEV := obj/cryptodev
 SRC_FILES_CRYPTODEV := $(wildcard $(SRC_DIR_CRYPTODEV)/*.c)
 OBJ_FILES_CRYPTODEV := $(patsubst $(SRC_DIR_CRYPTODEV)/%.c,$(OBJ_DIR_CRYPTODEV)/%.o,$(SRC_FILES_CRYPTODEV))
 
+SRC_DIR_CUDA := src/cuda
+OBJ_DIR_CUDA := obj/cuda
+
+SRC_FILES_CUDA := $(wildcard $(SRC_DIR_CUDA)/*.cu)
+OBJ_FILES_CUDA := $(patsubst $(SRC_DIR_CUDA)/%.cu,$(OBJ_DIR_CUDA)/%.o,$(SRC_FILES_CUDA))
+
 
 .PHONY: all checkdirs clean
 #.check-env:
@@ -70,6 +79,9 @@ $(OBJ_DIR_SERIAL)/%.o: $(SRC_DIR_SERIAL)/%.c
 
 $(OBJ_DIR_SERIAL_OPT)/%.o: $(SRC_DIR_SERIAL_OPT)/%.cpp
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
+	
+$(OBJ_DIR_CUDA)/%.o: $(SRC_DIR_CUDA)/%.cu
+	 $(NVCC) $(NVCC_FLAGS) -c $< -o $@
 
 $(OBJ_DIR_CRYPTODEV)/%.o: $(SRC_DIR_CRYPTODEV)/%.c
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
@@ -80,7 +92,6 @@ serial_lib: checkdirs $(OBJ_FILES_SERIAL)
 clean:
 	rm -Rf obj
 	rm -Rf bin
-	rm -Rf test/compdecomp
 	rm -Rf vec.out
 
 checkdirs: $(OBJ_DIR) $(BIN_DIR)
@@ -96,6 +107,10 @@ test_serial_lib: serial_lib
 test_serial_optimized_standalone: checkdirs $(OBJ_FILES_SERIAL_OPT)
 	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_SERIAL_OPT) test/compdecomp.c -o bin/serial_optimized/compdecomp -I./include 
 	bin/serial_optimized/compdecomp
+	
+test_cuda_standalone: checkdirs $(OBJ_FILES_CUDA)
+	$(NVCC) $(OBJ_FILES_CUDA) $(NVLINKER_FLAGS) -o bin/cuda/compdecomp   
+	bin/cuda/compdecomp
 
 test_cryptodev: checkdirs $(OBJ_FILES_CRYPTODEV)
 	$(CXX) $(CXX_FLAGS) $(OBJ_FILES_CRYPTODEV) -DUSEHW=1 test/compdecomp.c -o bin/cryptodev/compdecomp -I./include 
@@ -117,19 +132,26 @@ test_aix_standalone: checkdirs test/compdecomp_aix.c
 	$(CC) -O3 -std=c11 test/compdecomp_aix.c -o bin/aix/compdecomp -Wl,-b64 -maix64 -fopenmp
 	LIBPATH=/opt/freeware/lib64 bin/aix/compdecomp
 
-ifeq ($(shell uname),Darwin)
-standalone: test_serial_standalone test_serial_optimized_standalone
-else ifeq ($(shell uname -p),ppc)
+STANDALONE_TARGET := test_serial_standalone test_serial_optimized_standalone
+
+ifneq ($(CRYPTODEV_IS_LOADED),) 
+$(info cryptodev kernel module is available, including cryptodev test)
+STANDALONE_TARGET += test_cryptodev
+endif
+
+ifeq ($(NVCC_AVAILABLE),nvcc)
+$(info cuda is available)
+STANDALONE_TARGET += test_cuda_standalone
+endif
+
+ifeq ($(shell uname -p),ppc)
 standalone: test_serial_optimized_standalone
 else ifeq ($(shell uname -p),s390x)
 standalone: test_serial_optimized_standalone
-else ifeq ($(CRYPTODEV_IS_LOADED),)
-$(info cryptodev kernel module is not loaded, skipping cryptodev test)
-standalone: test_serial_standalone test_serial_optimized_standalone
 else
-standalone: test_serial_standalone test_serial_optimized_standalone test_cryptodev
+#$(info standlone targets: $(STANDALONE_TARGET))
+standalone: $(STANDALONE_TARGET)
 endif
-
 
 libs: serial_lib
 

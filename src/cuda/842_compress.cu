@@ -16,7 +16,7 @@
  * See 842.h for details of the 842 compressed format.
  */
 #include "842-internal.h"
-#include "opcodes.h"
+#include "../common/opcodes.h"
 
 #define PRIME64     (11400714785074694791ULL)
 

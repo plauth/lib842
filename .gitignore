@@ -4,6 +4,8 @@ obj/
 bin/
 test/simple_test
 vec.out
+a.out
+*.ptx
 
 ocl_test
 ocl_test.dSYM

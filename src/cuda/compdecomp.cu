@@ -4,14 +4,12 @@
 #include <sys/time.h>
 
 
-#include "sw842.h"
+#include "842-internal.h"
 
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32
 #define STREAM_COUNT 3
 #define CHUNKS_PER_THREAD 1024
-
-__global__ void cuda842_decompress(uint64_t *in, uint64_t *out);
 
 #define CHECK_ERROR( err ) \
   if( err != cudaSuccess ) { \
@@ -128,9 +126,9 @@ int main( int argc, const char* argv[])
 		const int chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
 
 		printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
-		printf("Number of Chunks: %d\n", num_chunks);
-		printf("Number of Blocks: %d\n", num_chunks / 1024 / THREADS_PER_BLOCK);
-		printf("Chunks per Kernel: %d\n", chunks_per_kernel);
+		//printf("Number of Chunks: %d\n", num_chunks);
+		//printf("Number of Blocks: %d\n", num_chunks / 1024 / THREADS_PER_BLOCK);
+		//printf("Chunks per Kernel: %d\n", chunks_per_kernel);
 
 		int stream_counter = 0;
 		timestart_decomp = timestamp();
@@ -155,16 +153,13 @@ int main( int argc, const char* argv[])
 	} else {
 
 		sw842_compress(inH, ilen, compressedH, &olen);
-		printf("copying compressed data to device\n");
 		cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
 		cudaDeviceSynchronize();
-        CHECK_ERROR(cuda_error);
-        printf("starting with device-based decompression\n");
-        cuda842_decompress<<<1,1>>>(compressedD, decompressedD);
-        printf("copying decompressed data back to the host\n");
+        	CHECK_ERROR(cuda_error);
+        	cuda842_decompress<<<1,1>>>(compressedD, decompressedD);
 		cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();
-        CHECK_ERROR(cuda_error);
+        	CHECK_ERROR(cuda_error);
 
 	}
 	

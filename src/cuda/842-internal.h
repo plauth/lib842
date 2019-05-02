@@ -2,6 +2,10 @@
 #ifndef __842_INTERNAL_H__
 #define __842_INTERNAL_H__
 
+#ifndef CHUNK_SIZE
+#define CHUNK_SIZE 1024
+#endif
+
 /* The 842 compressed format is made up of multiple blocks, each of
  * which have the format:
  *
@@ -207,5 +211,9 @@ struct sw842_param {
  	uint32_t bits;
  	uint64_t buffer;
  };
+
+// int sw842_compress(const uint8_t *in, unsigned int ilen,
+// 		   uint8_t *out, unsigned int *olen);
+ __global__ void cuda842_decompress(uint64_t *in, uint64_t *out);
 
 #endif

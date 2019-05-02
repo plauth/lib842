@@ -1,10 +1,6 @@
 #ifndef __SW842_H__
 #define __SW842_H__
 
-#ifndef CHUNK_SIZE
-#define CHUNK_SIZE 1024
-#endif
-
 #include <stdint.h>
 
 
