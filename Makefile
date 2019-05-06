@@ -11,12 +11,12 @@ ifeq ($(shell uname),Darwin)
 CC=gcc-7
 CXX=g++-7
 LDFLAGS_OCL := -framework OpenCL
-CRYPTODEV_IS_LOADED=0
+CRYPTODEV_IS_LOADED=
 else ifeq ($(shell uname),AIX)
 CC=gcc
 CXX=g++
 CC_FLAGS+=-maix64 -Wl,-b64
-CRYPTODEV_IS_LOADED=0
+CRYPTODEV_IS_LOADED=
 else ifeq ($(shell uname -p),ppc64le)
 CC=/opt/at11.0/bin/gcc
 CXX=/opt/at11.0/bin/g++
