@@ -97,7 +97,7 @@ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uint64_t index, uint64_t fsize)
 {
     uint64_t offset;
-    uint64_t total = round_down(((uint8_t*)p->out) - ((const uint8_t *)p->ostart), 8);
+    uint64_t total = round_down(((__global uint8_t*)p->out) - ((__global const uint8_t *)p->ostart), 8);
 
     offset = index * size;
 

@@ -20,7 +20,7 @@ CL842Kernels::CL842Kernels() {
         std::cerr << "Current platform vendor: " << platformVendor << "\n";
         cl_context_properties cprops[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
         //platformList[0]()
-        context = cl::Context(CL_DEVICE_TYPE_CPU, cprops, NULL, NULL, &err);
+        context = cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);
         checkErr(err, "Context::Context()");
         cl::vector<cl::Device> devices;
         devices = context.getInfo<CL_CONTEXT_DEVICES>();
