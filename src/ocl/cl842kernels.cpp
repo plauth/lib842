@@ -61,22 +61,19 @@ void CL842Kernels::prepareDecompressKernel() {
 }
 
 
-int CL842Kernels::decompress(cl::Buffer in, uint64_t ilen, cl::Buffer out, cl::Buffer olen) {
+void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out) {
     cl_int err;
     err = decompressKernel.setArg(0, in);
     checkErr(err, "Kernel::setArg(0)");
-    err = decompressKernel.setArg(1, sizeof(uint64_t), &ilen);
+    err = decompressKernel.setArg(1, out);
     checkErr(err, "Kernel::setArg(1)");
-    err = decompressKernel.setArg(2, out);
-    checkErr(err, "Kernel::setArg(2)");
-    err = decompressKernel.setArg(3, olen);
-    checkErr(err, "Kernel::setArg(3)");
 
     //size_t workgroup_size = getMaxWorkGroupSize(context);
 
     err = queue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, cl::NDRange(1,1), cl::NDRange(1, 1));
     checkErr(err, "enqueueNDRangeKernel()");
-    return 0;
+    //checkErr(queue.finish(), "execute kernel");
+    return;
 }
 
 cl::Buffer CL842Kernels::allocateBuffer(size_t size, cl_mem_flags flags) {

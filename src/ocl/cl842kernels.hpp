@@ -22,7 +22,7 @@ class CL842Kernels
     	void writeBuffer(cl::Buffer buffer, const void * ptr, size_t size);
     	void readBuffer(cl::Buffer buffer, void * ptr, size_t size);
         void fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size);
-    	int decompress(cl::Buffer in, uint64_t ilen, cl::Buffer out, cl::Buffer olen);
+    	void decompress(cl::Buffer in, cl::Buffer out);
 };
 
 #endif // CL842KERNELS_HPP

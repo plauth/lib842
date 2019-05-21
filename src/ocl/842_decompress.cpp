@@ -18,15 +18,12 @@ int main(int argc, char *argv[]) {
 
     cl::Buffer inBuffer     = kernels.allocateBuffer(64, CL_MEM_READ_ONLY);
     cl::Buffer outBuffer    = kernels.allocateBuffer(64, CL_MEM_READ_WRITE);
-    cl::Buffer olenBuffer   = kernels.allocateBuffer(8 , CL_MEM_READ_WRITE);
-
+    
     kernels.writeBuffer(inBuffer, (const void*) in, 64);
     kernels.fillBuffer(outBuffer, 0, 0, 64);
-    kernels.writeBuffer(olenBuffer, (const void*) &olen, 8);
-    kernels.decompress(inBuffer, 64, outBuffer, olenBuffer);
+    kernels.decompress(inBuffer, outBuffer);
     kernels.readBuffer(outBuffer, (void*) out, 64);
-    kernels.readBuffer(olenBuffer, (void*) &olen, 8);
-
+    
     printf("Input: %ld bytes\n", ilen);
     printf("Output: %ld bytes\n", olen);
     
