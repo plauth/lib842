@@ -20,7 +20,7 @@ CL842Kernels::CL842Kernels() {
         std::cerr << "Current platform vendor: " << platformVendor << "\n";
         cl_context_properties cprops[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
         //platformList[0]()
-        context = cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);
+        context = cl::Context(CL_DEVICE_TYPE_CPU, cprops, NULL, NULL, &err);
         checkErr(err, "Context::Context()");
         cl::vector<cl::Device> devices;
         devices = context.getInfo<CL_CONTEXT_DEVICES>();
@@ -61,7 +61,7 @@ void CL842Kernels::prepareDecompressKernel() {
 }
 
 
-void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out) {
+void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks) {
     cl_int err;
     err = decompressKernel.setArg(0, in);
     checkErr(err, "Kernel::setArg(0)");
@@ -69,10 +69,19 @@ void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out) {
     checkErr(err, "Kernel::setArg(1)");
 
     //size_t workgroup_size = getMaxWorkGroupSize(context);
+    cl::NDRange globalSize(1);
+    cl::NDRange workgroupSize(1);
 
-    err = queue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, cl::NDRange(1,1), cl::NDRange(1, 1));
+    if(num_chunks > THREADS_PER_BLOCK) {
+        printf("Using %d chunks of %d bytes, %d threads per block\n", num_chunks, CHUNK_SIZE, THREADS_PER_BLOCK);
+        globalSize = cl::NDRange(num_chunks);
+        workgroupSize = cl::NDRange(THREADS_PER_BLOCK);
+    } 
+    
+    
+    err = queue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, globalSize, workgroupSize);
     checkErr(err, "enqueueNDRangeKernel()");
-    //checkErr(queue.finish(), "execute kernel");
+    checkErr(queue.finish(), "execute kernel");
     return;
 }
 

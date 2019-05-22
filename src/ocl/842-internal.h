@@ -201,12 +201,23 @@ struct sw842_param {
 	uint64_t rollingFifo64[1 << I8_BITS];   // 256  * 8 bytes =   2 KiB
 };
 
- struct sw842_param_decomp {
- 	__global uint64_t *out;
+#ifdef OCL
+struct sw842_param_decomp {
+	__global uint64_t *out;
  	__global const uint64_t* ostart;
  	__global uint64_t *in;
  	uint32_t bits;
  	uint64_t buffer;
- };
+};
+#else
+struct sw842_param_decomp {
+	uint64_t *out;
+ 	const uint64_t* ostart;
+ 	uint64_t *in;
+ 	uint32_t bits;
+ 	uint64_t buffer;
+};
+
+#endif
 
 #endif
