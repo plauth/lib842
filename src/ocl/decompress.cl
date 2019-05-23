@@ -1,3 +1,4 @@
+//R"=====(
 #define OCL
 #include "src/ocl/842-internal.h"
 
@@ -171,8 +172,32 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out)
 
                     if(is_index) {
                         uint64_t offset = get_index(&p, dst_size, value, fifo_sizes[dst_size]);
-                        value = p.ostart[offset];
-                        //memcpy(&value, &p.ostart[offset], dst_size);
+                        __global uint8_t * ostart8 = (__global uint8_t *) p.ostart;
+                        switch(dst_size) {
+                            case 2:
+                                value = 
+                                    (((uint64_t) ostart8[offset    ])) |
+                                    (((uint64_t) ostart8[offset + 1]) << 8);
+                                break;
+                            case 4:
+                                value = 
+                                    (((uint64_t) ostart8[offset    ])) |
+                                    (((uint64_t) ostart8[offset + 1]) << 8 ) | 
+                                    (((uint64_t) ostart8[offset + 2]) << 16) |
+                                    (((uint64_t) ostart8[offset + 3]) << 24);
+                                break;
+                            case 8:
+                                value = 
+                                    (((uint64_t) ostart8[offset    ])) |
+                                    (((uint64_t) ostart8[offset + 1]) << 8 ) | 
+                                    (((uint64_t) ostart8[offset + 2]) << 16) |
+                                    (((uint64_t) ostart8[offset + 3]) << 24) |
+                                    (((uint64_t) ostart8[offset + 4]) << 32) |
+                                    (((uint64_t) ostart8[offset + 5]) << 40) | 
+                                    (((uint64_t) ostart8[offset + 6]) << 48) |
+                                    (((uint64_t) ostart8[offset + 7]) << 56);
+                                break;
+                        }
 
                         value <<= (WSIZE - (dst_size << 3));
                         value = bswap(value);
@@ -188,3 +213,4 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out)
 
     return;
 }
+//)====="

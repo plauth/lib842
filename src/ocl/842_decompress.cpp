@@ -1,13 +1,14 @@
 #include "clutil.hpp"
 #include "cl842kernels.hpp"
-#include <sys/time.h>
 #include <iostream>
+#include <sys/time.h>
 
 #include "842-internal.h"
 
 using namespace std;
 
 #define STRLEN 32
+#define THREADS_PER_BLOCK 1
 
 long long timestamp() {
     struct timeval te;
@@ -22,17 +23,19 @@ int nextMultipleOfChunkSize(unsigned int input) {
 } 
 
 int main(int argc, char *argv[]) {
-    CL842Kernels kernels;
+    CL842Kernels kernels; 
 
     uint8_t *inH, *compressedH, *decompressedH;
-    cl::Buffer compressedD, decompressedD;
 
-    inH = compressedH = decompressedH = NULL;
+    inH = compressedH = decompressedH = 0;
 
     uint32_t ilen, olen, dlen;
     ilen = olen = dlen = 0;
-    int64_t timestart_comp, timeend_comp;
-    int64_t timestart_decomp, timeend_decomp;
+
+    long long timestart_comp, timeend_comp;
+    long long timestart_decomp, timeend_decomp;
+
+    uint32_t num_chunks = 1;
 
     if(argc <= 1) {
         ilen = STRLEN;
@@ -45,11 +48,6 @@ int main(int argc, char *argv[]) {
         memset(inH, 0, ilen);
         memset(compressedH, 0, olen);
         memset(decompressedH, 0, dlen);
-
-        compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_ONLY);
-        decompressedD   = kernels.allocateBuffer(dlen, CL_MEM_READ_WRITE);
-        kernels.fillBuffer(compressedD, 0, 0, olen);
-        kernels.fillBuffer(decompressedD, 0, 0, dlen);
 
         uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
         strncpy((char *) inH, (const char *) tmp, STRLEN);
@@ -73,10 +71,7 @@ int main(int argc, char *argv[]) {
         memset(compressedH, 0, olen);
         memset(decompressedH, 0, dlen);
 
-        compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_ONLY);
-        decompressedD   = kernels.allocateBuffer(dlen, CL_MEM_READ_WRITE);
-        kernels.fillBuffer(compressedD, 0, 0, olen);
-        kernels.fillBuffer(decompressedD, 0, 0, dlen);
+        num_chunks = ilen / CHUNK_SIZE;
 
 
         if(!fread(inH, flen, 1, fp)) {
@@ -85,15 +80,15 @@ int main(int argc, char *argv[]) {
         fclose(fp);
     }
 
-    compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_ONLY);
-    decompressedD   = kernels.allocateBuffer(dlen, CL_MEM_READ_WRITE);
+    //compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_ONLY);
+    //decompressedD   = kernels.allocateBuffer(dlen, CL_MEM_READ_WRITE);
 
 
 
     if(ilen > CHUNK_SIZE) {
         printf("Using chunks of %d bytes\n", CHUNK_SIZE);
 
-        uint32_t num_chunks = ilen / CHUNK_SIZE;
+        
     
         timestart_comp = timestamp();
         #pragma omp parallel for
@@ -104,41 +99,46 @@ int main(int argc, char *argv[]) {
             
             sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
         }
-
         timeend_comp = timestamp();
 
+    } else {
+        sw842_compress(inH, ilen, compressedH, &olen);
+    }
+
+    kernels.prepareDecompressKernel();
+    cl::Buffer compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_ONLY);
+    cl::Buffer decompressedD   = kernels.allocateBuffer(dlen, CL_MEM_READ_WRITE);
+    kernels.fillBuffer(compressedD, 0, 0, olen);
+    kernels.fillBuffer(decompressedD, 0, 0, olen);
+
+    
+    if(ilen > CHUNK_SIZE) {
         printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
-
         kernels.writeBuffer(compressedD, (const void*) compressedH, olen);
-
         timestart_decomp = timestamp();
-
         kernels.decompress(compressedD, decompressedD, num_chunks);
-
         timeend_decomp = timestamp();
-
+        kernels.readBuffer(decompressedD, (void*) decompressedH, dlen);
+    } else {
+        kernels.writeBuffer(compressedD, (const void*) compressedH, olen);
+        kernels.decompress(compressedD, decompressedD, 1);
         kernels.readBuffer(decompressedD, (void*) decompressedH, dlen);
 
+    }
 
+
+    if (memcmp(inH, decompressedH, ilen) == 0) {
         printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
         printf("Decompression performance: %lld ms / %f MiB/s\n", timeend_decomp - timestart_decomp, (ilen / 1024 / 1024) / ((float) (timeend_decomp - timestart_decomp) / 1000));
 
-
-    } else {
-
-        sw842_compress(inH, ilen, compressedH, &olen);
-
-        kernels.writeBuffer(compressedD, (const void*) compressedH, olen);
-
-        kernels.decompress(compressedD, decompressedD, 1);
-        
-        kernels.readBuffer(decompressedD, (void*) decompressedH, dlen);
-    }
-    
-
-    if (memcmp(inH, decompressedH, ilen) == 0) {
         printf("Compression- and decompression was successful!\n");
     } else {
+
+        for (uint32_t i = 0; i < ilen; i++) {
+            printf("%02x:", inH[i]);
+        }
+
+        printf("\n\n");
 
         for (uint32_t i = 0; i < olen; i++) {
             printf("%02x:", compressedH[i]);
