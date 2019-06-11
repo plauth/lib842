@@ -1,4 +1,5 @@
 //R"=====(
+
 typedef uchar   uint8_t;
 typedef ushort  uint16_t;
 typedef short   int16_t;
@@ -98,7 +99,7 @@ struct sw842_param_decomp {
 #define I4_FIFO_SIZE    (4 * (1 << I4_BITS))
 #define I8_FIFO_SIZE    (8 * (1 << I8_BITS))
 
-#define __round_mask(x, y) ((__typeof__(x))((y)-1))
+#define __round_mask(x, y) ((y)-1)
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
 __constant uint16_t fifo_sizes[9] = {
@@ -151,14 +152,14 @@ __constant uint8_t dec_templates[26][4][2] = { // params size in bits
 
 inline uint64_t bswap(uint64_t value) {
     return
-    (uint64_t)((value & (uint64_t)0x00000000000000ffULL) << 56) |
-    (uint64_t)((value & (uint64_t)0x000000000000ff00ULL) << 40) |
-    (uint64_t)((value & (uint64_t)0x0000000000ff0000ULL) << 24) |
-    (uint64_t)((value & (uint64_t)0x00000000ff000000ULL) <<  8) |
-    (uint64_t)((value & (uint64_t)0x000000ff00000000ULL) >>  8) |
-    (uint64_t)((value & (uint64_t)0x0000ff0000000000ULL) >> 24) |
-    (uint64_t)((value & (uint64_t)0x00ff000000000000ULL) >> 40) |
-    (uint64_t)((value & (uint64_t)0xff00000000000000ULL) >> 56);
+    (uint64_t)((value & (uint64_t)0x00000000000000ff) << 56) |
+    (uint64_t)((value & (uint64_t)0x000000000000ff00) << 40) |
+    (uint64_t)((value & (uint64_t)0x0000000000ff0000) << 24) |
+    (uint64_t)((value & (uint64_t)0x00000000ff000000) <<  8) |
+    (uint64_t)((value & (uint64_t)0x000000ff00000000) >>  8) |
+    (uint64_t)((value & (uint64_t)0x0000ff0000000000) >> 24) |
+    (uint64_t)((value & (uint64_t)0x00ff000000000000) >> 40) |
+    (uint64_t)((value & (uint64_t)0xff00000000000000) >> 56);
 }
 
 inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
@@ -178,7 +179,6 @@ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
     p->bits -= n;
     p->buffer <<= n;
   }
-
 
   return value;
 }
