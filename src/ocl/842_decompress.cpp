@@ -3,12 +3,11 @@
 #include <iostream>
 #include <sys/time.h>
 
-#include "842-internal.h"
+#include "../../include/sw842.h"
 
 using namespace std;
 
 #define STRLEN 32
-#define THREADS_PER_BLOCK 1
 
 long long timestamp() {
     struct timeval te;
@@ -111,7 +110,6 @@ int main(int argc, char *argv[]) {
     kernels.fillBuffer(compressedD, 0, 0, olen);
     kernels.fillBuffer(decompressedD, 0, 0, olen);
 
-    
     if(ilen > CHUNK_SIZE) {
         printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
         kernels.writeBuffer(compressedD, (const void*) compressedH, olen);

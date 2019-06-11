@@ -22,40 +22,42 @@ CL842Kernels::CL842Kernels() {
         devices = context.getInfo<CL_CONTEXT_DEVICES>();
         checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
         std::string deviceName;
-        devices[0].getInfo((cl_device_info)CL_DEVICE_NAME,&deviceName);
+        devices[1].getInfo((cl_device_info)CL_DEVICE_NAME,&deviceName);
         std::cerr << "Device: " << deviceName << std::endl;
 
-        queue = cl::CommandQueue(context, devices[0], 0, &err);
+        queue = cl::CommandQueue(context, devices[1], 0, &err);
         checkErr(err, "CommandQueue::CommandQueue()");
 }
 
 void CL842Kernels::prepareDecompressKernel() {
-    std::call_once(CL842Kernels::decompressCompileFlag, [this]() {
-        std::cout << "Compiling decompress kernel..." << std::endl;
-        cl_int err;
-        ifstream cl_file("src/ocl/decompress.cl");
-        string cl_string(istreambuf_iterator<char>(cl_file), (istreambuf_iterator<char>()));
+    std::cout << "Compiling decompress kernel..." << std::endl;
+    
+    cl_int err;
+    ifstream cl_file("src/ocl/decompress.cl");
+    string cl_string(istreambuf_iterator<char>(cl_file), (istreambuf_iterator<char>()));
+   
+    std::ostringstream options;
+    options<<"-D CHUNK_SIZE="<< CHUNK_SIZE;
+
+    decompressProg = cl::Program (context, cl_string.c_str());
+    err = decompressProg.build(options.str().c_str());
+
+    if (err == CL_BUILD_PROGRAM_FAILURE) {
+        cl::vector<cl::Device> devices;
+        devices = context.getInfo<CL_CONTEXT_DEVICES>();
+        checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
+        std::string log = decompressProg.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0], NULL);
+        std::cerr << "Build Log: " << log << std::endl;
+    }
+    checkErr(err, "cl::Programm::build()");
+
+    decompressKernel = cl::Kernel(decompressProg, "decompress", &err);
+    checkErr(err, "cl::Kernel()");
         
-        decompressProg = cl::Program (context, cl_string.c_str());
-        err = decompressProg.build();
-
-        if (err == CL_BUILD_PROGRAM_FAILURE) {
-            cl::vector<cl::Device> devices;
-            devices = context.getInfo<CL_CONTEXT_DEVICES>();
-            checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
-            std::string log = decompressProg.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0], NULL);
-            std::cerr << "Build Log: " << log << std::endl;
-        }
-        checkErr(err, "cl::Programm::build()");
-
-        decompressKernel = cl::Kernel(decompressProg, "decompress", &err);
-        checkErr(err, "cl::Kernel()");
-    });
 }
 
 void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks) {
     cl_int err;
-    prepareDecompressKernel();
 
     err = decompressKernel.setArg(0, in);
     checkErr(err, "Kernel::setArg(0)");

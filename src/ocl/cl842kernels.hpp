@@ -3,12 +3,12 @@
 
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include "clutil.hpp"
 
-#define THREADS_PER_BLOCK 1
-#ifndef CHUNK_SIZE
+#define THREADS_PER_BLOCK 256
 #define CHUNK_SIZE 1024
-#endif
+
 
 class CL842Kernels
 {
@@ -16,7 +16,6 @@ class CL842Kernels
     	cl::Context context;
     	cl::CommandQueue queue;
 
-        std::once_flag decompressCompileFlag;
         cl::Program decompressProg;
         cl::Kernel decompressKernel;
     public:

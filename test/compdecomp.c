@@ -10,7 +10,7 @@
 #endif
 
 //#define CHUNK_SIZE 32768
-#define CHUNK_SIZE 4096
+#define CHUNK_SIZE 1024
 #define STRLEN 32
 
 

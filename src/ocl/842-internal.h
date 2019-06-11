@@ -2,10 +2,6 @@
 #ifndef __842_INTERNAL_H__
 #define __842_INTERNAL_H__
 
-#ifndef CHUNK_SIZE
-#define CHUNK_SIZE 1024
-#endif
-
 /* The 842 compressed format is made up of multiple blocks, each of
  * which have the format:
  *

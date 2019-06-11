@@ -1,6 +1,94 @@
 //R"=====(
-#define OCL
-#include "src/ocl/842-internal.h"
+typedef uchar   uint8_t;
+typedef ushort  uint16_t;
+typedef short   int16_t;
+typedef uint    uint32_t;
+typedef ulong   uint64_t; 
+
+/* special templates */
+#define OP_REPEAT   (0x1B)
+#define OP_ZEROS    (0x1C)
+#define OP_END      (0x1E)
+
+/* additional bits of each op param */
+#define OP_BITS     (5)
+#define REPEAT_BITS (6)
+#define I2_BITS     (8)
+#define I4_BITS     (9)
+#define I8_BITS     (8)
+#define D2_BITS     (16)
+#define D4_BITS     (32)
+#define D8_BITS     (64)
+#define CRC_BITS    (32)
+#define N0_BITS     (0)
+
+#define REPEAT_BITS_MAX     (0x3f)
+
+/* Arbitrary values used to indicate action */
+#define OP_ACTION   (0x70)
+#define OP_ACTION_INDEX (0x10)
+#define OP_ACTION_DATA  (0x20)
+#define OP_ACTION_NOOP  (0x40)
+#define OP_AMOUNT   (0x0f)
+#define OP_AMOUNT_0 (0x00)
+#define OP_AMOUNT_2 (0x02)
+#define OP_AMOUNT_4 (0x04)
+#define OP_AMOUNT_8 (0x08)
+
+#define D2      (OP_ACTION_DATA  | OP_AMOUNT_2)
+#define D4      (OP_ACTION_DATA  | OP_AMOUNT_4)
+#define D8      (OP_ACTION_DATA  | OP_AMOUNT_8)
+#define I2      (OP_ACTION_INDEX | OP_AMOUNT_2)
+#define I4      (OP_ACTION_INDEX | OP_AMOUNT_4)
+#define I8      (OP_ACTION_INDEX | OP_AMOUNT_8)
+#define N0      (OP_ACTION_NOOP  | OP_AMOUNT_0)
+
+#define DICT16_BITS     (10)
+#define DICT32_BITS     (11)
+#define DICT64_BITS     (10)
+
+#define I2N (13)
+#define I4N (53)
+#define I8N (149)
+
+//1st value: position of payload in dataAndIndices
+//2nd value: number of bits 
+#define D20_OP  {0,  D2_BITS}
+#define D21_OP  {1,  D2_BITS}
+#define D22_OP  {2,  D2_BITS}
+#define D23_OP  {3,  D2_BITS}
+#define D40_OP  {4,  D4_BITS}
+#define D41_OP  {5,  D4_BITS}
+#define D80_OP  {6,  D8_BITS}
+#define I20_OP  {7,  I2_BITS}
+#define I21_OP  {8,  I2_BITS}
+#define I22_OP  {9,  I2_BITS}
+#define I23_OP  {10, I2_BITS}
+#define I40_OP  {11, I4_BITS}
+#define I41_OP  {12, I4_BITS}
+#define I80_OP  {13, I8_BITS}
+#define D4S_OP  {14, D4_BITS}
+#define N0_OP   {15, 0}
+
+#define OP_DEC_NOOP  (0x00)
+#define OP_DEC_DATA  (0x00)
+#define OP_DEC_INDEX (0x80)
+
+#define OP_DEC_N0   {(N0_BITS | OP_DEC_NOOP),  0}
+#define OP_DEC_D2   {(D2_BITS | OP_DEC_DATA),  2}
+#define OP_DEC_D4   {(D4_BITS | OP_DEC_DATA),  4}
+#define OP_DEC_D8   {(D8_BITS | OP_DEC_DATA),  8}
+#define OP_DEC_I2   {(I2_BITS | OP_DEC_INDEX), 2}
+#define OP_DEC_I4   {(I4_BITS | OP_DEC_INDEX), 4}
+#define OP_DEC_I8   {(I8_BITS | OP_DEC_INDEX), 8}
+
+struct sw842_param_decomp {
+    __global uint64_t *out;
+    __global const uint64_t* ostart;
+    __global uint64_t *in;
+    uint32_t bits;
+    uint64_t buffer;
+};
 
 /* number of bits in a buffered word */
 #define WSIZE 64 //sizeof(uint64_t)
@@ -146,7 +234,7 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out)
         switch (op) {
             case OP_REPEAT:
                 op = read_bits(&p, REPEAT_BITS);
-                /* copy op + 1 */
+                // copy op + 1 
                 op++;
 
                 while (op-- > 0) {
@@ -165,6 +253,7 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out)
                     uint64_t value;
 
                     uint32_t dec_template = dec_templates[op][i][0];
+                    //printf("op is %x\n", dec_template & 0x7F);
                     uint32_t is_index = (dec_template >> 7);
                     uint32_t dst_size = dec_templates[op][i][1];
 
