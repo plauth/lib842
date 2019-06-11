@@ -22,10 +22,10 @@ CL842Kernels::CL842Kernels() {
         devices = context.getInfo<CL_CONTEXT_DEVICES>();
         checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
         std::string deviceName;
-        devices[1].getInfo((cl_device_info)CL_DEVICE_NAME,&deviceName);
+        devices[0].getInfo((cl_device_info)CL_DEVICE_NAME,&deviceName);
         std::cerr << "Device: " << deviceName << std::endl;
 
-        queue = cl::CommandQueue(context, devices[1], 0, &err);
+        queue = cl::CommandQueue(context, devices[0], 0, &err);
         checkErr(err, "CommandQueue::CommandQueue()");
 }
 
