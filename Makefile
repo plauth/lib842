@@ -1,5 +1,5 @@
 CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
-CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3
+CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopenmp
 NVCC_FLAGS	:= -O3 -maxrregcount 64 -gencode arch=compute_37,code=sm_37 --compile
 NVLINKER_FLAGS 	:= --cudart static --relocatable-device-code=false -gencode arch=compute_37,code=compute_37 -gencode arch=compute_37,code=sm_37 -link
 
@@ -123,7 +123,7 @@ goldenunit: checkdirs $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV)
 	bin/serial_optimized/goldenunit2
 
 ocl:
-	$(CXX) $(CXX_FLAGS) src/ocl/842_decompress.cpp src/ocl/cl842kernels.cpp src/serial_optimized/842_compress.cpp src/serial_optimized/bitstream.cpp $(LDFLAGS_OCL) -o ocl_test -I./include
+	$(CXX) $(CXX_FLAGS) src/serial_optimized/842_compress.cpp src/serial_optimized/bitstream.cpp src/ocl/cl842kernels.cpp src/ocl/compdecomp.cpp $(LDFLAGS_OCL) -o ocl_test -I./include
 
 cuda:
 	$(NVCC) test/transferbench.cu  -g -O3 obj/serial_optimized/842_decompress.o obj/serial_optimized/842_compress.o -o transferbench -I./include -D_FORCE_INLINES

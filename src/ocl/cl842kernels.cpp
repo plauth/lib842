@@ -3,31 +3,37 @@
 using namespace std;
 
 CL842Kernels::CL842Kernels() {
-        cl_int err;
-        cl::vector< cl::Platform > platformList;
-        cl::Platform::get(&platformList);
-        checkErr(platformList.size()!=0 ? CL_SUCCESS : -1, "cl::Platform::get");
-        std::cerr << "Number of available platforms: " << platformList.size() << std::endl;
-        cl::Platform platform = platformList[0];
+        std::vector<cl::Platform> platforms;
+        std::vector<cl::Device> devices;
 
-        std::string platformVendor;
-        platform.getInfo((cl_platform_info)CL_PLATFORM_VENDOR, &platformVendor);
+        cl::Platform::get(&platforms);
+        if(platforms.empty()) {
+            std::cerr << "No OpenCL platforms are available!" << std::endl;
+            exit(-1);
+        }
+        std::cerr << "Number of available platforms: " << platforms.size() << std::endl;
 
-        std::cerr << "Current platform vendor: " << platformVendor << "\n";
-        cl_context_properties cprops[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
-        //platformList[0]()
-        context = cl::Context(CL_DEVICE_TYPE_GPU, cprops, NULL, NULL, &err);
-        checkErr(err, "Context::Context()");
-        cl::vector<cl::Device> devices;
-        devices = context.getInfo<CL_CONTEXT_DEVICES>();
-        checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
-        std::string deviceName;
-        devices[0].getInfo((cl_device_info)CL_DEVICE_NAME,&deviceName);
-        std::cerr << "Device: " << deviceName << std::endl;
+        for(auto platform = platforms.begin(); devices.empty() && platform != platforms.end(); platform++) {
+            std::vector<cl::Device> platformDevices;
+            platform->getDevices(CL_DEVICE_TYPE_GPU, &platformDevices);
+            if(platformDevices.empty()) continue;
 
-        queue = cl::CommandQueue(context, devices[0], 0, &err);
-        checkErr(err, "CommandQueue::CommandQueue()");
 
+            std::cerr << "Platform: " << platform->getInfo<CL_PLATFORM_NAME>() << std::endl;
+            for(auto device = platformDevices.begin(); device != platformDevices.end(); device++) {
+                if (!device->getInfo<CL_DEVICE_AVAILABLE>()) continue;
+                std::cerr << "Device: " << device->getInfo<CL_DEVICE_NAME>() << std::endl;
+                devices.push_back(*device);
+            }
+        }
+
+        if(devices.empty()) {
+            std::cerr << "No GPU devices are available!!" << std::endl;
+            exit(-1);
+        }
+        context = cl::Context(devices);
+
+        queue = cl::CommandQueue(context, devices[0]);
 }
 
 void CL842Kernels::prepareDecompressKernel() {
