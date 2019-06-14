@@ -26,6 +26,8 @@ int main(int argc, char *argv[]) {
     fread(&dlen, sizeof(uint32_t), 1, stdin);
     fread(&num_chunks, sizeof(uint32_t), 1, stdin);
 
+    fprintf(stderr, "(decompress): olen = %d, dlen = %d, num_chunks = %d\n", olen, dlen, num_chunks);
+
     compressedH = (uint8_t*) malloc(olen);
     decompressedH = (uint8_t*) malloc(dlen);
 
@@ -39,7 +41,7 @@ int main(int argc, char *argv[]) {
     kernels.fillBuffer(compressedD, 0, 0, olen);
     kernels.fillBuffer(decompressedD, 0, 0, olen);
 
-    if(num_chunks < 1) {
+    if(num_chunks > 1) {
         fprintf(stderr, "Threads per Block: %d\n", THREADS_PER_BLOCK );
         kernels.writeBuffer(compressedD, (const void*) compressedH, olen);
         timestart_decomp = timestamp();

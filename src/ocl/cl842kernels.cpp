@@ -71,7 +71,7 @@ void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks
     cl::NDRange workgroupSize(1);
 
     if(num_chunks > THREADS_PER_BLOCK) {
-        printf("Using %d chunks of %d bytes, %d threads per block\n", num_chunks, CHUNK_SIZE, THREADS_PER_BLOCK);
+        fprintf(stderr, "Using %d chunks of %d bytes, %d threads per block\n", num_chunks, CHUNK_SIZE, THREADS_PER_BLOCK);
         globalSize = cl::NDRange(num_chunks);
         workgroupSize = cl::NDRange(THREADS_PER_BLOCK);
     } 

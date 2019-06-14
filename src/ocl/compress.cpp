@@ -88,6 +88,8 @@ int main(int argc, char *argv[]) {
 
     fprintf(stderr, "Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
 
+    fprintf(stderr, "(compress): olen = %d, dlen = %d, num_chunks = %d\n", olen, ilen, num_chunks);
+
     fwrite(&olen, sizeof(uint32_t), 1, stdout);
     fwrite(&ilen, sizeof(uint32_t), 1, stdout);
     fwrite(&num_chunks, sizeof(uint32_t), 1, stdout);

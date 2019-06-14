@@ -1,3 +1,4 @@
+*.dSYM
 cpu_serial/842_test
 cpu_serial/842_test.dSYM
 obj/
