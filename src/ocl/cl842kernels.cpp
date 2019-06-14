@@ -27,10 +27,12 @@ CL842Kernels::CL842Kernels() {
 
         queue = cl::CommandQueue(context, devices[0], 0, &err);
         checkErr(err, "CommandQueue::CommandQueue()");
+
+        prepareDecompressKernel();
 }
 
 void CL842Kernels::prepareDecompressKernel() {
-    std::cout << "Compiling decompress kernel..." << std::endl;
+    std::cerr << "Compiling decompress kernel..." << std::endl;
     
     cl_int err;
     ifstream cl_file("src/ocl/decompress.cl");
@@ -74,7 +76,7 @@ void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks
         workgroupSize = cl::NDRange(THREADS_PER_BLOCK);
     } 
     
-    printf("enqueueing kernel\n");
+    fprintf(stderr, "enqueueing kernel\n");
     err = queue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, globalSize, workgroupSize);
     checkErr(err, "enqueueNDRangeKernel()");
     checkErr(queue.finish(), "execute kernel");
