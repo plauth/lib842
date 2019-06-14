@@ -28,7 +28,6 @@ CL842Kernels::CL842Kernels() {
         queue = cl::CommandQueue(context, devices[0], 0, &err);
         checkErr(err, "CommandQueue::CommandQueue()");
 
-        prepareDecompressKernel();
 }
 
 void CL842Kernels::prepareDecompressKernel() {
