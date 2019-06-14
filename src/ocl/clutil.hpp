@@ -5,7 +5,7 @@
 #define CL_HPP_TARGET_OPENCL_VERSION 120
 
 #include <iostream>
-#include "cl2.hpp"
+#include <CL/cl2.hpp>
 
 inline void checkErr(cl_int err, const char * name) {
     if (err != CL_SUCCESS) {

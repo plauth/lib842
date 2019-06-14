@@ -22,6 +22,7 @@ int nextMultipleOfChunkSize(unsigned int input) {
 } 
 
 int main(int argc, char *argv[]) {
+    CL842Kernels kernels;
     uint8_t *inH, *compressedH, *decompressedH;
 
     inH = compressedH = decompressedH = 0;
@@ -102,7 +103,6 @@ int main(int argc, char *argv[]) {
         sw842_compress(inH, ilen, compressedH, &olen);
     }
 
-    CL842Kernels kernels;
     kernels.prepareDecompressKernel();
     cl::Buffer compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_ONLY);
     cl::Buffer decompressedD   = kernels.allocateBuffer(dlen, CL_MEM_READ_WRITE);
