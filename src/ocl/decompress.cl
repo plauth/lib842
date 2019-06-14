@@ -114,6 +114,12 @@ __constant uint16_t fifo_sizes[9] = {
     I8_FIFO_SIZE
 };
 
+
+__constant uint64_t masks[3] = {
+    0x000000000000FFFF,
+    0x00000000FFFFFFFF,
+    0xFFFFFFFFFFFFFFFF
+};
 __constant uint8_t dec_templates[26][4][2] = { // params size in bits
     {OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x00: { D8, N0, N0, N0 }, 64 bits
     {OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x01: { D4, D2, I2, N0 }, 56 bits
@@ -262,32 +268,16 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out)
                     if(is_index) {
                         uint64_t offset = get_index(&p, dst_size, value, fifo_sizes[dst_size]);
                         __global uint8_t * ostart8 = (__global uint8_t *) p.ostart;
-                        switch(dst_size) {
-                            case 2:
-                                value = 
-                                    (((uint64_t) ostart8[offset    ])) |
-                                    (((uint64_t) ostart8[offset + 1]) << 8);
-                                break;
-                            case 4:
-                                value = 
-                                    (((uint64_t) ostart8[offset    ])) |
-                                    (((uint64_t) ostart8[offset + 1]) << 8 ) | 
-                                    (((uint64_t) ostart8[offset + 2]) << 16) |
-                                    (((uint64_t) ostart8[offset + 3]) << 24);
-                                break;
-                            case 8:
-                                value = 
-                                    (((uint64_t) ostart8[offset    ])) |
-                                    (((uint64_t) ostart8[offset + 1]) << 8 ) | 
-                                    (((uint64_t) ostart8[offset + 2]) << 16) |
-                                    (((uint64_t) ostart8[offset + 3]) << 24) |
-                                    (((uint64_t) ostart8[offset + 4]) << 32) |
-                                    (((uint64_t) ostart8[offset + 5]) << 40) | 
-                                    (((uint64_t) ostart8[offset + 6]) << 48) |
-                                    (((uint64_t) ostart8[offset + 7]) << 56);
-                                break;
-                        }
-
+                        value = 
+                            (((uint64_t) ostart8[offset    ])) |
+                            (((uint64_t) ostart8[offset + 1]) << 8 ) | 
+                            (((uint64_t) ostart8[offset + 2]) << 16) |
+                            (((uint64_t) ostart8[offset + 3]) << 24) |
+                            (((uint64_t) ostart8[offset + 4]) << 32) |
+                            (((uint64_t) ostart8[offset + 5]) << 40) | 
+                            (((uint64_t) ostart8[offset + 6]) << 48) |
+                            (((uint64_t) ostart8[offset + 7]) << 56);
+                        value &= masks[dst_size >> 2];
                         value <<= (WSIZE - (dst_size << 3));
                         value = bswap(value);
                     }
