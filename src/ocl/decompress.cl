@@ -102,15 +102,9 @@ struct sw842_param_decomp {
 #define __round_mask(x, y) ((y)-1)
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
-__constant uint16_t fifo_sizes[9] = {
-    0,
-    0,
+__constant uint16_t fifo_sizes[3] = {
     I2_FIFO_SIZE,
-    0,
     I4_FIFO_SIZE,
-    0,
-    0,
-    0,
     I8_FIFO_SIZE
 };
 
@@ -266,17 +260,14 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out)
                     value = read_bits(&p, dec_template & 0x7F);
 
                     if(is_index) {
-                        uint64_t offset = get_index(&p, dst_size, value, fifo_sizes[dst_size]);
-                        __global uint8_t * ostart8 = (__global uint8_t *) p.ostart;
+                        uint64_t offset = get_index(&p, dst_size, value, fifo_sizes[dst_size >> 2]);
+                        offset >>= 1;
+                        __global uint16_t * ostart16 = (__global uint16_t *) p.ostart;
                         value = 
-                            (((uint64_t) ostart8[offset    ])) |
-                            (((uint64_t) ostart8[offset + 1]) << 8 ) | 
-                            (((uint64_t) ostart8[offset + 2]) << 16) |
-                            (((uint64_t) ostart8[offset + 3]) << 24) |
-                            (((uint64_t) ostart8[offset + 4]) << 32) |
-                            (((uint64_t) ostart8[offset + 5]) << 40) | 
-                            (((uint64_t) ostart8[offset + 6]) << 48) |
-                            (((uint64_t) ostart8[offset + 7]) << 56);
+                            (((uint64_t) ostart16[offset    ])) |
+                            (((uint64_t) ostart16[offset + 1]) << 16) |
+                            (((uint64_t) ostart16[offset + 2]) << 32) |
+                            (((uint64_t) ostart16[offset + 3]) << 48);
                         value &= masks[dst_size >> 2];
                         value <<= (WSIZE - (dst_size << 3));
                         value = bswap(value);
