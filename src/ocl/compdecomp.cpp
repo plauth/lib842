@@ -15,18 +15,13 @@ long long timestamp() {
     return ms;
 }
 
-int nextMultipleOfChunkSize(unsigned int input) {
-    unsigned int size = CHUNK_SIZE * THREADS_PER_BLOCK;
-    return (input + (size-1)) & ~(size-1);
-} 
-
 int main(int argc, char *argv[]) {
     CL842Kernels kernels;
     uint8_t *inH, *compressedH, *decompressedH;
 
     inH = compressedH = decompressedH = 0;
 
-    uint32_t ilen, olen, dlen;
+    size_t ilen, olen, dlen;
     ilen = olen = dlen = 0;
 
     long long timestart_comp, timeend_comp;
@@ -52,11 +47,10 @@ int main(int argc, char *argv[]) {
         FILE *fp;
         fp=fopen(argv[1], "r");
         fseek(fp, 0, SEEK_END);
-        unsigned int flen = ftell(fp);
-        ilen = flen;
-        printf("original file length: %d\n", ilen);
-        ilen = nextMultipleOfChunkSize(ilen);
-        printf("original file length (padded): %d\n", ilen);
+        size_t flen = ftell(fp);
+        printf("original file length: %ld\n", flen);
+        ilen = CL842Kernels::paddedSize(flen);
+        printf("original file length (padded): %ld\n", ilen);
         olen = ilen * 2;
         dlen = ilen;
         fseek(fp, 0, SEEK_SET);
@@ -87,7 +81,7 @@ int main(int argc, char *argv[]) {
         timestart_comp = timestamp();
         #pragma omp parallel for
         for(uint32_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
-            uint32_t chunk_olen = CHUNK_SIZE * 2;
+            size_t chunk_olen = CHUNK_SIZE * 2;
             uint8_t* chunk_in = inH + (CHUNK_SIZE * chunk_num);
             uint8_t* chunk_out = compressedH + ((CHUNK_SIZE * 2) * chunk_num);
             
@@ -105,7 +99,7 @@ int main(int argc, char *argv[]) {
     kernels.fillBuffer(decompressedD, 0, 0, olen);
 
     if(ilen > CHUNK_SIZE) {
-        printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
+        //printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
         kernels.writeBuffer(compressedD, (const void*) compressedH, olen);
         timestart_decomp = timestamp();
         kernels.decompress(compressedD, decompressedD, num_chunks);

@@ -29,7 +29,7 @@ int main( int argc, const char* argv[])
 {
 	uint8_t *in, *out, *decompressed;
 	in = out = decompressed = NULL;
-	unsigned int ilen, olen, dlen;
+	size_t ilen, olen, dlen;
 	ilen = olen = dlen = 0;
 	long long timestart_comp, timeend_comp;
 	long long timestart_decomp, timeend_decomp;
@@ -61,11 +61,10 @@ int main( int argc, const char* argv[])
 		FILE *fp;
 		fp=fopen(argv[1], "r");
 		fseek(fp, 0, SEEK_END);
-		unsigned int flen = ftell(fp);
-		ilen = flen;
-		printf("original file length: %d\n", ilen);
-		ilen = nextMultipleOfChunkSize(ilen);
-		printf("original file length (padded): %d\n", ilen);
+		size_t flen = ftell(fp);
+		printf("original file length: %ld\n", flen);
+		ilen = nextMultipleOfChunkSize(flen);
+		printf("original file length (padded): %ld\n", ilen);
 		olen = ilen * 2;
 		#ifdef USEHW
 		dlen = ilen * 2;
@@ -98,7 +97,7 @@ int main( int argc, const char* argv[])
 		#pragma omp parallel for
 		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			
-			unsigned int chunk_olen = CHUNK_SIZE * 2;
+			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 			
@@ -134,7 +133,7 @@ int main( int argc, const char* argv[])
 		timestart_decomp = timestamp();
 		#pragma omp parallel for
 		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			unsigned int chunk_dlen = CHUNK_SIZE;
+			size_t chunk_dlen = CHUNK_SIZE;
 
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
@@ -157,7 +156,7 @@ int main( int argc, const char* argv[])
 		free(compressedChunkPositions);
 		free(compressedChunkSizes);
 
-		printf("Input: %d bytes\n", ilen);
+		printf("Input: %ld bytes\n", ilen);
 		printf("Output: %lld bytes\n", currentChunkPos);
 		printf("Compression factor: %f\n", (float) currentChunkPos / (float) ilen);
 		printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
@@ -179,8 +178,8 @@ int main( int argc, const char* argv[])
 		sw842_decompress(out, olen, decompressed, &dlen);
 		#endif
 
-		printf("Input: %d bytes\n", ilen);
-		printf("Output: %d bytes\n", olen);
+		printf("Input: %ld bytes\n", ilen);
+		printf("Output: %ld bytes\n", olen);
 		printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
 		

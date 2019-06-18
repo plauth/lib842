@@ -495,8 +495,8 @@ static inline void process_next(struct sw842_param *p)
  * will contain the number of output bytes written on success, or
  * 0 on error.
  */
-int sw842_compress(const uint8_t *in, unsigned int ilen,
-		   uint8_t *out, unsigned int *olen)
+int sw842_compress(const uint8_t *in, size_t ilen,
+		   uint8_t *out, size_t *olen)
 {
 	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param)); 
 
@@ -526,7 +526,7 @@ int sw842_compress(const uint8_t *in, unsigned int ilen,
 	*olen = 0;
 	/* if using strict mode, we can only compress a multiple of 8 */
 	if (ilen % 8) {
-		fprintf(stderr, "Can only compress multiples of 8 bytes, but len is len %d (%% 8 = %d)\n", ilen, ilen % 8);
+		fprintf(stderr, "Can only compress multiples of 8 bytes, but len is len %ld (%% 8 = %ld)\n", ilen, ilen % 8);
 		return -EINVAL;
 	}
 

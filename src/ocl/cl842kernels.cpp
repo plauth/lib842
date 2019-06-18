@@ -66,16 +66,16 @@ void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks
 
     //size_t workgroup_size = getMaxWorkGroupSize(context);
     cl::NDRange globalSize(1);
-    cl::NDRange workgroupSize(1);
+    cl::NDRange localSize(1);
 
-    if(num_chunks > THREADS_PER_BLOCK) {
-        fprintf(stderr, "Using %d chunks of %d bytes, %d threads per block\n", num_chunks, CHUNK_SIZE, THREADS_PER_BLOCK);
+    if(num_chunks > LOCAL_SIZE) {
+        fprintf(stderr, "Using %d chunks of %d bytes, %d threads per workgroup\n", num_chunks, CHUNK_SIZE, LOCAL_SIZE);
         globalSize = cl::NDRange(num_chunks);
-        workgroupSize = cl::NDRange(THREADS_PER_BLOCK);
+        localSize = cl::NDRange(LOCAL_SIZE);
     } 
     
     fprintf(stderr, "enqueueing kernel\n");
-    err = m_queue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, globalSize, workgroupSize);
+    err = m_queue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, globalSize, localSize);
     checkErr(err, "enqueueNDRangeKernel()");
     checkErr(m_queue.finish(), "execute kernel");
     return;
@@ -101,5 +101,10 @@ void CL842Kernels::readBuffer(cl::Buffer buffer, void * ptr, size_t size) {
 void CL842Kernels::fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size) {
     m_queue.enqueueFillBuffer(buffer, value, offset, size);
     checkErr(m_queue.finish(), "enqueueFillBuffer()");
+}
+
+size_t CL842Kernels::paddedSize(size_t size) {
+    size_t workgroup_size = CHUNK_SIZE * LOCAL_SIZE;
+    return (size + (workgroup_size-1)) & ~(workgroup_size-1);
 }
 

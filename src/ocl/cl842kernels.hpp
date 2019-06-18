@@ -13,8 +13,12 @@
 #include <CL/cl.hpp>
 #endif
 
-#define THREADS_PER_BLOCK 256
+#ifndef LOCAL_SIZE
+#define LOCAL_SIZE 256
+#endif
+#ifndef CHUNK_SIZE
 #define CHUNK_SIZE 1024
+#endif
 
 
 inline void checkErr(cl_int err, const char * name) {
@@ -28,12 +32,14 @@ class CL842Kernels
 {
     public:
         static const cl_device_type usedDeviceTypes;
+        static size_t paddedSize(size_t size);
         CL842Kernels();
         cl::Buffer allocateBuffer(size_t size, cl_mem_flags flags);
         void writeBuffer(cl::Buffer buffer, const void * ptr, size_t size);
         void readBuffer(cl::Buffer buffer, void * ptr, size_t size);
         void fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size);
         void decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks);
+
     private:
         //cl::Buffer compressedD, decompressedD;
 
