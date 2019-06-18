@@ -1,19 +1,17 @@
 #include "cl842kernels.hpp"
 
-using namespace std;
+const cl_device_type CL842Kernels::usedDeviceTypes = CL_DEVICE_TYPE_ALL;
 
 CL842Kernels::CL842Kernels() {
-        std::vector<cl::Platform> platforms;
-        std::vector<cl::Device> devices;
 
-        cl::Platform::get(&platforms);
-        if(platforms.empty()) {
+        cl::Platform::get(&m_platforms);
+        if(m_platforms.empty()) {
             std::cerr << "No OpenCL platforms are available!" << std::endl;
             exit(-1);
         }
-        std::cerr << "Number of available platforms: " << platforms.size() << std::endl;
+        std::cerr << "Number of available platforms: " << m_platforms.size() << std::endl;
 
-        for(auto platform = platforms.begin(); devices.empty() && platform != platforms.end(); platform++) {
+        for(auto platform = m_platforms.begin(); m_devices.empty() && platform != m_platforms.end(); platform++) {
             std::vector<cl::Device> platformDevices;
             platform->getDevices(CL_DEVICE_TYPE_GPU, &platformDevices);
             if(platformDevices.empty()) continue;
@@ -23,48 +21,43 @@ CL842Kernels::CL842Kernels() {
             for(auto device = platformDevices.begin(); device != platformDevices.end(); device++) {
                 if (!device->getInfo<CL_DEVICE_AVAILABLE>()) continue;
                 std::cerr << "Device: " << device->getInfo<CL_DEVICE_NAME>() << std::endl;
-                devices.push_back(*device);
+                m_devices.push_back(*device);
             }
         }
 
-        if(devices.empty()) {
+        if(m_devices.empty()) {
             std::cerr << "No GPU devices are available!!" << std::endl;
             exit(-1);
         }
-        context = cl::Context(devices);
+        m_context = cl::Context(m_devices);
 
-        queue = cl::CommandQueue(context, devices[0]);
-}
+        std::string sourceCode = decompressKernelSource();
+        cl::Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length()+1));
 
-void CL842Kernels::prepareDecompressKernel() {
-    std::cerr << "Compiling decompress kernel..." << std::endl;
-    
-    cl_int err;
-    ifstream cl_file("src/ocl/decompress.cl");
-    string cl_string(istreambuf_iterator<char>(cl_file), (istreambuf_iterator<char>()));
-   
-    std::ostringstream options;
-    options<<"-D CHUNK_SIZE="<< CHUNK_SIZE;
+        std::ostringstream options;
+        options<<"-D CHUNK_SIZE="<< CHUNK_SIZE;
 
-    decompressProg = cl::Program (context, cl_string.c_str());
-    err = decompressProg.build(options.str().c_str());
-
-    if (err == CL_BUILD_PROGRAM_FAILURE) {
-        cl::vector<cl::Device> devices;
-        devices = context.getInfo<CL_CONTEXT_DEVICES>();
-        checkErr(devices.size() > 0 ? CL_SUCCESS : -1, "devices.size() > 0");
-        std::string log = decompressProg.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0], NULL);
-        std::cerr << "Build Log: " << log << std::endl;
-    }
-    checkErr(err, "cl::Programm::build()");
-
-    decompressKernel = cl::Kernel(decompressProg, "decompress", &err);
-    checkErr(err, "cl::Kernel()");
+        m_program = cl::Program(m_context, source);
+        if (m_program.build(m_devices, options.str().c_str()) == CL_BUILD_PROGRAM_FAILURE) {
+            std::cerr << "Build Log: " << m_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(m_devices[0], NULL) << std::endl;
+        }
         
+        m_queue = cl::CommandQueue(m_context, m_devices[0]);
 }
+
+std::string CL842Kernels::decompressKernelSource() const{
+    std::ifstream sourceFile("src/ocl/decompress.cl");
+    return std::string(
+        std::istreambuf_iterator<char>(sourceFile),
+        (std::istreambuf_iterator<char>()));
+}
+
 
 void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks) {
     cl_int err;
+
+    cl::Kernel decompressKernel(m_program, "decompress", &err);
+    checkErr(err, "cl::Kernel()");
 
     err = decompressKernel.setArg(0, in);
     checkErr(err, "Kernel::setArg(0)");
@@ -82,31 +75,31 @@ void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks
     } 
     
     fprintf(stderr, "enqueueing kernel\n");
-    err = queue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, globalSize, workgroupSize);
+    err = m_queue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, globalSize, workgroupSize);
     checkErr(err, "enqueueNDRangeKernel()");
-    checkErr(queue.finish(), "execute kernel");
+    checkErr(m_queue.finish(), "execute kernel");
     return;
 }
 
 cl::Buffer CL842Kernels::allocateBuffer(size_t size, cl_mem_flags flags) {
     cl_int err;
-    cl::Buffer buffer = cl::Buffer(this->context, flags, size, NULL, &err);
+    cl::Buffer buffer = cl::Buffer(m_context, flags, size, NULL, &err);
     checkErr(err, "cl::Buffer()");
     return buffer;
 }
 
 void CL842Kernels::writeBuffer(cl::Buffer buffer, const void * ptr, size_t size) {
-    this->queue.enqueueWriteBuffer(buffer, CL_TRUE, 0, size, ptr);
-    checkErr(queue.finish(), "enqueueWriteBuffer()");
+    m_queue.enqueueWriteBuffer(buffer, CL_TRUE, 0, size, ptr);
+    checkErr(m_queue.finish(), "enqueueWriteBuffer()");
 }
 
 void CL842Kernels::readBuffer(cl::Buffer buffer, void * ptr, size_t size) {
-    this->queue.enqueueReadBuffer(buffer, CL_TRUE, 0, size, ptr);
-    checkErr(queue.finish(), "enqueueReadBuffer()");
+    m_queue.enqueueReadBuffer(buffer, CL_TRUE, 0, size, ptr);
+    checkErr(m_queue.finish(), "enqueueReadBuffer()");
 }
 
 void CL842Kernels::fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size) {
-    this->queue.enqueueFillBuffer(buffer, value, offset, size);
-    checkErr(queue.finish(), "enqueueFillBuffer()");
+    m_queue.enqueueFillBuffer(buffer, value, offset, size);
+    checkErr(m_queue.finish(), "enqueueFillBuffer()");
 }
 

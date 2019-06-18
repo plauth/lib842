@@ -1,9 +1,8 @@
-#include "clutil.hpp"
-#include "cl842kernels.hpp"
 #include <iostream>
 #include <sys/time.h>
 
 #include "../../include/sw842.h"
+#include "cl842kernels.hpp"
 
 using namespace std;
 
@@ -78,9 +77,6 @@ int main(int argc, char *argv[]) {
         fclose(fp);
     }
 
-    //compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_ONLY);
-    //decompressedD   = kernels.allocateBuffer(dlen, CL_MEM_READ_WRITE);
-
 
 
     if(ilen > CHUNK_SIZE) {
@@ -103,8 +99,7 @@ int main(int argc, char *argv[]) {
         sw842_compress(inH, ilen, compressedH, &olen);
     }
 
-    kernels.prepareDecompressKernel();
-    cl::Buffer compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_ONLY);
+    cl::Buffer compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_WRITE);
     cl::Buffer decompressedD   = kernels.allocateBuffer(dlen, CL_MEM_READ_WRITE);
     kernels.fillBuffer(compressedD, 0, 0, olen);
     kernels.fillBuffer(decompressedD, 0, 0, olen);
