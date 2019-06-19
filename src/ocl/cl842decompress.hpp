@@ -31,28 +31,27 @@ inline void checkErr(cl_int err, const char * name) {
 class CL842Decompress
 {
     public:
-        static const cl_device_type usedDeviceTypes;
         static size_t paddedSize(size_t size);
-        CL842Decompress();
-        cl::Buffer allocateBuffer(size_t size, cl_mem_flags flags);
-        void writeBuffer(cl::Buffer buffer, const void * ptr, size_t size);
-        void readBuffer(cl::Buffer buffer, void * ptr, size_t size);
-        void fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size);
-        void decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks);
+
+        CL842Decompress(uint8_t* input, size_t inputSize, uint8_t* output, size_t outputSize);
+        void decompress();
 
     private:
-        //cl::Buffer compressedD, decompressedD;
-
         std::vector<cl::Platform> m_platforms;
         cl::Context m_context;
         std::vector<cl::Device> m_devices;
         cl::Program m_program;
         cl::CommandQueue m_queue;
 
-        size_t m_inputSize, m_outputSize;
+        size_t m_inputSize, m_outputSize, m_numChunks;
 
-        std::string decompressKernelSource() const;
-        void decompressBuildProgram(std::string);
+        uint8_t* m_inputHostMemory;
+        uint8_t* m_outputHostMemory;
+        cl::Buffer m_inputBuffer;
+        cl::Buffer m_outputBuffer;
+
+        std::string kernelSource() const;
+        void buildProgram(std::string);
 
 };
 
