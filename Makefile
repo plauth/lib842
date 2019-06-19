@@ -123,7 +123,7 @@ goldenunit: checkdirs $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV)
 	bin/serial_optimized/goldenunit2
 
 ocl:
-	$(CXX) $(CXX_FLAGS) src/serial_optimized/842_compress.cpp src/serial_optimized/bitstream.cpp src/ocl/cl842.cpp src/ocl/compdecomp.cpp $(LDFLAGS_OCL) -o ocl_test -I./include
+	$(CXX) $(CXX_FLAGS) src/serial_optimized/842_compress.cpp src/serial_optimized/bitstream.cpp src/ocl/cl842decompress.cpp src/ocl/compdecomp.cpp $(LDFLAGS_OCL) -o ocl_test -I./include
 
 cuda:
 	$(NVCC) test/transferbench.cu  -g -O3 obj/serial_optimized/842_decompress.o obj/serial_optimized/842_compress.o -o transferbench -I./include -D_FORCE_INLINES

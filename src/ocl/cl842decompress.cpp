@@ -1,9 +1,8 @@
-#include "cl842.hpp"
+#include "cl842decompress.hpp"
 
-const cl_device_type CL842::usedDeviceTypes = CL_DEVICE_TYPE_ALL;
+const cl_device_type CL842Decompress::usedDeviceTypes = CL_DEVICE_TYPE_ALL;
 
-CL842::CL842() {
-
+CL842Decompress::CL842Decompress() {
         cl::Platform::get(&m_platforms);
         if(m_platforms.empty()) {
             std::cerr << "No OpenCL platforms are available!" << std::endl;
@@ -29,23 +28,27 @@ CL842::CL842() {
             std::cerr << "No GPU devices are available!!" << std::endl;
             exit(-1);
         }
+
         m_context = cl::Context(m_devices);
-
-        std::string sourceCode = decompressKernelSource();
-        cl::Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length()+1));
-
-        std::ostringstream options;
-        options<<"-D CHUNK_SIZE="<< CHUNK_SIZE;
-
-        m_program = cl::Program(m_context, source);
-        if (m_program.build(m_devices, options.str().c_str()) == CL_BUILD_PROGRAM_FAILURE) {
-            std::cerr << "Build Log: " << m_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(m_devices[0], NULL) << std::endl;
-        }
-        
         m_queue = cl::CommandQueue(m_context, m_devices[0]);
+        
+        decompressBuildProgram(decompressKernelSource());
+
 }
 
-std::string CL842::decompressKernelSource() const{
+void CL842Decompress::decompressBuildProgram(std::string sourceCode) {
+    cl::Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length()+1));
+
+    std::ostringstream options;
+    options<<"-D CHUNK_SIZE="<< CHUNK_SIZE;
+
+    m_program = cl::Program(m_context, source);
+    if (m_program.build(m_devices, options.str().c_str()) == CL_BUILD_PROGRAM_FAILURE) {
+        std::cerr << "Build Log: " << m_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(m_devices[0], NULL) << std::endl;
+}
+}
+
+std::string CL842Decompress::decompressKernelSource() const{
     std::ifstream sourceFile("src/ocl/decompress.cl");
     return std::string(
         std::istreambuf_iterator<char>(sourceFile),
@@ -53,7 +56,7 @@ std::string CL842::decompressKernelSource() const{
 }
 
 
-void CL842::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks) {
+void CL842Decompress::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks) {
     cl_int err;
 
     cl::Kernel decompressKernel(m_program, "decompress", &err);
@@ -81,29 +84,29 @@ void CL842::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks) {
     return;
 }
 
-cl::Buffer CL842::allocateBuffer(size_t size, cl_mem_flags flags) {
+cl::Buffer CL842Decompress::allocateBuffer(size_t size, cl_mem_flags flags) {
     cl_int err;
     cl::Buffer buffer = cl::Buffer(m_context, flags, size, NULL, &err);
     checkErr(err, "cl::Buffer()");
     return buffer;
 }
 
-void CL842::writeBuffer(cl::Buffer buffer, const void * ptr, size_t size) {
+void CL842Decompress::writeBuffer(cl::Buffer buffer, const void * ptr, size_t size) {
     m_queue.enqueueWriteBuffer(buffer, CL_TRUE, 0, size, ptr);
     checkErr(m_queue.finish(), "enqueueWriteBuffer()");
 }
 
-void CL842::readBuffer(cl::Buffer buffer, void * ptr, size_t size) {
+void CL842Decompress::readBuffer(cl::Buffer buffer, void * ptr, size_t size) {
     m_queue.enqueueReadBuffer(buffer, CL_TRUE, 0, size, ptr);
     checkErr(m_queue.finish(), "enqueueReadBuffer()");
 }
 
-void CL842::fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size) {
+void CL842Decompress::fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size) {
     m_queue.enqueueFillBuffer(buffer, value, offset, size);
     checkErr(m_queue.finish(), "enqueueFillBuffer()");
 }
 
-size_t CL842::paddedSize(size_t size) {
+size_t CL842Decompress::paddedSize(size_t size) {
     size_t workgroup_size = CHUNK_SIZE * LOCAL_SIZE;
     return (size + (workgroup_size-1)) & ~(workgroup_size-1);
 }

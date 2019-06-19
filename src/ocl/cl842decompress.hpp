@@ -1,5 +1,5 @@
-#ifndef CL842KERNELS_HPP
-#define CL842KERNELS_HPP
+#ifndef CL842DecompressKERNELS_HPP
+#define CL842DecompressKERNELS_HPP
 
 #include <fstream>
 #include <iostream>
@@ -28,12 +28,12 @@ inline void checkErr(cl_int err, const char * name) {
     }
 }
 
-class CL842
+class CL842Decompress
 {
     public:
         static const cl_device_type usedDeviceTypes;
         static size_t paddedSize(size_t size);
-        CL842();
+        CL842Decompress();
         cl::Buffer allocateBuffer(size_t size, cl_mem_flags flags);
         void writeBuffer(cl::Buffer buffer, const void * ptr, size_t size);
         void readBuffer(cl::Buffer buffer, void * ptr, size_t size);
@@ -49,8 +49,11 @@ class CL842
         cl::Program m_program;
         cl::CommandQueue m_queue;
 
+        size_t m_inputSize, m_outputSize;
+
         std::string decompressKernelSource() const;
+        void decompressBuildProgram(std::string);
 
 };
 
-#endif // CL842KERNELS_HPP
+#endif // CL842DecompressKERNELS_HPP

@@ -2,7 +2,7 @@
 #include <sys/time.h>
 
 #include "../../include/sw842.h"
-#include "cl842.hpp"
+#include "cl842decompress.hpp"
 
 using namespace std;
 
@@ -16,7 +16,7 @@ long long timestamp() {
 }
 
 int main(int argc, char *argv[]) {
-    CL842 kernels;
+    CL842Decompress clDecompress;
 
     uint8_t *inH, *compressedH, *decompressedH;
     size_t flen, ilen, olen, dlen;
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
         fseek(fp, 0, SEEK_SET);
         fclose(fp);
         
-        ilen = CL842::paddedSize(flen);
+        ilen = CL842Decompress::paddedSize(flen);
         
         printf("original file length: %ld\n", flen);
         printf("original file length (padded): %ld\n", ilen);
@@ -100,22 +100,22 @@ int main(int argc, char *argv[]) {
         sw842_compress(inH, ilen, compressedH, &olen);
     }
 
-    cl::Buffer compressedD     = kernels.allocateBuffer(olen, CL_MEM_READ_WRITE);
-    cl::Buffer decompressedD   = kernels.allocateBuffer(dlen, CL_MEM_READ_WRITE);
-    kernels.fillBuffer(compressedD, 0, 0, olen);
-    kernels.fillBuffer(decompressedD, 0, 0, olen);
+    cl::Buffer compressedD     = clDecompress.allocateBuffer(olen, CL_MEM_READ_WRITE);
+    cl::Buffer decompressedD   = clDecompress.allocateBuffer(dlen, CL_MEM_READ_WRITE);
+    clDecompress.fillBuffer(compressedD, 0, 0, olen);
+    clDecompress.fillBuffer(decompressedD, 0, 0, olen);
 
     if(ilen > CHUNK_SIZE) {
         //printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
-        kernels.writeBuffer(compressedD, (const void*) compressedH, olen);
+        clDecompress.writeBuffer(compressedD, (const void*) compressedH, olen);
         timestart_decomp = timestamp();
-        kernels.decompress(compressedD, decompressedD, num_chunks);
+        clDecompress.decompress(compressedD, decompressedD, num_chunks);
         timeend_decomp = timestamp();
-        kernels.readBuffer(decompressedD, (void*) decompressedH, dlen);
+        clDecompress.readBuffer(decompressedD, (void*) decompressedH, dlen);
     } else {
-        kernels.writeBuffer(compressedD, (const void*) compressedH, olen);
-        kernels.decompress(compressedD, decompressedD, 1);
-        kernels.readBuffer(decompressedD, (void*) decompressedH, dlen);
+        clDecompress.writeBuffer(compressedD, (const void*) compressedH, olen);
+        clDecompress.decompress(compressedD, decompressedD, 1);
+        clDecompress.readBuffer(decompressedD, (void*) decompressedH, dlen);
 
     }
 
