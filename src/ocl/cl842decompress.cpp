@@ -1,3 +1,4 @@
+#include <chrono>
 #include "cl842decompress.hpp"
 
 size_t CL842Decompress::paddedSize(size_t size) {
@@ -92,11 +93,20 @@ void CL842Decompress::decompress() {
         localSize = cl::NDRange(LOCAL_SIZE);
     } 
     
+
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+    
     fprintf(stderr, "enqueueing kernel\n");
     err = m_queue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, globalSize, localSize);
 
     checkErr(err, "enqueueNDRangeKernel()");
     checkErr(m_queue.finish(), "execute kernel");
+
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count();
+
+    std::cerr << "Decompression performance: " << duration << "ms" << " / " << (m_outputSize / 1024 / 1024) / ((float) duration / 1000) << "MiB/s" << std::endl;
 
     m_queue.enqueueReadBuffer(m_outputBuffer, CL_TRUE, 0, m_outputSize, m_outputHostMemory);
     checkErr(m_queue.finish(), "enqueueReadBuffer()");

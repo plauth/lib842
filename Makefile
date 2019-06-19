@@ -6,21 +6,21 @@ NVLINKER_FLAGS 	:= --cudart static --relocatable-device-code=false -gencode arch
 NVCC_TEST := $(shell which nvcc 2> /dev/null)
 NVCC_AVAILABLE := $(notdir $(NVCC_TEST))
 
+LDFLAGS_OCL := -lOpenCL
+CRYPTODEV_IS_LOADED :=
+
 NVCC=nvcc
 ifeq ($(shell uname),Darwin)
 CC=gcc-7
 CXX=g++-7
 LDFLAGS_OCL := -framework OpenCL
-CRYPTODEV_IS_LOADED=
 else ifeq ($(shell uname),AIX)
 CC=gcc
 CXX=g++
 CC_FLAGS+=-maix64 -Wl,-b64
-CRYPTODEV_IS_LOADED=
 else ifeq ($(shell uname -p),ppc64le)
 CC=/opt/at11.0/bin/gcc
 CXX=/opt/at11.0/bin/g++
-LDFLAGS_OCL := -lOpenCL
 CRYPTODEV_IS_LOADED := $(shell lsmod | grep cryptodev)
 else ifeq ($(shell uname -p),ppc)
 CXX_FLAGS += -DDISABLE_CRC
@@ -32,7 +32,6 @@ CXX=g++
 CRYPTODEV_IS_LOADED := $(shell lsmod | grep cryptodev)
 #CC=/opt/intel/compilers_and_libraries/linux/bin/intel64/icc
 #CXX=/opt/intel/compilers_and_libraries/linux/bin/intel64/icpc
-LDFLAGS_OCL := -lOpenCL 
 endif
 
 

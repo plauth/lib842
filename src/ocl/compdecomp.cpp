@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 
 #include "../../include/sw842.h"
 #include "cl842decompress.hpp"
@@ -11,10 +12,10 @@ using namespace std;
 int main(int argc, char *argv[]) {
 
 
-    uint8_t *compressIn, *compressOut, *decompressIn, *decompressOut;
+    char *compressIn;
+    uint8_t *compressOut, *decompressIn, *decompressOut;
     size_t flen, ilen, olen, dlen;
 
-    compressIn = compressOut = decompressIn = decompressOut = NULL;
     flen = ilen = olen = dlen = 0;
 
     size_t num_chunks = 0;
@@ -22,12 +23,13 @@ int main(int argc, char *argv[]) {
     if(argc <= 1) {
         ilen = STRLEN;
     } else if (argc == 2) {
-        FILE *fp;
-        fp=fopen(argv[1], "r");
-        fseek(fp, 0, SEEK_END);
-        flen = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-        fclose(fp);
+        std::ifstream is (argv[1], std::ifstream::binary);
+        if(!is)
+            exit(-1);
+        is.seekg (0, is.end);
+        flen = is.tellg();
+        is.seekg (0, is.beg);
+        is.close();
         
         ilen = CL842Decompress::paddedSize(flen);
         
@@ -38,7 +40,7 @@ int main(int argc, char *argv[]) {
     olen = ilen * 2;
     dlen = ilen;
 
-    compressIn = (uint8_t *) calloc(ilen, sizeof(uint8_t));
+    compressIn = new char [ilen];
     compressOut = (uint8_t *) calloc(olen, sizeof(uint8_t));
     decompressIn = (uint8_t *) calloc(olen, sizeof(uint8_t));
     decompressOut = (uint8_t *) calloc(dlen, sizeof(uint8_t));
@@ -49,28 +51,32 @@ int main(int argc, char *argv[]) {
     }  else if (argc == 2) {
         num_chunks = ilen / CHUNK_SIZE;
 
-        FILE *fp;
-        fp=fopen(argv[1], "r");
-        if(!fread(compressIn, flen, 1, fp)) {
-            fprintf(stderr, "FAIL: Reading file content to memory failed.\n");
-        }
-        fclose(fp);
+        std::ifstream is (argv[1], std::ifstream::binary);
+        if(!is)
+            exit(-1);
+        is.seekg (0, is.beg);
+        is.read (compressIn, flen);
+
+        if (is)
+            std::cerr << "successfully read all " << flen << " bytes." << std::endl;
+        else
+            std::cerr << "error: only " << is.gcount() << "bytes could be read"  << std::endl;
+        is.close();
     }
 
     if(num_chunks > 1) {
         printf("Using %ld chunks of %d bytes\n", num_chunks, CHUNK_SIZE);
     
-        #pragma omp parallel for
         for(uint32_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
             size_t chunk_olen = CHUNK_SIZE * 2;
-            uint8_t* chunk_in = compressIn + (CHUNK_SIZE * chunk_num);
+            uint8_t* chunk_in = ((uint8_t*) compressIn) + (CHUNK_SIZE * chunk_num);
             uint8_t* chunk_out = compressOut + ((CHUNK_SIZE * 2) * chunk_num);
             
             sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
         }
 
     } else {
-        sw842_compress(compressIn, ilen, compressOut, &olen);
+        sw842_compress((uint8_t*) compressIn, ilen, compressOut, &olen);
     }
 
     memcpy(decompressIn, compressOut, olen);
@@ -86,6 +92,7 @@ int main(int argc, char *argv[]) {
         printf("Compression- and decompression was successful!\n");
     } else {
 
+        /*
         for (uint32_t i = 0; i < ilen; i++) {
             printf("%02x:", compressIn[i]);
         }
@@ -101,6 +108,7 @@ int main(int argc, char *argv[]) {
         for (uint32_t i = 0; i < dlen; i++) {
             printf("%02x:", decompressOut[i]);
         }
+        */
 
         printf("\n\n");
 
