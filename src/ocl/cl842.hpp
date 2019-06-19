@@ -28,12 +28,12 @@ inline void checkErr(cl_int err, const char * name) {
     }
 }
 
-class CL842Kernels
+class CL842
 {
     public:
         static const cl_device_type usedDeviceTypes;
         static size_t paddedSize(size_t size);
-        CL842Kernels();
+        CL842();
         cl::Buffer allocateBuffer(size_t size, cl_mem_flags flags);
         void writeBuffer(cl::Buffer buffer, const void * ptr, size_t size);
         void readBuffer(cl::Buffer buffer, void * ptr, size_t size);

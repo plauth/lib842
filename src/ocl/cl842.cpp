@@ -1,8 +1,8 @@
-#include "cl842kernels.hpp"
+#include "cl842.hpp"
 
-const cl_device_type CL842Kernels::usedDeviceTypes = CL_DEVICE_TYPE_ALL;
+const cl_device_type CL842::usedDeviceTypes = CL_DEVICE_TYPE_ALL;
 
-CL842Kernels::CL842Kernels() {
+CL842::CL842() {
 
         cl::Platform::get(&m_platforms);
         if(m_platforms.empty()) {
@@ -45,7 +45,7 @@ CL842Kernels::CL842Kernels() {
         m_queue = cl::CommandQueue(m_context, m_devices[0]);
 }
 
-std::string CL842Kernels::decompressKernelSource() const{
+std::string CL842::decompressKernelSource() const{
     std::ifstream sourceFile("src/ocl/decompress.cl");
     return std::string(
         std::istreambuf_iterator<char>(sourceFile),
@@ -53,7 +53,7 @@ std::string CL842Kernels::decompressKernelSource() const{
 }
 
 
-void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks) {
+void CL842::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks) {
     cl_int err;
 
     cl::Kernel decompressKernel(m_program, "decompress", &err);
@@ -81,29 +81,29 @@ void CL842Kernels::decompress(cl::Buffer in, cl::Buffer out, uint32_t num_chunks
     return;
 }
 
-cl::Buffer CL842Kernels::allocateBuffer(size_t size, cl_mem_flags flags) {
+cl::Buffer CL842::allocateBuffer(size_t size, cl_mem_flags flags) {
     cl_int err;
     cl::Buffer buffer = cl::Buffer(m_context, flags, size, NULL, &err);
     checkErr(err, "cl::Buffer()");
     return buffer;
 }
 
-void CL842Kernels::writeBuffer(cl::Buffer buffer, const void * ptr, size_t size) {
+void CL842::writeBuffer(cl::Buffer buffer, const void * ptr, size_t size) {
     m_queue.enqueueWriteBuffer(buffer, CL_TRUE, 0, size, ptr);
     checkErr(m_queue.finish(), "enqueueWriteBuffer()");
 }
 
-void CL842Kernels::readBuffer(cl::Buffer buffer, void * ptr, size_t size) {
+void CL842::readBuffer(cl::Buffer buffer, void * ptr, size_t size) {
     m_queue.enqueueReadBuffer(buffer, CL_TRUE, 0, size, ptr);
     checkErr(m_queue.finish(), "enqueueReadBuffer()");
 }
 
-void CL842Kernels::fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size) {
+void CL842::fillBuffer(cl::Buffer buffer, cl_uint value, size_t offset, size_t size) {
     m_queue.enqueueFillBuffer(buffer, value, offset, size);
     checkErr(m_queue.finish(), "enqueueFillBuffer()");
 }
 
-size_t CL842Kernels::paddedSize(size_t size) {
+size_t CL842::paddedSize(size_t size) {
     size_t workgroup_size = CHUNK_SIZE * LOCAL_SIZE;
     return (size + (workgroup_size-1)) & ~(workgroup_size-1);
 }

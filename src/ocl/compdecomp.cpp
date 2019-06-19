@@ -2,7 +2,7 @@
 #include <sys/time.h>
 
 #include "../../include/sw842.h"
-#include "cl842kernels.hpp"
+#include "cl842.hpp"
 
 using namespace std;
 
@@ -16,24 +16,39 @@ long long timestamp() {
 }
 
 int main(int argc, char *argv[]) {
-    CL842Kernels kernels;
+    CL842 kernels;
+
     uint8_t *inH, *compressedH, *decompressedH;
+    size_t flen, ilen, olen, dlen;
 
-    inH = compressedH = decompressedH = 0;
+    inH = compressedH = decompressedH = NULL;
+    flen = ilen = olen = dlen = 0;
 
-    size_t ilen, olen, dlen;
-    ilen = olen = dlen = 0;
-
-    long long timestart_comp, timeend_comp;
-    long long timestart_decomp, timeend_decomp;
+    long long timestart_comp = 0, timeend_comp = 0;
+    long long timestart_decomp = 0, timeend_decomp = 0;
 
     uint32_t num_chunks = 1;
 
     if(argc <= 1) {
         ilen = STRLEN;
-        olen = ilen * 2;
-        dlen = ilen;
+    } else if (argc == 2) {
+        FILE *fp;
+        fp=fopen(argv[1], "r");
+        fseek(fp, 0, SEEK_END);
+        flen = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+        fclose(fp);
+        
+        ilen = CL842::paddedSize(flen);
+        
+        printf("original file length: %ld\n", flen);
+        printf("original file length (padded): %ld\n", ilen);
+    }
 
+    olen = ilen * 2;
+    dlen = ilen;
+
+    if(argc <= 1) {
         inH = (uint8_t*) malloc(ilen);
         compressedH = (uint8_t*) malloc(olen);
         decompressedH = (uint8_t*) malloc(dlen);
@@ -44,16 +59,7 @@ int main(int argc, char *argv[]) {
         uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
         strncpy((char *) inH, (const char *) tmp, STRLEN);
     }  else if (argc == 2) {
-        FILE *fp;
-        fp=fopen(argv[1], "r");
-        fseek(fp, 0, SEEK_END);
-        size_t flen = ftell(fp);
-        printf("original file length: %ld\n", flen);
-        ilen = CL842Kernels::paddedSize(flen);
-        printf("original file length (padded): %ld\n", ilen);
-        olen = ilen * 2;
-        dlen = ilen;
-        fseek(fp, 0, SEEK_SET);
+
 
         inH = (uint8_t*) malloc(ilen);
         compressedH = (uint8_t*) malloc(olen);
@@ -64,7 +70,8 @@ int main(int argc, char *argv[]) {
 
         num_chunks = ilen / CHUNK_SIZE;
 
-
+        FILE *fp;
+        fp=fopen(argv[1], "r");
         if(!fread(inH, flen, 1, fp)) {
             fprintf(stderr, "FAIL: Reading file content to memory failed.\n");
         }
