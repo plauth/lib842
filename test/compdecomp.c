@@ -89,13 +89,13 @@ int main( int argc, const char* argv[])
 	if(ilen > CHUNK_SIZE) {
 		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
 	
-		int num_chunks = ilen / CHUNK_SIZE;
+		size_t num_chunks = ilen / CHUNK_SIZE;
 		uint64_t *compressedChunkPositions = (uint64_t*) malloc(sizeof(uint64_t) * num_chunks);
-		uint32_t *compressedChunkSizes = (uint32_t*) malloc(sizeof(uint32_t) * num_chunks);
+		size_t *compressedChunkSizes = (size_t*) malloc(sizeof(size_t) * num_chunks);
 
 		timestart_comp = timestamp();
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			
 			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
@@ -114,7 +114,7 @@ int main( int argc, const char* argv[])
 
 		uint64_t currentChunkPos = 0;
 		
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			compressedChunkPositions[chunk_num] = currentChunkPos;
 			currentChunkPos += compressedChunkSizes[chunk_num];
 		}
@@ -122,7 +122,7 @@ int main( int argc, const char* argv[])
 		uint8_t *out_condensed = (uint8_t *) malloc(currentChunkPos);
 
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			uint8_t * chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 			uint8_t * chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
 			memcpy(chunk_condensed, chunk_out, compressedChunkSizes[chunk_num]);
@@ -132,7 +132,7 @@ int main( int argc, const char* argv[])
 
 		timestart_decomp = timestamp();
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			size_t chunk_dlen = CHUNK_SIZE;
 
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
