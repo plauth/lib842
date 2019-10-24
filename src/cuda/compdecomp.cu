@@ -37,11 +37,11 @@ int main( int argc, const char* argv[])
 	uint8_t *inH, *compressedH, *decompressedH;
 	uint64_t *compressedD, *decompressedD;
 	#ifdef USE_STREAMS
-	printf("Using streams for overlapping memory transfers and computation.\n");
-	cudaStream_t streams[STREAM_COUNT];
-	for(int i = 0; i < STREAM_COUNT; i++) {
-		cudaStreamCreate(&streams[i]);
-	}
+		printf("Using streams for overlapping memory transfers and computation.\n");
+		cudaStream_t streams[STREAM_COUNT];
+		for(int i = 0; i < STREAM_COUNT; i++) {
+			cudaStreamCreate(&streams[i]);
+		}
 	#endif
 	size_t ilen, olen, dlen;
 	ilen = olen = dlen = 0;
@@ -130,30 +130,34 @@ int main( int argc, const char* argv[])
 
 
 		#ifdef USE_STREAMS
-		const int chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
-		int stream_counter = 0;
-		timestart_decomp = timestamp();
-		for(int i = 0; i < num_chunks; i += chunks_per_kernel) {
-			cudaMemcpyAsync(compressedD + ((i * CHUNK_SIZE * 2)/8), compressedH + (i * CHUNK_SIZE * 2), chunks_per_kernel * CHUNK_SIZE * 2, cudaMemcpyHostToDevice, streams[stream_counter%STREAM_COUNT]);
-			cuda842_decompress<<<chunks_per_kernel / THREADS_PER_BLOCK, THREADS_PER_BLOCK, 0, streams[stream_counter%STREAM_COUNT]>>>(compressedD + (i * (CHUNK_SIZE/8) * 2), decompressedD + (i * (CHUNK_SIZE/8)));
-			cudaMemcpyAsync(decompressedH + (i * CHUNK_SIZE), decompressedD + (i * (CHUNK_SIZE/8)), chunks_per_kernel * CHUNK_SIZE, cudaMemcpyDeviceToHost, streams[stream_counter%STREAM_COUNT]);
-			stream_counter++;
-		}
-		cudaDeviceSynchronize();
-		cuda_error = cudaGetLastError();
-		CHECK_ERROR(cuda_error);
-		timeend_decomp = timestamp();
+			const int chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
+			int stream_counter = 0;
+			timestart_decomp = timestamp();
+			for(int i = 0; i < num_chunks; i += chunks_per_kernel) {
+				cudaMemcpyAsync(compressedD + ((i * CHUNK_SIZE * 2)/8), compressedH + (i * CHUNK_SIZE * 2), chunks_per_kernel * CHUNK_SIZE * 2, cudaMemcpyHostToDevice, streams[stream_counter%STREAM_COUNT]);
+				cuda842_decompress<<<chunks_per_kernel / THREADS_PER_BLOCK, THREADS_PER_BLOCK, 0, streams[stream_counter%STREAM_COUNT]>>>(compressedD + (i * (CHUNK_SIZE/8) * 2), decompressedD + (i * (CHUNK_SIZE/8)));
+				cudaMemcpyAsync(decompressedH + (i * CHUNK_SIZE), decompressedD + (i * (CHUNK_SIZE/8)), chunks_per_kernel * CHUNK_SIZE, cudaMemcpyDeviceToHost, streams[stream_counter%STREAM_COUNT]);
+				stream_counter++;
+			}
+			cudaDeviceSynchronize();
+			cuda_error = cudaGetLastError();
+			CHECK_ERROR(cuda_error);
+			timeend_decomp = timestamp();
 		#else
-		timestart_decomp = timestamp();
-		cuda842_decompress<<<num_chunks / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(compressedD, decompressedD);
-		cudaDeviceSynchronize();
-		cuda_error = cudaGetLastError();
-		CHECK_ERROR(cuda_error);
-        timeend_decomp = timestamp();
-		
-		cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize();
-        CHECK_ERROR(cuda_error);
+			cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
+			cudaDeviceSynchronize();
+			CHECK_ERROR(cuda_error);
+
+			timestart_decomp = timestamp();
+			cuda842_decompress<<<num_chunks / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(compressedD, decompressedD);
+			cudaDeviceSynchronize();
+			cuda_error = cudaGetLastError();
+			CHECK_ERROR(cuda_error);
+	        timeend_decomp = timestamp();
+			
+			cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
+			cudaDeviceSynchronize();
+	        CHECK_ERROR(cuda_error);
 		#endif
 
 
