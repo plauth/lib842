@@ -1,7 +1,7 @@
 CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
 CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopenmp
-NVCC_FLAGS	:= -O3 -maxrregcount 64 -gencode arch=compute_37,code=sm_37 --compile
-NVLINKER_FLAGS 	:= --cudart static --relocatable-device-code=false -gencode arch=compute_37,code=compute_37 -gencode arch=compute_37,code=sm_37 -link
+NVCC_FLAGS	:= -Xcompiler "-fopenmp" -O3 -maxrregcount 64 -gencode arch=compute_62,code=sm_62 -lgomp --compile
+NVLINKER_FLAGS 	:= --cudart static --relocatable-device-code=false -gencode arch=compute_62,code=compute_62 -gencode arch=compute_62,code=sm_62 -link
 
 NVCC_TEST := $(shell which nvcc 2> /dev/null)
 NVCC_AVAILABLE := $(notdir $(NVCC_TEST))
@@ -34,6 +34,8 @@ CRYPTODEV_IS_LOADED := $(shell lsmod | grep cryptodev)
 #CXX=/opt/intel/compilers_and_libraries/linux/bin/intel64/icpc
 endif
 
+#CC=clang-8
+#CXX=clang++-8
 
 MODULES   := serial serial_optimized cryptodev aix cuda
 OBJ_DIR := $(addprefix obj/,$(MODULES))
@@ -80,7 +82,7 @@ $(OBJ_DIR_SERIAL_OPT)/%.o: $(SRC_DIR_SERIAL_OPT)/%.cpp
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
 	
 $(OBJ_DIR_CUDA)/%.o: $(SRC_DIR_CUDA)/%.cu
-	 $(NVCC) $(NVCC_FLAGS) -c $< -o $@
+	$(NVCC) $(NVCC_FLAGS) -c $< -lgomp -o $@
 
 $(OBJ_DIR_CRYPTODEV)/%.o: $(SRC_DIR_CRYPTODEV)/%.c
 	$(CXX) $(CXX_FLAGS) -c $< -o $@
@@ -108,7 +110,7 @@ test_serial_optimized_standalone: checkdirs $(OBJ_FILES_SERIAL_OPT)
 	bin/serial_optimized/compdecomp
 	
 test_cuda_standalone: checkdirs $(OBJ_FILES_CUDA)
-	$(NVCC) $(OBJ_FILES_CUDA) $(NVLINKER_FLAGS) -o bin/cuda/compdecomp   
+	$(NVCC) $(OBJ_FILES_CUDA) $(NVLINKER_FLAGS) -lgomp -o bin/cuda/compdecomp
 	bin/cuda/compdecomp
 
 test_cryptodev: checkdirs $(OBJ_FILES_CRYPTODEV)

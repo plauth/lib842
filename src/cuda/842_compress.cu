@@ -94,10 +94,6 @@ static inline void find_index(struct sw842_param *p) {
         p->templateKeys[6] = (149 * 3) & p->validity[6];
 }
 
-static inline uint16_t max(uint16_t a, uint16_t b) {
-    return (a > b) ? a : b;
-}
-
 static inline uint8_t get_template(struct sw842_param *p) {
         uint16_t template_key = 0;
 

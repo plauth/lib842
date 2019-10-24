@@ -93,7 +93,7 @@
 
 #define BRANCH_FREE (1)
 //#define DEBUG 1
-//#define STRICT
+#define STRICT
 
 /* special templates */
 #define OP_REPEAT	(0x1B)
@@ -212,8 +212,6 @@ struct sw842_param {
  	uint64_t buffer;
  };
 
-// int sw842_compress(const uint8_t *in, unsigned int ilen,
-// 		   uint8_t *out, unsigned int *olen);
  __global__ void cuda842_decompress(uint64_t *in, uint64_t *out);
 
 #endif
