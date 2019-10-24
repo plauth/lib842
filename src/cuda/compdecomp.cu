@@ -37,6 +37,7 @@ int main( int argc, const char* argv[])
 	uint8_t *inH, *compressedH, *decompressedH;
 	uint64_t *compressedD, *decompressedD;
 	#ifdef USE_STREAMS
+	printf("Using streams for overlapping memory transfers and computation.\n");
 	cudaStream_t streams[STREAM_COUNT];
 	for(int i = 0; i < STREAM_COUNT; i++) {
 		cudaStreamCreate(&streams[i]);

@@ -1,7 +1,10 @@
+ifndef CAPABILITY
+CAPABILITY := 37
+endif
 CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
 CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopenmp
-NVCC_FLAGS	:= -Xcompiler "-fopenmp" -O3 -maxrregcount 64 -gencode arch=compute_62,code=sm_62 -lgomp --compile
-NVLINKER_FLAGS 	:= --cudart static --relocatable-device-code=false -gencode arch=compute_62,code=compute_62 -gencode arch=compute_62,code=sm_62 -link
+NVCC_FLAGS	:= -Xcompiler "-fopenmp" -O3 -maxrregcount 64 -gencode arch=compute_$(CAPABILITY),code=sm_$(CAPABILITY) -lgomp --compile
+NVLINKER_FLAGS 	:= --cudart static --relocatable-device-code=false -gencode arch=compute_$(CAPABILITY),code=compute_$(CAPABILITY) -gencode arch=compute_$(CAPABILITY),code=sm_$(CAPABILITY) -link
 
 NVCC_TEST := $(shell which nvcc 2> /dev/null)
 NVCC_AVAILABLE := $(notdir $(NVCC_TEST))
