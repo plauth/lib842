@@ -1,9 +1,15 @@
+XCOMPILER_FLAGS := -fopenmp
 ifndef CAPABILITY
+ifeq ($(shell uname -p),aarch64)
+CAPABILITY := 62
+XCOMPILER_FLAGS += -DUSE_UNIFIED_MEM=1
+else
 CAPABILITY := 37
+endif
 endif
 CC_FLAGS	:= -Wall -fPIC -std=gnu11 -g -O3 -fopenmp
 CXX_FLAGS	:= -Wall -fPIC -std=gnu++11 -g -O3 -fopenmp
-NVCC_FLAGS	:= -Xcompiler "-fopenmp" -O3 -maxrregcount 64 -gencode arch=compute_$(CAPABILITY),code=sm_$(CAPABILITY) -lgomp --compile
+NVCC_FLAGS	:= -Xcompiler "$(XCOMPILER_FLAGS)" -O3 -maxrregcount 64 -gencode arch=compute_$(CAPABILITY),code=sm_$(CAPABILITY) -lgomp --compile
 NVLINKER_FLAGS 	:= --cudart static --relocatable-device-code=false -gencode arch=compute_$(CAPABILITY),code=compute_$(CAPABILITY) -gencode arch=compute_$(CAPABILITY),code=sm_$(CAPABILITY) -link
 
 NVCC_TEST := $(shell which nvcc 2> /dev/null)
@@ -14,8 +20,8 @@ CRYPTODEV_IS_LOADED :=
 
 NVCC=nvcc
 ifeq ($(shell uname),Darwin)
-CC=gcc-7
-CXX=g++-7
+CC=gcc-8
+CXX=gcc++-8
 LDFLAGS_OCL := -framework OpenCL
 else ifeq ($(shell uname),AIX)
 CC=gcc

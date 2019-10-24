@@ -9,7 +9,11 @@
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32
 #define STREAM_COUNT 3
+#ifdef USE_UNIFIED_MEM
+#define CHUNKS_PER_THREAD 32
+#else
 #define CHUNKS_PER_THREAD 1024
+#endif
 
 #define CHECK_ERROR( err ) \
   if( err != cudaSuccess ) { \
@@ -34,8 +38,12 @@ int main( int argc, const char* argv[])
 	#ifdef STRICT
 	printf("Running in strict mode (i.e. fully compatible to the hardware-based nx842 unit).\n");
 	#endif
-	uint8_t *inH, *compressedH, *decompressedH;
+	uint8_t *in, *compressed, *decompressed;
+	#ifndef USE_UNIFIED_MEM
 	uint64_t *compressedD, *decompressedD;
+	#else
+	printf("Using unified memory model.\n");
+	#endif
 	#ifdef USE_STREAMS
 		printf("Using streams for overlapping memory transfers and computation.\n");
 		cudaStream_t streams[STREAM_COUNT];
@@ -59,20 +67,28 @@ int main( int argc, const char* argv[])
 		ilen = STRLEN;
 		olen = ilen * 2;
 		dlen = ilen;
-		cudaHostAlloc((void**) &inH, ilen, cudaHostAllocPortable);
-		cudaHostAlloc((void**) &compressedH, olen, cudaHostAllocPortable);
-		cudaHostAlloc((void**) &decompressedH, dlen, cudaHostAllocPortable);
-		memset(inH, 0, ilen);
-		memset(compressedH, 0, olen);
-		memset(decompressedH, 0, dlen);
+		#ifdef USE_UNIFIED_MEM
+		cudaMallocManaged(&in, ilen);
+		cudaMallocManaged(&compressed, olen);
+		cudaMallocManaged(&decompressed, dlen);
+		#else
+		cudaHostAlloc((void**) &in, ilen, cudaHostAllocPortable);
+		cudaHostAlloc((void**) &compressed, olen, cudaHostAllocPortable);
+		cudaHostAlloc((void**) &decompressed, dlen, cudaHostAllocPortable);
 
 		cudaMalloc((void**) &compressedD, olen);
 		cudaMalloc((void**) &decompressedD, dlen);
 		cudaMemset(compressedD, 0, olen);
 		cudaMemset(decompressedD, 0, dlen);
+		#endif
+
+		memset(in, 0, ilen);
+		memset(compressed, 0, olen);
+		memset(decompressed, 0, dlen);
 
 		uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
-		strncpy((char *) inH, (const char *) tmp, STRLEN);
+		
+		strncpy((char *) in, (const char *) tmp, STRLEN);
 
 	} else if (argc == 2) {
 		FILE *fp;
@@ -87,20 +103,26 @@ int main( int argc, const char* argv[])
 		dlen = ilen;
 		fseek(fp, 0, SEEK_SET);
 
-		cudaHostAlloc((void**) &inH, ilen, cudaHostAllocPortable);
-		cudaHostAlloc((void**) &compressedH, olen, cudaHostAllocPortable);
-		cudaHostAlloc((void**) &decompressedH, dlen, cudaHostAllocPortable);
-		memset(inH, 0, ilen);
-		memset(compressedH, 0, olen);
-		memset(decompressedH, 0, dlen);
+		#ifdef USE_UNIFIED_MEM
+        cudaMallocManaged(&in, ilen);
+        cudaMallocManaged(&compressed, olen);
+        cudaMallocManaged(&decompressed, dlen);
+        #else
+		cudaHostAlloc((void**) &in, ilen, cudaHostAllocPortable);
+		cudaHostAlloc((void**) &compressed, olen, cudaHostAllocPortable);
+		cudaHostAlloc((void**) &decompressed, dlen, cudaHostAllocPortable);
 
 		cudaMalloc((void**) &compressedD, olen);
 		cudaMalloc((void**) &decompressedD, dlen);
 		cudaMemset(compressedD, 0, olen);
 		cudaMemset(decompressedD, 0, dlen);
+		#endif
 
+		memset(in, 0, ilen);
+		memset(compressed, 0, olen);
+		memset(decompressed, 0, dlen);
 
-		if(!fread(inH, flen, 1, fp)) {
+		if(!fread(in, flen, 1, fp)) {
 			fprintf(stderr, "FAIL: Reading file content to memory failed.\n");
 		}
 		fclose(fp);
@@ -118,8 +140,8 @@ int main( int argc, const char* argv[])
 		for(uint32_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			
 			size_t chunk_olen = CHUNK_SIZE * 2;
-			uint8_t* chunk_in = inH + (CHUNK_SIZE * chunk_num);
-			uint8_t* chunk_out = compressedH + ((CHUNK_SIZE * 2) * chunk_num);
+			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
+			uint8_t* chunk_out = compressed + ((CHUNK_SIZE * 2) * chunk_num);
 			
 			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
 			compressedChunkSizes[chunk_num] = chunk_olen;
@@ -129,7 +151,7 @@ int main( int argc, const char* argv[])
 		printf("Threads per Block: %d\n", THREADS_PER_BLOCK );
 
 
-		#ifdef USE_STREAMS
+		#if defined USE_STREAMS
 			const int chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
 			int stream_counter = 0;
 			timestart_decomp = timestamp();
@@ -143,8 +165,18 @@ int main( int argc, const char* argv[])
 			cuda_error = cudaGetLastError();
 			CHECK_ERROR(cuda_error);
 			timeend_decomp = timestamp();
+		#elif defined USE_UNIFIED_MEM
+ 			const int chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
+			timestart_decomp = timestamp();
+			for(int i = 0; i < num_chunks; i += chunks_per_kernel) {
+				cuda842_decompress<<<chunks_per_kernel / THREADS_PER_BLOCK, THREADS_PER_BLOCK, 0>>>(((uint64_t *)compressed) + (i * (CHUNK_SIZE/8) * 2), ((uint64_t*) decompressed) + (i * (CHUNK_SIZE/8)));
+			}
+			cudaDeviceSynchronize();
+			cuda_error = cudaGetLastError();
+			CHECK_ERROR(cuda_error);
+			timeend_decomp = timestamp();
 		#else
-			cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
+			cuda_error = cudaMemcpy(compressedD, compressed, olen, cudaMemcpyHostToDevice);
 			cudaDeviceSynchronize();
 			CHECK_ERROR(cuda_error);
 
@@ -155,7 +187,7 @@ int main( int argc, const char* argv[])
 			CHECK_ERROR(cuda_error);
 	        timeend_decomp = timestamp();
 			
-			cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
+			cuda_error = cudaMemcpy(decompressed, decompressedD, dlen, cudaMemcpyDeviceToHost);
 			cudaDeviceSynchronize();
 	        CHECK_ERROR(cuda_error);
 		#endif
@@ -168,29 +200,43 @@ int main( int argc, const char* argv[])
 
 
 	} else {
-
-		sw842_compress(inH, ilen, compressedH, &olen);
-		cuda_error = cudaMemcpy(compressedD, compressedH, olen, cudaMemcpyHostToDevice);
-		cudaDeviceSynchronize();
-        	CHECK_ERROR(cuda_error);
-        	cuda842_decompress<<<1,1>>>(compressedD, decompressedD);
-		cuda_error = cudaMemcpy(decompressedH, decompressedD, dlen, cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize();
-        	CHECK_ERROR(cuda_error);
+		
+		sw842_compress(in, ilen, compressed, &olen);
+		#ifdef USE_UNIFIED_MEM
+			cuda842_decompress<<<1,1>>>((uint64_t*)compressed, (uint64_t*)decompressed);
+			cudaDeviceSynchronize();
+			cuda_error = cudaGetLastError();
+			CHECK_ERROR(cuda_error);
+		#else
+			cuda_error = cudaMemcpy(compressedD, compressed, olen, cudaMemcpyHostToDevice);
+			cudaDeviceSynchronize();
+			CHECK_ERROR(cuda_error);
+			cuda842_decompress<<<1,1>>>(compressedD, decompressedD);
+			cuda_error = cudaMemcpy(decompressed, decompressedD, dlen, cudaMemcpyDeviceToHost);
+			cudaDeviceSynchronize();
+			CHECK_ERROR(cuda_error);
+        #endif
 
 	}
 	
-	if (memcmp(inH, decompressedH, ilen) == 0) {
+	if (memcmp(in, decompressed, ilen) == 0) {
 		printf("Compression- and decompression was successful!\n");
 	} else {
 		fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
 	}
-	cudaFreeHost(inH);
-	cudaFreeHost(compressedH);
-	cudaFreeHost(decompressedH);
+
+	#ifdef USE_UNIFIED_MEM
+	cudaFree(in);
+	cudaFree(compressed);
+	cudaFree(decompressed);
+	#else
+	cudaFreeHost(in);
+	cudaFreeHost(compressed);
+	cudaFreeHost(decompressed);
 
 	cudaFree(compressedD);
 	cudaFree(decompressedD);
+	#endif
 	#ifdef USE_STREAMS
 	for(int i = 1; i < STREAM_COUNT; i++) {
 		cudaStreamDestroy(streams[i]);
