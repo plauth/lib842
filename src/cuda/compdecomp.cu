@@ -175,6 +175,13 @@ int main( int argc, const char* argv[])
 			cuda_error = cudaGetLastError();
 			CHECK_ERROR(cuda_error);
 			timeend_decomp = timestamp();
+		#elif defined USE_UNIFIED_MEM_SINGLE
+			timestart_decomp = timestamp();
+			cuda842_decompress<<<num_chunks / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(compressed, decompressed);
+			cudaDeviceSynchronize();
+			cuda_error = cudaGetLastError();
+			CHECK_ERROR(cuda_error);
+	        timeend_decomp = timestamp();
 		#else
 			cuda_error = cudaMemcpy(compressedD, compressed, olen, cudaMemcpyHostToDevice);
 			cudaDeviceSynchronize();
