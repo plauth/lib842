@@ -18,6 +18,11 @@
 #include "842-internal.h"
 #include "../common/opcodes.h"
 
+/* If defined, avoid (ab)using undefined behaviour (as defined by the standard),
+ * which nevertheless works on our target platforms and provides better performance.
+ * This option is also useful to avoid warnings for debugging (e.g. valgrind). */
+#define ONLY_WELL_DEFINED_BEHAVIOUR
+
 #define PRIME64     (11400714785074694791ULL)
 
 #define NO_ENTRY        (-1)
@@ -61,6 +66,16 @@ static inline void find_index(struct sw842_param *p) {
         isIndexValid[5] = (index[5] >= 0) ? 0xFFFF : 0x0000;
         isIndexValid[6] = (index[6] >= 0) ? 0xFFFF : 0x0000;
 
+        #ifdef ONLY_WELL_DEFINED_BEHAVIOUR
+        isDataValid[0] = (index[0] >= 0 && p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
+        isDataValid[1] = (index[1] >= 0 && p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
+        isDataValid[2] = (index[2] >= 0 && p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
+        isDataValid[3] = (index[3] >= 0 && p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ? 0xFFFF : 0x0000;
+        isDataValid[4] = (index[4] >= 0 && p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
+        isDataValid[5] = (index[5] >= 0 && p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
+        isDataValid[6] = (index[6] >= 0 && p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
+        #else
+        // Causes (generally inocuous) out-of-bounds access when index[i] is negative
         isDataValid[0] = (p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
         isDataValid[1] = (p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
         isDataValid[2] = (p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
@@ -68,6 +83,7 @@ static inline void find_index(struct sw842_param *p) {
         isDataValid[4] = (p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
         isDataValid[5] = (p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
         isDataValid[6] = (p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
+        #endif
 
         p->validity[0] = isIndexValid[0] & isDataValid[0];
         p->validity[1] = isIndexValid[1] & isDataValid[1];
@@ -499,6 +515,12 @@ int sw842_compress(const uint8_t *in, size_t ilen,
 		   uint8_t *out, size_t *olen)
 {
 	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param)); 
+
+	#ifdef ONLY_WELL_DEFINED_BEHAVIOUR
+	// TODOXXX: It appears that actually this memset should ALWAYS be done,
+	//          because if one executes memset(..., 55, ...), the program crashes!
+	memset(&p->hashes, 0, sizeof(p->hashes));
+	#endif
 
 	uint64_t last, next;
 	uint8_t repeat_count = 0;

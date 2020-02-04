@@ -177,7 +177,6 @@ struct sw842_param {
 	uint8_t *in;
 	const uint8_t *instart;
 	uint64_t ilen;
-	uint8_t *out;
 	uint64_t olen;
 
 	// 0-6: data; 7-13: indices; 14: 0

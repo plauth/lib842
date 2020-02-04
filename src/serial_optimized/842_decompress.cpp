@@ -19,6 +19,11 @@
 #include "842-internal.h"
 #include "inttypes.h"
 
+/* If defined, avoid (ab)using undefined behaviour (as defined by the standard),
+ * which nevertheless works on our target platforms and provides better performance.
+ * This option is also useful to avoid warnings for debugging (e.g. valgrind). */
+#define ONLY_WELL_DEFINED_BEHAVIOUR
+
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE	(2 * (1 << I2_BITS))
 #define I4_FIFO_SIZE	(4 * (1 << I4_BITS))
@@ -98,7 +103,12 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
     /* fetch WSIZE bits  */
     p->buffer = read_word(p);
     value |= p->buffer >> (WSIZE - (n - p->bits));
+    #ifdef ONLY_WELL_DEFINED_BEHAVIOUR
+    // Avoid shift by 64 (only shifts of strictly less bits bits are allowed by the standard)
+    p->buffer = (n - p->bits) < 64 ? (p->buffer << (n - p->bits)) : 0;
+    #else
     p->buffer <<= n - p->bits;
+    #endif
     p->bits += WSIZE - n;
     p->buffer *= (p->bits > 0);
   }  else {

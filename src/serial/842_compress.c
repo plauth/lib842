@@ -33,6 +33,11 @@
  */
 #define SW842_STRICT 1
 
+/* If defined, avoid (ab)using undefined behaviour (as defined by the standard),
+ * which nevertheless works on our target platforms and provides better performance.
+ * This option is also useful to avoid warnings for debugging (e.g. valgrind). */
+#define ONLY_WELL_DEFINED_BEHAVIOUR
+
 static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 	{ I8, N0, N0, N0, 0x19 }, /* 8 */
 	{ I4, I4, N0, N0, 0x18 }, /* 18 */
@@ -459,6 +464,12 @@ int sw842_compress(const uint8_t *in, size_t ilen,
 	p->htable2 = NULL;
 	p->htable4 = NULL;
 	p->htable8 = NULL;
+	#ifdef ONLY_WELL_DEFINED_BEHAVIOUR
+	// Zero-initialize p->nodeX to avoid using uninitialized values in replace_hash
+	memset(p->node2, 0, sizeof(p->node2));
+	memset(p->node4, 0, sizeof(p->node4));
+	memset(p->node8, 0, sizeof(p->node8));
+	#endif
 
 	p->in = (uint8_t *)in;
 	p->instart = p->in;
