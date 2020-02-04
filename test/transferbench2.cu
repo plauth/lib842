@@ -9,8 +9,8 @@
 #include "sw842.h"
 #endif
 
-#define CHUNK_SIZE 32768
-//#define CHUNK_SIZE 4096
+#define CHUNK_SIZE ((size_t)32768)
+//#define CHUNK_SIZE ((size_t)4096)
 
 #define ERRORCHECK() cErrorCheck(__FILE__, __LINE__)
 
@@ -20,7 +20,7 @@
     exit( -1 ); \
   }
 
-int nextMultipleOfChunkSize(unsigned int input) {
+size_t nextMultipleOfChunkSize(size_t input) {
 	return (input + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
 }
 
@@ -46,7 +46,7 @@ int main( int argc, const char* argv[])
 	uint8_t *cuda_uncompressed, *cuda_compressed;
 	uint8_t *in, *out, *decompressed;
 	in = out = decompressed = NULL;
-	unsigned int ilen, olen, dlen;
+	size_t ilen, olen, dlen;
 	ilen = olen = dlen = 0;
 
 	if(argc <= 1) {
@@ -67,13 +67,13 @@ int main( int argc, const char* argv[])
 		memset(out, 0, olen);
 		memset(decompressed, 0, dlen);
 
-		strncpy((char *) in, (const char *) tmp, 32);
+		memcpy(in, tmp, 32);
 
 	} else if (argc == 2) {
 		FILE *fp;
 		fp=fopen(argv[1], "r");
 		fseek(fp, 0, SEEK_END);
-		unsigned int flen = ftell(fp);
+		size_t flen = (size_t)ftell(fp);
 		ilen = flen;
 		printf("original file length: %d\n", ilen);
 		ilen = nextMultipleOfChunkSize(ilen);
@@ -101,16 +101,16 @@ int main( int argc, const char* argv[])
 	}
 
 	if(ilen > CHUNK_SIZE) {
-		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
+		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
 	
-		int num_chunks = ilen / CHUNK_SIZE;
-		uint64_t *compressedChunkPositions = (uint64_t*) malloc(sizeof(uint64_t) * num_chunks);
-		uint32_t *compressedChunkSizes = (uint32_t*) malloc(sizeof(uint32_t) * num_chunks);
+		size_t num_chunks = ilen / CHUNK_SIZE;
+		size_t *compressedChunkPositions = (size_t*) malloc(sizeof(size_t) * num_chunks);
+		size_t *compressedChunkSizes = (size_t*) malloc(sizeof(size_t) * num_chunks);
 
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			
-			unsigned int chunk_olen = CHUNK_SIZE * 2;
+			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 			
@@ -126,8 +126,8 @@ int main( int argc, const char* argv[])
         CHECK_ERROR(cuda_error);
         ERRORCHECK();
 		
-		uint64_t currentChunkPos = 0;
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		size_t currentChunkPos = 0;
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			compressedChunkPositions[chunk_num] = currentChunkPos;
 			currentChunkPos += compressedChunkSizes[chunk_num];
 		}
@@ -135,7 +135,7 @@ int main( int argc, const char* argv[])
 		uint8_t *out_condensed = (uint8_t *) malloc(currentChunkPos);
 
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			uint8_t * chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 			uint8_t * chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
 			memcpy(chunk_condensed, chunk_out, compressedChunkSizes[chunk_num]);
@@ -144,8 +144,8 @@ int main( int argc, const char* argv[])
 		cudaMalloc((void**) &cuda_compressed, ilen);
 
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			unsigned int chunk_dlen = CHUNK_SIZE;
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+			size_t chunk_dlen = CHUNK_SIZE;
 
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
@@ -169,8 +169,8 @@ int main( int argc, const char* argv[])
 		cudaFree(cuda_uncompressed);
 		cudaFree(cuda_compressed);
 
-		printf("Input: %d bytes\n", ilen);
-		printf("Output: %lld bytes\n", currentChunkPos);
+		printf("Input: %zu bytes\n", ilen);
+		printf("Output: %zu bytes\n", currentChunkPos);
 		printf("Compression factor: %f\n", (float) currentChunkPos / (float) ilen);
 		printf("Transfer time to GPU (uncompressed): %f ms\n", timer_uncompressed);
 		printf("Transfer time to GPU (compressed): %f ms\n", timer_compressed);
@@ -190,8 +190,8 @@ int main( int argc, const char* argv[])
 		sw842_decompress(out, olen, decompressed, &dlen);
 		#endif
 
-		printf("Input: %d bytes\n", ilen);
-		printf("Output: %d bytes\n", olen);
+		printf("Input: %zu bytes\n", ilen);
+		printf("Output: %zu bytes\n", olen);
 		printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
 		/*

@@ -9,8 +9,8 @@
 #include "sw842.h"
 #endif
 
-//#define CHUNK_SIZE 32768
-#define CHUNK_SIZE 1024
+//#define CHUNK_SIZE ((size_t)32768)
+#define CHUNK_SIZE ((size_t)1024)
 #define STRLEN 32
 
 
@@ -21,7 +21,7 @@ long long timestamp() {
 	return ms;
 }
 
-int nextMultipleOfChunkSize(unsigned int input) {
+size_t nextMultipleOfChunkSize(size_t input) {
 	return (input + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
 } 
 
@@ -55,16 +55,16 @@ int main( int argc, const char* argv[])
 		memset(out, 0, olen);
 		memset(decompressed, 0, dlen);
 
-		strncpy((char *) in, (const char *) tmp, STRLEN);
+		memcpy(in, tmp, STRLEN);
 
 	} else if (argc == 2) {
 		FILE *fp;
 		fp=fopen(argv[1], "r");
 		fseek(fp, 0, SEEK_END);
-		size_t flen = ftell(fp);
-		printf("original file length: %ld\n", flen);
+		size_t flen = (size_t)ftell(fp);
+		printf("original file length: %zu\n", flen);
 		ilen = nextMultipleOfChunkSize(flen);
-		printf("original file length (padded): %ld\n", ilen);
+		printf("original file length (padded): %zu\n", ilen);
 		olen = ilen * 2;
 		#ifdef USEHW
 		dlen = ilen * 2;
@@ -87,10 +87,10 @@ int main( int argc, const char* argv[])
 	}
 
 	if(ilen > CHUNK_SIZE) {
-		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
+		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
 	
 		size_t num_chunks = ilen / CHUNK_SIZE;
-		uint64_t *compressedChunkPositions = (uint64_t*) malloc(sizeof(uint64_t) * num_chunks);
+		size_t *compressedChunkPositions = (size_t*) malloc(sizeof(size_t) * num_chunks);
 		size_t *compressedChunkSizes = (size_t*) malloc(sizeof(size_t) * num_chunks);
 
 		timestart_comp = timestamp();
@@ -112,7 +112,7 @@ int main( int argc, const char* argv[])
 		
 		timestart_condense = timeend_comp;
 
-		uint64_t currentChunkPos = 0;
+		size_t currentChunkPos = 0;
 		
 		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			compressedChunkPositions[chunk_num] = currentChunkPos;
@@ -156,8 +156,8 @@ int main( int argc, const char* argv[])
 		free(compressedChunkPositions);
 		free(compressedChunkSizes);
 
-		printf("Input: %ld bytes\n", ilen);
-		printf("Output: %lld bytes\n", currentChunkPos);
+		printf("Input: %zu bytes\n", ilen);
+		printf("Output: %zu bytes\n", currentChunkPos);
 		printf("Compression factor: %f\n", (float) currentChunkPos / (float) ilen);
 		printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
 		printf("Condensation performance: %lld ms / %f MiB/s\n", timeend_condense - timestart_condense, (currentChunkPos / 1024 / 1024) / ((float) (timeend_condense - timestart_condense) / 1000));
@@ -178,8 +178,8 @@ int main( int argc, const char* argv[])
 		sw842_decompress(out, olen, decompressed, &dlen);
 		#endif
 
-		printf("Input: %ld bytes\n", ilen);
-		printf("Output: %ld bytes\n", olen);
+		printf("Input: %zu bytes\n", ilen);
+		printf("Output: %zu bytes\n", olen);
 		printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
 		

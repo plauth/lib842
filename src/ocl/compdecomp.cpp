@@ -27,14 +27,14 @@ int main(int argc, char *argv[]) {
         if(!is)
             exit(-1);
         is.seekg (0, is.end);
-        flen = is.tellg();
+        flen = (size_t)is.tellg();
         is.seekg (0, is.beg);
         is.close();
         
         ilen = CL842Decompress::paddedSize(flen);
         
-        printf("original file length: %ld\n", flen);
-        printf("original file length (padded): %ld\n", ilen);
+        printf("original file length: %zu\n", flen);
+        printf("original file length (padded): %zu\n", ilen);
     }
 
     olen = ilen * 2;
@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
 
     if(argc <= 1) {
         uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
-        strncpy((char *) compressIn, (const char *) tmp, STRLEN);
+        memcpy(compressIn, tmp, STRLEN);
     }  else if (argc == 2) {
         num_chunks = ilen / CHUNK_SIZE;
 
@@ -65,9 +65,9 @@ int main(int argc, char *argv[]) {
     }
 
     if(num_chunks > 1) {
-        printf("Using %ld chunks of %d bytes\n", num_chunks, CHUNK_SIZE);
+        printf("Using %zu chunks of %d bytes\n", num_chunks, CHUNK_SIZE);
     
-        for(uint32_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
+        for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
             size_t chunk_olen = CHUNK_SIZE * 2;
             uint8_t* chunk_in = ((uint8_t*) compressIn) + (CHUNK_SIZE * chunk_num);
             uint8_t* chunk_out = compressOut + ((CHUNK_SIZE * 2) * chunk_num);
@@ -93,19 +93,19 @@ int main(int argc, char *argv[]) {
     } else {
 
         /*
-        for (uint32_t i = 0; i < ilen; i++) {
+        for (size_t i = 0; i < ilen; i++) {
             printf("%02x:", compressIn[i]);
         }
 
         printf("\n\n");
 
-        for (uint32_t i = 0; i < olen; i++) {
+        for (size_t i = 0; i < olen; i++) {
             printf("%02x:", compressOut[i]);
         }
 
         printf("\n\n");
 
-        for (uint32_t i = 0; i < dlen; i++) {
+        for (size_t i = 0; i < dlen; i++) {
             printf("%02x:", decompressOut[i]);
         }
         */

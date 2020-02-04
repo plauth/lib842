@@ -406,7 +406,7 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 				write64(p.out, swap_native_to_be64(output_word));
 				p.out += 8;
 			#else
-				fprintf(stderr, "Invalid op template: %llx\n", op);
+				fprintf(stderr, "Invalid op template: %" PRIx64 "\n", op);
 	        	return -EINVAL;
 			#endif
 	    }

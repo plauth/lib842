@@ -6,8 +6,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <inttypes.h>
 
-static uint64_t nextMultipleOfEight(uint64_t input) {
+static size_t nextMultipleOfEight(size_t input) {
         return (input + 7) & ~7;
 } 
 
@@ -21,9 +22,9 @@ int main(int argc, char **argv) {
 			FILE *fp;
 			fp=fopen(argv[i_args], "r");
 			fseek(fp, 0, SEEK_END);
-			unsigned int flen = ftell(fp);
+			size_t flen = (size_t)ftell(fp);
 			fseek(fp, 0, SEEK_SET);
-			unsigned int blen = nextMultipleOfEight(flen);
+			size_t blen = nextMultipleOfEight(flen);
 			printf("Computing all hash values for file '%s' (padded length: %d)\n", argv[i_args], blen);
 			uint8_t *buffer = (uint8_t *) malloc(blen);
 			memset(buffer, 0, blen);
@@ -84,9 +85,9 @@ int main(int argc, char **argv) {
                         }
 
                         #ifdef DEBUG
-                        printf("Collisions for 2 byte values: %llu (%f%%)\n", collisions16, ((float) collisions16 / (float) (blen >> 1) * 100));
-                        printf("Collisions for 4 byte values: %llu (%f%%)\n", collisions32, ((float) collisions32 / (float) (blen >> 2) * 100));
-                        printf("Collisions for 8 byte values: %llu (%f%%)\n", collisions64, ((float) collisions64 / (float) (blen >> 3) * 100));
+                        printf("Collisions for 2 byte values: %" PRIu64 " (%f%%)\n", collisions16, ((float) collisions16 / (float) (blen >> 1) * 100));
+                        printf("Collisions for 4 byte values: %" PRIu64 " (%f%%)\n", collisions32, ((float) collisions32 / (float) (blen >> 2) * 100));
+                        printf("Collisions for 8 byte values: %" PRIu64 " (%f%%)\n", collisions64, ((float) collisions64 / (float) (blen >> 3) * 100));
 			printf("\n\n");
                         #endif
 

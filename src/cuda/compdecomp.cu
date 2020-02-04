@@ -28,8 +28,8 @@ long long timestamp() {
 	return ms;
 }
 
-int nextMultipleOfChunkSize(unsigned int input) {
-	unsigned int size = CHUNK_SIZE * CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
+size_t nextMultipleOfChunkSize(size_t input) {
+	size_t size = CHUNK_SIZE * CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
 	return (input + (size-1)) & ~(size-1);
 } 
 
@@ -88,17 +88,17 @@ int main( int argc, const char* argv[])
 
 		uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
 		
-		strncpy((char *) in, (const char *) tmp, STRLEN);
+		memcpy(in, tmp, STRLEN);
 
 	} else if (argc == 2) {
 		FILE *fp;
 		fp=fopen(argv[1], "r");
 		fseek(fp, 0, SEEK_END);
-		unsigned int flen = ftell(fp);
+		size_t flen = (size_t)ftell(fp);
 		ilen = flen;
-		printf("original file length: %ld\n", ilen);
+		printf("original file length: %zu\n", ilen);
 		ilen = nextMultipleOfChunkSize(ilen);
-		printf("original file length (padded): %ld\n", ilen);
+		printf("original file length (padded): %zu\n", ilen);
 		olen = ilen * 2;
 		dlen = ilen;
 		fseek(fp, 0, SEEK_SET);
@@ -131,13 +131,13 @@ int main( int argc, const char* argv[])
 	if(ilen > CHUNK_SIZE) {
 		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
 
-		uint32_t num_chunks = ilen / CHUNK_SIZE;
-		uint64_t *compressedChunkPositions = (uint64_t*) malloc(sizeof(uint64_t) * num_chunks);
-		uint32_t *compressedChunkSizes = (uint32_t*) malloc(sizeof(uint32_t) * num_chunks);
+		size_t num_chunks = ilen / CHUNK_SIZE;
+		size_t *compressedChunkPositions = (size_t*) malloc(sizeof(size_t) * num_chunks);
+		size_t *compressedChunkSizes = (size_t*) malloc(sizeof(size_t) * num_chunks);
 	
 		timestart_comp = timestamp();
 		#pragma omp parallel for
-		for(uint32_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			
 			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
@@ -152,10 +152,10 @@ int main( int argc, const char* argv[])
 
 
 		#if defined USE_STREAMS
-			const int chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
+			const size_t chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
 			int stream_counter = 0;
 			timestart_decomp = timestamp();
-			for(int i = 0; i < num_chunks; i += chunks_per_kernel) {
+			for(size_t i = 0; i < num_chunks; i += chunks_per_kernel) {
 				cudaMemcpyAsync(compressedD + ((i * CHUNK_SIZE * 2)/8), compressedH + (i * CHUNK_SIZE * 2), chunks_per_kernel * CHUNK_SIZE * 2, cudaMemcpyHostToDevice, streams[stream_counter%STREAM_COUNT]);
 				cuda842_decompress<<<chunks_per_kernel / THREADS_PER_BLOCK, THREADS_PER_BLOCK, 0, streams[stream_counter%STREAM_COUNT]>>>(compressedD + (i * (CHUNK_SIZE/8) * 2), decompressedD + (i * (CHUNK_SIZE/8)));
 				cudaMemcpyAsync(decompressedH + (i * CHUNK_SIZE), decompressedD + (i * (CHUNK_SIZE/8)), chunks_per_kernel * CHUNK_SIZE, cudaMemcpyDeviceToHost, streams[stream_counter%STREAM_COUNT]);
@@ -166,9 +166,9 @@ int main( int argc, const char* argv[])
 			CHECK_ERROR(cuda_error);
 			timeend_decomp = timestamp();
 		#elif defined USE_UNIFIED_MEM
- 			const int chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
+ 			const size_t chunks_per_kernel = CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
 			timestart_decomp = timestamp();
-			for(int i = 0; i < num_chunks; i += chunks_per_kernel) {
+			for(size_t i = 0; i < num_chunks; i += chunks_per_kernel) {
 				cuda842_decompress<<<chunks_per_kernel / THREADS_PER_BLOCK, THREADS_PER_BLOCK, 0>>>(((uint64_t *)compressed) + (i * (CHUNK_SIZE/8) * 2), ((uint64_t*) decompressed) + (i * (CHUNK_SIZE/8)));
 			}
 			cudaDeviceSynchronize();

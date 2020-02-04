@@ -526,7 +526,7 @@ int sw842_compress(const uint8_t *in, size_t ilen,
 	*olen = 0;
 	/* if using strict mode, we can only compress a multiple of 8 */
 	if (ilen % 8) {
-		fprintf(stderr, "Can only compress multiples of 8 bytes, but len is len %ld (%% 8 = %ld)\n", ilen, ilen % 8);
+		fprintf(stderr, "Can only compress multiples of 8 bytes, but len is len %zu (%% 8 = %zu)\n", ilen, ilen % 8);
 		return -EINVAL;
 	}
 

@@ -6,9 +6,9 @@
 #include <sys/types.h>
 #include <sys/vminfo.h> 
 
-#define CHUNK_SIZE 262144 //32768
-//#define CHUNK_SIZE 524288 //65536
-//#define CHUNK_SIZE 4096
+#define CHUNK_SIZE ((size_t)262144) //32768
+//#define CHUNK_SIZE ((size_t)524288) //65536
+//#define CHUNK_SIZE ((size_t)4096)
 #define ALIGNMENT 4096
 
 
@@ -19,7 +19,7 @@ long long timestamp() {
 	return ms;
 }
 
-int nextMultipleOfChunkSize(unsigned int input) {
+size_t nextMultipleOfChunkSize(size_t input) {
 	return (input + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
 } 
 
@@ -63,13 +63,13 @@ int main( int argc, const char* argv[])
 		memset(out, 0, olen);
 		memset(decompressed, 0, dlen);
 
-		strncpy((char *) in, (const char *) tmp, 32);
+		memcpy(in, tmp, 32);
 
 	} else if (argc == 2) {
 		FILE *fp;
 		fp=fopen(argv[1], "r");
 		fseek(fp, 0, SEEK_END);
-		unsigned int flen = ftell(fp);
+		size_t flen = (size_t)ftell(fp);
 		ilen = flen;
 		#ifndef BENCHMARK
 		printf("original file length: %d\n", ilen);
@@ -109,7 +109,7 @@ int main( int argc, const char* argv[])
 
 	if(ilen > CHUNK_SIZE) {
 		#ifndef BENCHMARK
-		printf("Using chunks of %d bytes\n", CHUNK_SIZE);
+		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
 		#endif
 		size_t acc_olen = 0;
 		ret = 0;
@@ -119,7 +119,7 @@ int main( int argc, const char* argv[])
 
 		timestart_comp = timestamp();
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
@@ -135,14 +135,14 @@ int main( int argc, const char* argv[])
 		timeend_comp = timestamp();
 		
 		size_t currentChunkPos = 0;
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			currentChunkPos += compressedChunkSizes[chunk_num];
 		}	
-		int chunk_olen = CHUNK_SIZE * 2;
+		size_t chunk_olen = CHUNK_SIZE * 2;
 		
 		timestart_decomp = timestamp();
 		#pragma omp parallel for
-		for(int chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
+		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			size_t chunk_dlen = CHUNK_SIZE;
 
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
@@ -163,8 +163,8 @@ int main( int argc, const char* argv[])
 		#ifdef BENCHMARK
 		printf("%.4f,%.4f\n", (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000), (ilen / 1024 / 1024) / ((float) (timeend_decomp - timestart_decomp) / 1000));
 		#else
-		printf("Input: %d bytes\n", ilen);
-		printf("Output: %d bytes\n", currentChunkPos);
+		printf("Input: %zu bytes\n", ilen);
+		printf("Output: %zu bytes\n", currentChunkPos);
 		printf("Compression factor: %f\n", (float) currentChunkPos / (float) ilen);
 		printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
 		printf("Decompression performance: %lld ms / %f MiB/s\n", timeend_decomp - timestart_decomp, (ilen / 1024 / 1024) / ((float) (timeend_decomp - timestart_decomp) / 1000));
@@ -182,18 +182,18 @@ int main( int argc, const char* argv[])
 	            printf( "Error calling 'accel_decompress' (%d): %s\n", errno, strerror( errno ) );
 		}	
 
-		printf("Input: %d bytes\n", ilen);
-		printf("Output: %d bytes\n", olen);
+		printf("Input: %zu bytes\n", ilen);
+		printf("Output: %zu bytes\n", olen);
 		printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
 		/*	
-		for (int i = 0; i < ilen; i++) {
+		for (size_t i = 0; i < ilen; i++) {
 			printf("%02x:", in[i]);
 		}
 
 		printf("\n\n");
 
-		for (int i = 0; i < olen; i++) {
+		for (size_t i = 0; i < olen; i++) {
 			printf("%02x:", out[i]);
 		}
 
