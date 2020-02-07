@@ -212,8 +212,9 @@ int main( int argc, const char* argv[])
 			cudaDeviceSynchronize();
 			CHECK_ERROR(cuda_error);
 			cuda842_decompress<<<1,1>>>(compressedD, decompressedD);
-			cuda_error = cudaMemcpy(decompressed, decompressedD, dlen, cudaMemcpyDeviceToHost);
+			cudaMemcpy(decompressed, decompressedD, dlen, cudaMemcpyDeviceToHost);
 			cudaDeviceSynchronize();
+			cuda_error = cudaGetLastError();
 			CHECK_ERROR(cuda_error);
         #endif
 
