@@ -39,9 +39,9 @@ static void output_table(int rows, int len, char *trans)
 		for (i = 0; i < len - 1; i++) {
 			if (i % 4 == 0)
 				printf("\n");
-			printf("%s(0x%8.8xL), ", trans, swap_endianness32(crc32table_be[j][i]));
+			printf("%s(0x%8.8xL), ", trans, crc32table_be[j][i]);
 		}
-		printf("%s(0x%8.8xL)},\n", trans, swap_endianness32(crc32table_be[j][len - 1]));
+		printf("%s(0x%8.8xL)},\n", trans, crc32table_be[j][len - 1]);
 	}
 }
 
@@ -50,11 +50,19 @@ int main(int argc, char** argv)
 	printf("/* this file is generated - do not edit */\n");
 	printf("#include <stdint.h>\n\n");
 
+	printf("#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__\n");
+	printf("#define tobe(x) (((x & 0x000000FF) << 24) | ((x & 0x0000FF00) <<  8) |\\\n");
+	printf("                 ((x & 0x00FF0000) >>  8) | ((x & 0xFF000000) >> 24))\n");
+	printf("#else\n");
+	printf("#define tobe(x) x\n");
+	printf("#endif\n");
 
 	crc32init_be();
 	printf("static const uint32_t crc32table_be[%d][%d] = {", 8, 256);
-	output_table(8, 256, "");
-		printf("};\n");
+	output_table(8, 256, "tobe");
+	printf("};\n");
+
+	printf("#undef tobe\n");
 
 	return 0;
 }

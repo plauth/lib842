@@ -427,7 +427,7 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 	 * next bit after End of stream template.
 	 */
 	#ifndef DISABLE_CRC
-	uint64_t crc = swap_be_to_native32(read_bits(&p, CRC_BITS));
+	uint64_t crc = read_bits(&p, CRC_BITS);
 	
 	/*
 	 * Validate CRC saved in compressed data.

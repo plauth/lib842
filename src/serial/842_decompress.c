@@ -55,9 +55,9 @@ static uint8_t decomp_ops[OPS_MAX][4] = {
 
 
 #define beN_to_cpu(d, s)					\
-	((s) == 2 ? swap_endianness16(get_unaligned16((__be16 *)d)) :	\
-	 (s) == 4 ? swap_endianness32(get_unaligned32((__be32 *)d)) :	\
-	 (s) == 8 ? swap_endianness64(get_unaligned64((__be64 *)d)) :	\
+	((s) == 2 ? swap_be_to_native16(get_unaligned16((__be16 *)d)) :	\
+	 (s) == 4 ? swap_be_to_native32(get_unaligned32((__be32 *)d)) :	\
+	 (s) == 8 ? swap_be_to_native64(get_unaligned64((__be64 *)d)) :	\
 	 0)
 
 static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n);
@@ -107,11 +107,11 @@ static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n)
 	if (bits <= 8)
 		*d = *in >> (8 - bits);
 	else if (bits <= 16)
-		*d = swap_endianness16(get_unaligned16((__be16 *)in)) >> (16 - bits);
+		*d = swap_be_to_native16(get_unaligned16((__be16 *)in)) >> (16 - bits);
 	else if (bits <= 32)
-		*d = swap_endianness32(get_unaligned32((__be32 *)in)) >> (32 - bits);
+		*d = swap_be_to_native32(get_unaligned32((__be32 *)in)) >> (32 - bits);
 	else
-		*d = swap_endianness64(get_unaligned64((__be64 *)in)) >> (64 - bits);
+		*d = swap_be_to_native64(get_unaligned64((__be64 *)in)) >> (64 - bits);
 
 	*d &= GENMASK_ULL(n - 1, 0);
 
@@ -140,13 +140,13 @@ static int do_data(struct sw842_param_decomp *p, uint8_t n)
 
 	switch (n) {
 	case 2:
-		put_unaligned_le16(swap_endianness16(v), (__be16 *)p->out);
+		put_unaligned_le16(swap_native_to_be16(v), (__be16 *)p->out);
 		break;
 	case 4:
-		put_unaligned_le32(swap_endianness32(v), (__be32 *)p->out);
+		put_unaligned_le32(swap_native_to_be32(v), (__be32 *)p->out);
 		break;
 	case 8:
-		put_unaligned_le64(swap_endianness64(v), (__be64 *)p->out);
+		put_unaligned_le64(swap_native_to_be64(v), (__be64 *)p->out);
 		break;
 	default:
 		return -EINVAL;

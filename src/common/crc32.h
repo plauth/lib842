@@ -8,11 +8,19 @@
 /* implements slicing-by-4 or slicing-by-8 algorithm */
 static inline uint32_t crc32_be(uint32_t crc, unsigned char const *buf, size_t len)
 {
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #  define DO_CRC(x) crc = t0[(crc ^ (x)) & 255] ^ (crc >> 8)
 #  define DO_CRC4 (t3[(q) & 255] ^ t2[(q >> 8) & 255] ^ \
 		   t1[(q >> 16) & 255] ^ t0[(q >> 24) & 255])
 #  define DO_CRC8 (t7[(q) & 255] ^ t6[(q >> 8) & 255] ^ \
 		   t5[(q >> 16) & 255] ^ t4[(q >> 24) & 255])
+# else
+#  define DO_CRC(x) crc = t0[((crc >> 24) ^ (x)) & 255] ^ (crc << 8)
+#  define DO_CRC4 (t0[(q) & 255] ^ t1[(q >> 8) & 255] ^ \
+		   t2[(q >> 16) & 255] ^ t3[(q >> 24) & 255])
+#  define DO_CRC8 (t4[(q) & 255] ^ t5[(q >> 8) & 255] ^ \
+		   t6[(q >> 16) & 255] ^ t7[(q >> 24) & 255])
+# endif
 
 	const uint32_t *b;
 	size_t rem_len;
@@ -51,6 +59,9 @@ static inline uint32_t crc32_be(uint32_t crc, unsigned char const *buf, size_t l
 		for (i = 0; i < len; i++)
 			DO_CRC(*++p); /* use pre increment for speed */
 	}
+	// TODOXXX: This changes the CRC wrt. the original version of lib842, but
+	// is necessary to match the stock Linux kernel output!
+	crc = swap_be_to_native32(crc);
 	return crc;
 #undef DO_CRC
 #undef DO_CRC4

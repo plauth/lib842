@@ -73,7 +73,7 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 #define INDEX_NOT_CHECKED	(-2)
 
 #define get_input_data(p, o, b)						\
-	swap_endianness##b(get_unaligned##b((__be##b *)((p)->in + (o))))
+	swap_be_to_native##b(get_unaligned##b((__be##b *)((p)->in + (o))))
 
 #define UINT_TYPE(b) UINT_TYPE_##b
 #define UINT_TYPE_2 uint16_t
@@ -182,19 +182,19 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 	if (bits <= 8)
 		*out = o | d;
 	else if (bits <= 16)
-		put_unaligned_le16(swap_endianness16(o << 8 | d), (__be16 *)out);
+		put_unaligned_le16(swap_native_to_be16(o << 8 | d), (__be16 *)out);
 	else if (bits <= 24)
-		put_unaligned_le32(swap_endianness32(o << 24 | d << 8), (__be32 *)out);
+		put_unaligned_le32(swap_native_to_be32(o << 24 | d << 8), (__be32 *)out);
 	else if (bits <= 32)
-		put_unaligned_le32(swap_endianness32(o << 24 | d), (__be32 *)out);
+		put_unaligned_le32(swap_native_to_be32(o << 24 | d), (__be32 *)out);
 	else if (bits <= 40)
-		put_unaligned_le64(swap_endianness64(o << 56 | d << 24), (__be64 *)out);
+		put_unaligned_le64(swap_native_to_be64(o << 56 | d << 24), (__be64 *)out);
 	else if (bits <= 48)
-		put_unaligned_le64(swap_endianness64(o << 56 | d << 16), (__be64 *)out);
+		put_unaligned_le64(swap_native_to_be64(o << 56 | d << 16), (__be64 *)out);
 	else if (bits <= 56)
-		put_unaligned_le64(swap_endianness64(o << 56 | d << 8), (__be64 *)out);
+		put_unaligned_le64(swap_native_to_be64(o << 56 | d << 8), (__be64 *)out);
 	else
-		put_unaligned_le64(swap_endianness64(o << 56 | d), (__be64 *)out);
+		put_unaligned_le64(swap_native_to_be64(o << 56 | d), (__be64 *)out);
 
 	p->bit += n;
 

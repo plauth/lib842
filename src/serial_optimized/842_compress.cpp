@@ -607,7 +607,7 @@ repeat:
     #ifndef DISABLE_CRC
     uint32_t crc = crc32_be(0, (const unsigned char *) in, ilen);
 
-	stream_write_bits(p->stream, swap_be_to_native32(crc), CRC_BITS);
+	stream_write_bits(p->stream, crc, CRC_BITS);
     #endif
 
 	stream_flush(p->stream);
