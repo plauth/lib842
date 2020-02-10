@@ -19,7 +19,7 @@ endif()
 # In-kernel, possibly hardware-accelerated implementation (cryptodev)
 try_compile(HAVE_CRYPTODEV_LINUX_COMP
             "${CMAKE_BINARY_DIR}/temp"
-            "${CMAKE_SOURCE_DIR}/check_cryptodev_linux_comp.c")
+            "${PROJECT_SOURCE_DIR}/check_cryptodev_linux_comp.c")
 if(HAVE_CRYPTODEV_LINUX_COMP)
     set(SRCFILES ${SRCFILES} src/cryptodev/842_interface.c)
 endif()
