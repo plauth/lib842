@@ -55,7 +55,7 @@ void c842_ctx_deinit(struct cryptodev_ctx* ctx)
 	}
 }
 
-int c842_compress(struct cryptodev_ctx* ctx, const void* input, unsigned int ilen, void* output, unsigned int *olen)
+int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, void* output, size_t *olen)
 {
 	struct crypt_op cryp;
 	void* p;
@@ -75,12 +75,21 @@ int c842_compress(struct cryptodev_ctx* ctx, const void* input, unsigned int ile
 		}
 	}
 
+	if (ilen > UINT32_MAX) {
+		fprintf(stderr, "ilen too big\n");
+		return -1;
+	}
+	if (*olen > UINT32_MAX) {
+		fprintf(stderr, "olen too big\n");
+		return -1;
+	}
+
 	memset(&cryp, 0, sizeof(cryp));
 
 	/* Encrypt data.in to data.encrypted */
 	cryp.ses = ctx->sess.ses;
-	cryp.len = ilen;
-	cryp.dlen = *olen;
+	cryp.len = (__u32)ilen;
+	cryp.dlen = (__u32)*olen;
 	cryp.src = (__u8*)input;
 	cryp.dst = (__u8*)output;
 	cryp.op = COP_ENCRYPT;
@@ -94,7 +103,7 @@ int c842_compress(struct cryptodev_ctx* ctx, const void* input, unsigned int ile
 	return 0;
 }
 
-int c842_decompress(struct cryptodev_ctx* ctx, const void* input, unsigned int ilen, void* output, unsigned int *olen)
+int c842_decompress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, void* output, size_t *olen)
 {
 	struct crypt_op cryp;
 	void* p;
@@ -114,12 +123,21 @@ int c842_decompress(struct cryptodev_ctx* ctx, const void* input, unsigned int i
 		}
 	}
 
+	if (ilen > UINT32_MAX) {
+		fprintf(stderr, "ilen too big\n");
+		return -1;
+	}
+	if (*olen > UINT32_MAX) {
+		fprintf(stderr, "olen too big\n");
+		return -1;
+	}
+
 	memset(&cryp, 0, sizeof(cryp));
 
 	/* Encrypt data.in to data.encrypted */
 	cryp.ses = ctx->sess.ses;
-	cryp.len = ilen;
-	cryp.dlen = *olen;
+	cryp.len = (__u32)ilen;
+	cryp.dlen = (__u32)*olen;
 	cryp.src = (__u8*)input;
 	cryp.dst = (__u8*)output;
 	cryp.op = COP_DECRYPT;
@@ -133,7 +151,7 @@ int c842_decompress(struct cryptodev_ctx* ctx, const void* input, unsigned int i
 	return 0;
 }
 
-int hw842_compress(const uint8_t *in, unsigned int ilen, uint8_t *out, unsigned int *olen) {
+int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen) {
 	int cfd = -1;
 	int err = 0;
 	struct cryptodev_ctx ctx;
@@ -170,7 +188,7 @@ int hw842_compress(const uint8_t *in, unsigned int ilen, uint8_t *out, unsigned 
 	return 0;
 }
 
-int hw842_decompress(const uint8_t *in, unsigned int ilen, uint8_t *out, unsigned int *olen) {
+int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen) {
 	int cfd = -1;
 	int err = 0;
 	struct cryptodev_ctx ctx;
