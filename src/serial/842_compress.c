@@ -132,6 +132,20 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
     DL_APPEND(h->head, el);																	\
 } while (0)
 
+#define destroy_hashtable(p, b)		do {	\
+	struct hlist_node##b *s, *htmp;			\
+	HASH_ITER(hh, p->htable##b, s, htmp) {	\
+		struct node##b##_el *elt, *tmp;		\
+		DL_FOREACH_SAFE(s->head,elt,tmp) {	\
+			DL_DELETE(s->head,elt);			\
+			free(elt);						\
+		}									\
+											\
+		HASH_DEL(p->htable##b, s);			\
+		free(s);							\
+	}										\
+} while(0)
+
 static uint8_t bmask[8] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
 
 static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n);
@@ -484,7 +498,8 @@ int sw842_compress(const uint8_t *in, size_t ilen,
 	/* if using strict mode, we can only compress a multiple of 8 */
 	if (ilen % 8) {
 		fprintf(stderr, "Can only compress multiples of 8 bytes, but len is len %zu (%% 8 = %zu)\n", ilen, ilen % 8);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto cleanup;
 	}
 
 	/* let's compress at least 8 bytes, mkay? */
@@ -524,7 +539,7 @@ int sw842_compress(const uint8_t *in, size_t ilen,
 			ret = process_next(p);
 
 		if (ret)
-			return ret;
+			goto cleanup;
 
 repeat:
 		last = next;
@@ -536,14 +551,14 @@ repeat:
 	if (repeat_count) {
 		ret = add_repeat_template(p, repeat_count);
 		if (ret)
-			return ret;
+			goto cleanup;
 	}
 
 skip_comp:
 	if (p->ilen > 0) {
 		ret = add_short_data_template(p, p->ilen);
 		if (ret)
-			return ret;
+			goto cleanup;
 
 		p->in += p->ilen;
 		p->ilen = 0;
@@ -551,7 +566,7 @@ skip_comp:
 
 	ret = add_end_template(p);
 	if (ret)
-		return ret;
+		goto cleanup;
 
 	/*
 	 * crc(0:31) is appended to target data starting with the next
@@ -564,7 +579,7 @@ skip_comp:
 
 	ret = add_bits(p, crc, CRC_BITS);
 	if (ret)
-		return ret;
+		goto cleanup;
 
 	if (p->bit) {
 		p->out++;
@@ -575,20 +590,30 @@ skip_comp:
 	/* pad compressed length to multiple of 8 */
 	pad = (8 - ((total - p->olen) % 8)) % 8;
 	if (pad) {
-		if (pad > p->olen) /* we were so close! */
-			return -ENOSPC;
+		if (pad > p->olen) { /* we were so close! */
+			ret = -ENOSPC;
+			goto cleanup;
+		}
 		memset(p->out, 0, pad);
 		p->out += pad;
 		p->olen -= pad;
 	}
 
-	if (unlikely((total - p->olen) > UINT_MAX))
-		return -ENOSPC;
+	if (unlikely((total - p->olen) > UINT_MAX)) {
+		ret = -ENOSPC;
+		goto cleanup;
+	}
 
 	*olen = total - p->olen;
 
 	//printf("Out: %lld bits (%f bytes)\n", outbits, (outbits / 8.0f));
-	free(p);
 
-	return 0;
+	ret = 0;
+
+cleanup:
+	destroy_hashtable(p, 8);
+	destroy_hashtable(p, 4);
+	destroy_hashtable(p, 2);
+	free(p);
+	return ret;
 }
