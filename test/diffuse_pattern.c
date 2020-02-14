@@ -3,7 +3,16 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
+#ifdef USEHW
+#include "hw842.h"
+#define lib842_compress hw842_compress
+#define lib842_decompress hw842_decompress
+#else
 #include "sw842.h"
+#define lib842_compress sw842_compress
+#define lib842_decompress sw842_decompress
+#endif
+
 #define BUFFER_SIZE 65536
 
 static unsigned xorshift_seed;
@@ -40,11 +49,11 @@ int main(void)
         // Try to copress the data, then uncompress it, and check the result is correct
         uint8_t *comp_data = (uint8_t *)malloc(2*BUFFER_SIZE);
         size_t comp_size = 2*BUFFER_SIZE;
-        int ret_compress = sw842_compress(data_buffer, BUFFER_SIZE, comp_data, &comp_size);
+        int ret_compress = lib842_compress(data_buffer, BUFFER_SIZE, comp_data, &comp_size);
         if (ret_compress == 0) {
             uint8_t *uncomp_data = (uint8_t *)malloc(BUFFER_SIZE);
             size_t uncomp_size = BUFFER_SIZE;
-            int ret_decompress = sw842_decompress(comp_data, comp_size, uncomp_data, &uncomp_size);
+            int ret_decompress = lib842_decompress(comp_data, comp_size, uncomp_data, &uncomp_size);
             if (ret_decompress == 0) {
                 if (memcmp(data_buffer, uncomp_data, BUFFER_SIZE) == 0) {
                     printf("it=%i: Pattern compressed to %zu bytes and decompressed OK\n", it, comp_size);
