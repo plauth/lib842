@@ -67,6 +67,11 @@ endif()
 if (OpenCL_FOUND)
     add_executable(test_ocl src/ocl/compdecomp.cpp)
     target_link_libraries (test_ocl 842 ${OpenCL_LIBRARY})
+
+    add_executable(test_ocl_inplace src/ocl/compdecomp.cpp)
+    set_target_properties(test_ocl_inplace PROPERTIES COMPILE_DEFINITIONS "INPLACE")
+    target_link_libraries (test_ocl_inplace 842 ${OpenCL_LIBRARY})
+
 endif()
 
 # TODOXXX: Integrate all options from the GNU Makefile here and then remove it
