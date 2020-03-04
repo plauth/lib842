@@ -2,7 +2,7 @@
 #include <fstream>
 
 #include "../../include/sw842.h"
-#include "cl842decompress.hpp"
+#include "../../include/cl842.hpp"
 
 using namespace std;
 
@@ -10,10 +10,7 @@ using namespace std;
 
 
 int main(int argc, char *argv[]) {
-
-
-    char *compressIn;
-    uint8_t *compressOut, *decompressIn, *decompressOut;
+    uint8_t *compressIn, *compressOut, *decompressIn, *decompressOut;
     size_t flen, ilen, olen, dlen;
 
     flen = ilen = olen = dlen = 0;
@@ -31,7 +28,7 @@ int main(int argc, char *argv[]) {
         is.seekg (0, is.beg);
         is.close();
         
-        ilen = CL842Decompress::paddedSize(flen);
+        ilen = CL842HostDecompress::paddedSize(flen);
         
         printf("original file length: %zu\n", flen);
         printf("original file length (padded): %zu\n", ilen);
@@ -40,23 +37,22 @@ int main(int argc, char *argv[]) {
     olen = ilen * 2;
     dlen = ilen;
 
-    compressIn = new char [ilen];
+    compressIn = (uint8_t *) calloc(ilen, sizeof(uint8_t));
     compressOut = (uint8_t *) calloc(olen, sizeof(uint8_t));
     decompressIn = (uint8_t *) calloc(olen, sizeof(uint8_t));
     decompressOut = (uint8_t *) calloc(dlen, sizeof(uint8_t));
 
     if(argc <= 1) {
-        num_chunks = 1;
         uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
         memcpy(compressIn, tmp, STRLEN);
     }  else if (argc == 2) {
-        num_chunks = ilen / CHUNK_SIZE;
+        num_chunks = ilen / CL842_CHUNK_SIZE;
 
         std::ifstream is (argv[1], std::ifstream::binary);
         if(!is)
             exit(-1);
         is.seekg (0, is.beg);
-        is.read (compressIn, flen);
+        is.read (reinterpret_cast<char *>(compressIn), flen);
 
         if (is)
             std::cerr << "successfully read all " << flen << " bytes." << std::endl;
@@ -65,22 +61,24 @@ int main(int argc, char *argv[]) {
         is.close();
     }
 
-    if(num_chunks > 1) {
-        printf("Using %zu chunks of %d bytes\n", num_chunks, CHUNK_SIZE);
-    }
+    if(num_chunks >= 1) {
+        printf("Using %zu chunks of %d bytes\n", num_chunks, CL842_CHUNK_SIZE);
     
-    for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
-        size_t chunk_olen = CHUNK_SIZE * 2;
-        uint8_t* chunk_in = ((uint8_t*) compressIn) + (CHUNK_SIZE * chunk_num);
-        uint8_t* chunk_out = compressOut + ((CHUNK_SIZE * 2) * chunk_num);
-        
-        sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
+        for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
+            size_t chunk_olen = CL842_CHUNK_SIZE * 2;
+            uint8_t* chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
+            uint8_t* chunk_out = compressOut + ((CL842_CHUNK_SIZE * 2) * chunk_num);
+            
+            sw842_compress(chunk_in, CL842_CHUNK_SIZE, chunk_out, &chunk_olen);
+        }
+    } else {
+        sw842_compress(compressIn, ilen, compressOut, &olen);
     }
 
     memcpy(decompressIn, compressOut, olen);
 
-    CL842Decompress clDecompress(decompressIn, olen, CHUNK_SIZE * 2, decompressOut, dlen);
-    clDecompress.decompress();
+    CL842HostDecompress clDecompress(CL842_CHUNK_SIZE * 2);
+    clDecompress.decompress(decompressIn, olen, decompressOut, dlen);
 
 
     if (memcmp(compressIn, decompressOut, ilen) == 0) {
