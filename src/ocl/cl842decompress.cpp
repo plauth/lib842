@@ -5,12 +5,13 @@ size_t CL842Decompress::paddedSize(size_t size) {
     return (size + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
 }
 
-CL842Decompress::CL842Decompress(uint8_t* input, size_t inputSize, uint8_t* output, size_t outputSize) {
+CL842Decompress::CL842Decompress(uint8_t* input, size_t inputSize, size_t inputChunkStride, uint8_t* output, size_t outputSize) {
     m_inputHostMemory = input;
     m_inputSize = inputSize;
+    m_inputChunkStride = inputChunkStride;
     m_outputHostMemory = output;
     m_outputSize = outputSize;
-    m_numChunks = (inputSize + CHUNK_SIZE * 2 - 1) / (CHUNK_SIZE * 2);
+    m_numChunks = (inputSize + inputChunkStride - 1) / (inputChunkStride);
 
     cl::Platform::get(&m_platforms);
     if(m_platforms.empty()) {
@@ -53,6 +54,7 @@ void CL842Decompress::buildProgram(std::string sourceCode) {
 
     std::ostringstream options;
     options<<"-D CHUNK_SIZE="<< CHUNK_SIZE;
+    options<<" -D CHUNK_STRIDE=" << m_inputChunkStride;
 
     m_program = cl::Program(m_context, source);
     if (m_program.build(m_devices, options.str().c_str()) == CL_BUILD_PROGRAM_FAILURE) {

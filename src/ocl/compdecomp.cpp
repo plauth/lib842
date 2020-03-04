@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
 
     memcpy(decompressIn, compressOut, olen);
 
-    CL842Decompress clDecompress(decompressIn, olen, decompressOut, dlen);
+    CL842Decompress clDecompress(decompressIn, olen, CHUNK_SIZE * 2, decompressOut, dlen);
     clDecompress.decompress();
 
 

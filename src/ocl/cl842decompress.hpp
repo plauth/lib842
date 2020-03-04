@@ -33,7 +33,7 @@ class CL842Decompress
     public:
         static size_t paddedSize(size_t size);
 
-        CL842Decompress(uint8_t* input, size_t inputSize, uint8_t* output, size_t outputSize);
+        CL842Decompress(uint8_t* input, size_t inputSize, size_t inputChunkStride, uint8_t* output, size_t outputSize);
         void decompress();
 
     private:
@@ -46,6 +46,7 @@ class CL842Decompress
         size_t m_inputSize, m_outputSize, m_numChunks;
 
         uint8_t* m_inputHostMemory;
+        size_t m_inputChunkStride;
         uint8_t* m_outputHostMemory;
         cl::Buffer m_inputBuffer;
         cl::Buffer m_outputBuffer;

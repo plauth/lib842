@@ -218,7 +218,7 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out, ulong nu
 
     struct sw842_param_decomp p;
     p.ostart = p.out = out + ((CHUNK_SIZE / 8) * chunk_num);
-    p.in = (in + ((CHUNK_SIZE / 8 * 2) * chunk_num));
+    p.in = (in + ((CHUNK_STRIDE / 8) * chunk_num));
 
 
     p.buffer = 0;
