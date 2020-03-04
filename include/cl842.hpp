@@ -3,6 +3,7 @@
 
 #define CL_HPP_MINIMUM_OPENCL_VERSION 120
 #define CL_HPP_TARGET_OPENCL_VERSION 120
+#define __CL_ENABLE_EXCEPTIONS
 #if defined(__APPLE__) || defined(__MACOSX)
 #include <OpenCL/cl.hpp>
 #else
@@ -15,39 +16,52 @@
 #define CL842_CHUNK_SIZE 1024
 #endif
 
-class CL842DeviceDecompress
+/**
+ * Low-level interface to CL842, for integration into existing OpenCL applications
+ * where context, command queue, buffers, etc. are already available.
+ */
+class CL842DeviceDecompressor
 {
     public:
-        CL842DeviceDecompress(const cl::Context &context, const VECTOR_CLASS<cl::Device> &devices, size_t inputChunkStride);
-        void decompress(const cl::CommandQueue &commandQueue,
-                        const cl::Buffer &inputBuffer, size_t inputSize,
-                        const cl::Buffer &outputBuffer, size_t outputSize,
-                        const VECTOR_CLASS<cl::Event> *events = nullptr, cl::Event *event = nullptr);
+        CL842DeviceDecompressor(const cl::Context& context,
+                                const VECTOR_CLASS<cl::Device>& devices,
+                                size_t inputChunkStride,
+                                bool verbose = false);
+        void decompress(const cl::CommandQueue& commandQueue,
+                        const cl::Buffer& inputBuffer, size_t inputSize,
+                        const cl::Buffer& outputBuffer, size_t outputSize,
+                        const VECTOR_CLASS<cl::Event>* events = nullptr, cl::Event* event = nullptr);
 
     private:
+        bool m_verbose;
         cl::Program m_program;
 
         size_t m_inputChunkStride;
 
         std::string kernelSource() const;
-        void buildProgram(const cl::Context &context, const VECTOR_CLASS<cl::Device> &devices, std::string sourceCode);
+        void buildProgram(const cl::Context& context, const VECTOR_CLASS<cl::Device>& devices, std::string sourceCode);
 };
 
-class CL842HostDecompress
+/**
+ * High-level interface to CL842, for easily compressing data available on the host
+ * using any available OpenCL-capable devices.
+ */
+class CL842HostDecompressor
 {
     public:
         static size_t paddedSize(size_t size);
 
-        CL842HostDecompress(size_t inputChunkStride);
+        CL842HostDecompressor(size_t inputChunkStride, bool verbose = false);
         void decompress(const uint8_t* input, size_t inputSize, uint8_t* output, size_t outputSize);
 
     private:
-        std::vector<cl::Device> m_devices;
+        bool m_verbose;
+        VECTOR_CLASS<cl::Device> m_devices;
         cl::Context m_context;
         cl::CommandQueue m_queue;
-        CL842DeviceDecompress backend;
+        CL842DeviceDecompressor deviceCompressor;
 
-        static std::vector<cl::Device> findDevices();
+        VECTOR_CLASS<cl::Device> findDevices();
 };
 
 #endif

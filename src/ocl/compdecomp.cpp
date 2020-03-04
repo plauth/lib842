@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
         is.seekg (0, is.beg);
         is.close();
         
-        ilen = CL842HostDecompress::paddedSize(flen);
+        ilen = CL842HostDecompressor::paddedSize(flen);
         
         printf("original file length: %zu\n", flen);
         printf("original file length (padded): %zu\n", ilen);
@@ -77,8 +77,13 @@ int main(int argc, char *argv[]) {
 
     memcpy(decompressIn, compressOut, olen);
 
-    CL842HostDecompress clDecompress(CL842_CHUNK_SIZE * 2);
-    clDecompress.decompress(decompressIn, olen, decompressOut, dlen);
+    try {
+        CL842HostDecompressor clDecompress(CL842_CHUNK_SIZE * 2, true);
+        clDecompress.decompress(decompressIn, olen, decompressOut, dlen);
+    } catch (const cl::Error &ex) {
+        std::cerr << "ERROR: " << ex.what()  << " (" << ex.err() << ")" << std::endl;
+        exit(EXIT_FAILURE);
+    }
 
 
     if (memcmp(compressIn, decompressOut, ilen) == 0) {
