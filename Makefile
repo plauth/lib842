@@ -46,7 +46,7 @@ endif
 #CC=clang-8
 #CXX=clang++-8
 
-MODULES   := serial serial_optimized cryptodev aix cuda
+MODULES   := serial serial_optimized cryptodev aix cuda tools
 OBJ_DIR := $(addprefix obj/,$(MODULES))
 BIN_DIR := $(addprefix bin/,$(MODULES))
 
@@ -132,7 +132,11 @@ goldenunit: checkdirs $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV)
 	bin/serial_optimized/goldenunit1
 	bin/serial_optimized/goldenunit2
 
-ocl:
+bin/tools/cl2h: checkdirs src/tools/cl2h.cpp
+	$(CXX) $(CXX_FLAGS) src/tools/cl2h.cpp -o bin/tools/cl2h
+
+ocl: bin/tools/cl2h
+	bin/tools/cl2h src/ocl/decompress.cl src/ocl/decompress.cl.h CL842_DECOMPRESS_SOURCE
 	$(CXX) $(CXX_FLAGS) src/serial_optimized/842_compress.cpp src/serial_optimized/bitstream.cpp src/ocl/cl842decompress.cpp src/ocl/compdecomp.cpp $(LDFLAGS_OCL) -o ocl_test -I./include
 
 cuda:

@@ -1,9 +1,13 @@
-#include <chrono>
 #include "../../include/cl842.hpp"
 
-#include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <chrono>
+
+// This file is generated during the build process and defines a
+// CL842_DECOMPRESS_SOURCE with the source of the decompression OpenCL kernel
+#include "decompress.cl.h"
 
 #ifndef LOCAL_SIZE
 #define LOCAL_SIZE 256
@@ -16,7 +20,7 @@ CL842DeviceDecompressor::CL842DeviceDecompressor(const cl::Context& context,
     : m_verbose(verbose),
       m_inputChunkStride(inputChunkStride)
 {
-    buildProgram(context, devices, kernelSource());
+    buildProgram(context, devices);
 }
 
 
@@ -61,21 +65,12 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue& commandQueue,
     }
 }
 
-std::string CL842DeviceDecompressor::kernelSource() const{
-    std::ifstream sourceFile("src/ocl/decompress.cl");
-    return std::string(
-        std::istreambuf_iterator<char>(sourceFile),
-        (std::istreambuf_iterator<char>()));
-}
-
-void CL842DeviceDecompressor::buildProgram(const cl::Context& context, const VECTOR_CLASS<cl::Device>& devices, std::string sourceCode) {
-    cl::Program::Sources source(1, std::make_pair(sourceCode.c_str(), sourceCode.length()+1));
-
+void CL842DeviceDecompressor::buildProgram(const cl::Context& context, const VECTOR_CLASS<cl::Device>& devices) {
     std::ostringstream options;
     options<<"-D CL842_CHUNK_SIZE="<< CL842_CHUNK_SIZE;
     options<<" -D CL842_CHUNK_STRIDE=" << m_inputChunkStride;
 
-    m_program = cl::Program(context, source);
+    m_program = cl::Program(context, std::string(CL842_DECOMPRESS_SOURCE));
     try {
         m_program.build(devices, options.str().c_str());
     } catch (const cl::Error& ex) {

@@ -38,8 +38,7 @@ class CL842DeviceDecompressor
 
         size_t m_inputChunkStride;
 
-        std::string kernelSource() const;
-        void buildProgram(const cl::Context& context, const VECTOR_CLASS<cl::Device>& devices, std::string sourceCode);
+        void buildProgram(const cl::Context& context, const VECTOR_CLASS<cl::Device>& devices);
 };
 
 /**
