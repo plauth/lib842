@@ -2,8 +2,7 @@
 #include "cl842decompress.hpp"
 
 size_t CL842Decompress::paddedSize(size_t size) {
-    size_t workgroup_size = CHUNK_SIZE * LOCAL_SIZE;
-    return (size + (workgroup_size-1)) & ~(workgroup_size-1);
+    return (size + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
 }
 
 CL842Decompress::CL842Decompress(uint8_t* input, size_t inputSize, uint8_t* output, size_t outputSize) {
@@ -11,7 +10,7 @@ CL842Decompress::CL842Decompress(uint8_t* input, size_t inputSize, uint8_t* outp
     m_inputSize = inputSize;
     m_outputHostMemory = output;
     m_outputSize = outputSize;
-    m_numChunks = inputSize / (CHUNK_SIZE * 2);
+    m_numChunks = (inputSize + CHUNK_SIZE * 2 - 1) / (CHUNK_SIZE * 2);
 
     cl::Platform::get(&m_platforms);
     if(m_platforms.empty()) {
@@ -82,15 +81,15 @@ void CL842Decompress::decompress() {
     checkErr(err, "Kernel::setArg(0)");
     err = decompressKernel.setArg(1, m_outputBuffer);
     checkErr(err, "Kernel::setArg(1)");
+    err = decompressKernel.setArg(2, static_cast<cl_ulong>(m_numChunks));
+    checkErr(err, "Kernel::setArg(2)");
 
     //size_t workgroup_size = getMaxWorkGroupSize(context);
-    cl::NDRange globalSize(1);
-    cl::NDRange localSize(1);
+    cl::NDRange globalSize((m_numChunks + (LOCAL_SIZE-1)) & ~(LOCAL_SIZE-1));
+    cl::NDRange localSize(LOCAL_SIZE);
 
-    if(m_numChunks > LOCAL_SIZE) {
+    if(m_numChunks > 1) {
         std::cerr << "Using " << m_numChunks << " chunks of " << CHUNK_SIZE << " bytes, " << LOCAL_SIZE << " threads per workgroup" << std::endl;
-        globalSize = cl::NDRange(m_numChunks);
-        localSize = cl::NDRange(LOCAL_SIZE);
     } 
     
 

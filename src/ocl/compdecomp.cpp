@@ -46,6 +46,7 @@ int main(int argc, char *argv[]) {
     decompressOut = (uint8_t *) calloc(dlen, sizeof(uint8_t));
 
     if(argc <= 1) {
+        num_chunks = 1;
         uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
         memcpy(compressIn, tmp, STRLEN);
     }  else if (argc == 2) {
@@ -66,17 +67,14 @@ int main(int argc, char *argv[]) {
 
     if(num_chunks > 1) {
         printf("Using %zu chunks of %d bytes\n", num_chunks, CHUNK_SIZE);
+    }
     
-        for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
-            size_t chunk_olen = CHUNK_SIZE * 2;
-            uint8_t* chunk_in = ((uint8_t*) compressIn) + (CHUNK_SIZE * chunk_num);
-            uint8_t* chunk_out = compressOut + ((CHUNK_SIZE * 2) * chunk_num);
-            
-            sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
-        }
-
-    } else {
-        sw842_compress((uint8_t*) compressIn, ilen, compressOut, &olen);
+    for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
+        size_t chunk_olen = CHUNK_SIZE * 2;
+        uint8_t* chunk_in = ((uint8_t*) compressIn) + (CHUNK_SIZE * chunk_num);
+        uint8_t* chunk_out = compressOut + ((CHUNK_SIZE * 2) * chunk_num);
+        
+        sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
     }
 
     memcpy(decompressIn, compressOut, olen);

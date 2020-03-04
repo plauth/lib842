@@ -209,9 +209,12 @@ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uint64_t i
     return offset;
 }
 
-__kernel void decompress(__global uint64_t *in, __global uint64_t *out)
+__kernel void decompress(__global uint64_t *in, __global uint64_t *out, ulong numChunks)
 {
-    unsigned int chunk_num = get_group_id(0) * get_local_size(0) + get_local_id(0);
+    unsigned int chunk_num = get_global_id(0);
+    if (chunk_num >= numChunks) {
+        return;
+    }
 
     struct sw842_param_decomp p;
     p.ostart = p.out = out + ((CHUNK_SIZE / 8) * chunk_num);
