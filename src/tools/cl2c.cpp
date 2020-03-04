@@ -5,7 +5,7 @@
 
 int main(int argc, char *argv[]) {
     if (argc != 4) {
-        std::cout << "Usage: cl2h input.cl output.h variable_name\n";
+        std::cout << "Usage: cl2c input.cl output.h variable_name\n";
         exit(EXIT_FAILURE);
     }
 
@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
     std::ofstream outputFile(argv[2], std::ifstream::out);
     outputFile.exceptions(std::ofstream::badbit);
 
-    outputFile << "static const char *" << argv[3] << " = \n\"";
+    outputFile << "const char *" << argv[3] << " = \n\"";
 
     int c;
     while ((c = inputFile.get()) != EOF) {

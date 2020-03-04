@@ -36,13 +36,13 @@ endif()
 
 # OpenCL implementation
 if (OpenCL_FOUND)
-    add_executable(cl2h src/tools/cl2h.cpp)
+    add_executable(cl2c src/tools/cl2c.cpp)
     add_custom_command(
-        OUTPUT src/ocl/decompress.cl.h
-        COMMAND cl2h src/ocl/decompress.cl src/ocl/decompress.cl.h CL842_DECOMPRESS_SOURCE
-        DEPENDS src/ocl/decompress.cl)
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl.c
+        COMMAND cl2c ${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/decompress.cl ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl.c CL842_DECOMPRESS_SOURCE
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/decompress.cl)
 
-    set(SRCFILES ${SRCFILES} src/ocl/cl842decompress.cpp src/ocl/decompress.cl.h)
+    set(SRCFILES ${SRCFILES} src/ocl/cl842decompress.cpp decompress_cl.c)
 endif()
 
 add_library(842 STATIC ${SRCFILES})

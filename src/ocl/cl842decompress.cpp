@@ -5,9 +5,9 @@
 #include <string>
 #include <chrono>
 
-// This file is generated during the build process and defines a
+// This symbol is generated during the build process and defines a
 // CL842_DECOMPRESS_SOURCE with the source of the decompression OpenCL kernel
-#include "decompress.cl.h"
+extern const char *CL842_DECOMPRESS_SOURCE;
 
 #ifndef LOCAL_SIZE
 #define LOCAL_SIZE 256
