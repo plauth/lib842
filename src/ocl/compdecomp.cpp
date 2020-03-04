@@ -8,6 +8,13 @@ using namespace std;
 
 #define STRLEN 32
 
+#define INPLACE
+
+#ifdef INPLACE
+static const uint8_t CHUNK_MAGIC[16] = {
+        0xbe, 0x5a, 0x46, 0xbf, 0x97, 0xe5, 0x2d, 0xd7, 0xb2, 0x7c, 0x94, 0x1a, 0xee, 0xd6, 0x70, 0x76
+};
+#endif
 
 int main(int argc, char *argv[]) {
     uint8_t *compressIn, *compressOut, *decompressIn, *decompressOut;
@@ -18,7 +25,7 @@ int main(int argc, char *argv[]) {
     size_t num_chunks = 0;
 
     if(argc <= 1) {
-        ilen = STRLEN;
+        ilen = CL842HostDecompressor::paddedSize(STRLEN);
     } else if (argc == 2) {
         std::ifstream is (argv[1], std::ifstream::binary);
         if(!is)
@@ -34,7 +41,11 @@ int main(int argc, char *argv[]) {
         printf("original file length (padded): %zu\n", ilen);
     }
 
+#ifdef INPLACE
+    olen = ilen;
+#else
     olen = ilen * 2;
+#endif
     dlen = ilen;
 
     compressIn = (uint8_t *) calloc(ilen, sizeof(uint8_t));
@@ -43,6 +54,7 @@ int main(int argc, char *argv[]) {
     decompressOut = (uint8_t *) calloc(dlen, sizeof(uint8_t));
 
     if(argc <= 1) {
+        num_chunks = 1;
         uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
         memcpy(compressIn, tmp, STRLEN);
     }  else if (argc == 2) {
@@ -61,30 +73,79 @@ int main(int argc, char *argv[]) {
         is.close();
     }
 
-    if(num_chunks >= 1) {
-        printf("Using %zu chunks of %d bytes\n", num_chunks, CL842_CHUNK_SIZE);
-    
-        for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
-            size_t chunk_olen = CL842_CHUNK_SIZE * 2;
-            uint8_t* chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
-            uint8_t* chunk_out = compressOut + ((CL842_CHUNK_SIZE * 2) * chunk_num);
-            
-            sw842_compress(chunk_in, CL842_CHUNK_SIZE, chunk_out, &chunk_olen);
+    printf("Using %zu chunks of %d bytes\n", num_chunks, CL842_CHUNK_SIZE);
+
+#ifdef INPLACE
+    /** The objective of INPLACE is to define a format that allows easy network
+        transmission of compressed data without excessive copying,
+        buffer overallocation, etc..
+        As part of this, as the name mentions, chunks are decompressed in-place.
+
+        A file is compressed as follows: It is first chunked into chunks of size
+        CL842_CHUNK_SIZE, and each chunk is compressed with 842. Chunks are
+        classified as compressible if the compressed size is
+        <= CL842_CHUNK_SIZE - sizeof(CHUNK_MAGIC) - sizeof(uint64_t),
+        otherwise they are considered incompressible.
+
+        The chunks are placed into the decompression buffer as follows:
+        * For incompressible chunks, the compressed version is thrown away
+          and the uncompressed data is written directly to the buffer.
+        * For compressible chunks, the following is written to the buffer:
+          CHUNK_MAGIC: A sequence of bytes (similar to a UUID)
+                       that allows recognizing that this is a compressed chunk.
+          Size (64-bit): The size of the data after compression.
+          *BLANK*: All unused space in the chunk is placed here.
+          Compressed data: All compressed data is placed at the end of the buffer.
+
+        The INPLACE flag is propagated to the OpenCL decompression kernel,
+        which recognizes this format and does a little more work to handle it.
+        Mostly, it ignores uncompressed/incompressible chunks
+        (because it sees that CHUNK_MAGIC is not present),
+        and decompresses compressed chunks in-place, using some lookahead
+        bytes to ensure that the output pointer doesn't 'catch up' the input pointer.
+    */
+    std::vector<uint8_t> temp_buffer(CL842_CHUNK_SIZE * 2);
+
+    for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
+        size_t chunk_olen = CL842_CHUNK_SIZE * 2;
+        uint8_t* chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
+        uint8_t* chunk_out = compressOut + (CL842_CHUNK_SIZE * chunk_num);
+        
+        sw842_compress(chunk_in, CL842_CHUNK_SIZE, &temp_buffer[0], &chunk_olen);
+        if (chunk_olen <= CL842_CHUNK_SIZE - sizeof(CHUNK_MAGIC) - sizeof(uint64_t)) {
+            memcpy(chunk_out, CHUNK_MAGIC, sizeof(CHUNK_MAGIC));
+            *reinterpret_cast<uint64_t *>(chunk_out + sizeof(CHUNK_MAGIC)) = chunk_olen;
+            memcpy(&chunk_out[CL842_CHUNK_SIZE - chunk_olen], &temp_buffer[0], chunk_olen);
+        } else {
+            memcpy(&chunk_out[0], &chunk_in[0], CL842_CHUNK_SIZE);
         }
-    } else {
-        sw842_compress(compressIn, ilen, compressOut, &olen);
     }
+#else
+    for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
+        size_t chunk_olen = CL842_CHUNK_SIZE * 2;
+        uint8_t* chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
+        uint8_t* chunk_out = compressOut + ((CL842_CHUNK_SIZE * 2) * chunk_num);
+        
+        sw842_compress(chunk_in, CL842_CHUNK_SIZE, chunk_out, &chunk_olen);
+    }
+#endif
+
 
     memcpy(decompressIn, compressOut, olen);
 
     try {
+        #ifdef INPLACE
+        CL842HostDecompressor clDecompress(CL842_CHUNK_SIZE, true, true);
+        clDecompress.decompress(decompressIn, olen, decompressIn, dlen);
+        memcpy(decompressOut, decompressIn, olen);
+        #else
         CL842HostDecompressor clDecompress(CL842_CHUNK_SIZE * 2, true);
         clDecompress.decompress(decompressIn, olen, decompressOut, dlen);
+        #endif
     } catch (const cl::Error &ex) {
         std::cerr << "ERROR: " << ex.what()  << " (" << ex.err() << ")" << std::endl;
         exit(EXIT_FAILURE);
     }
-
 
     if (memcmp(compressIn, decompressOut, ilen) == 0) {
         //printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));

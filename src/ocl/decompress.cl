@@ -89,6 +89,10 @@ struct sw842_param_decomp {
     __global uint64_t *in;
     uint32_t bits;
     uint64_t buffer;
+    #ifdef INPLACE
+    // FIXME: Determined experimentally. Is this enough for the worst possible case?
+    uint64_t lookAheadBuffer[6];
+    #endif
 };
 
 /* number of bits in a buffered word */
@@ -169,7 +173,17 @@ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
     value = 0;
 
   if (p->bits < n) {
+    #ifdef INPLACE
+    p->buffer = p->lookAheadBuffer[0];
+    p->lookAheadBuffer[0] = p->lookAheadBuffer[1];
+    p->lookAheadBuffer[1] = p->lookAheadBuffer[2];
+    p->lookAheadBuffer[2] = p->lookAheadBuffer[3];
+    p->lookAheadBuffer[3] = p->lookAheadBuffer[4];
+    p->lookAheadBuffer[4] = p->lookAheadBuffer[5];
+    p->lookAheadBuffer[5] = bswap(*p->in);
+    #else
     p->buffer = bswap(*p->in);
+    #endif
     p->in++;
     value |= p->buffer >> (WSIZE - (n - p->bits));
     p->buffer <<= n - p->bits;
@@ -220,8 +234,24 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out, ulong nu
     p.ostart = p.out = out + ((CL842_CHUNK_SIZE / 8) * chunk_num);
     p.in = (in + ((CL842_CHUNK_STRIDE / 8) * chunk_num));
 
+    #ifdef INPLACE
+    if (p.in[0] != 0xd72de597bf465abe || p.in[1] != 0x7670d6ee1a947cb2) { // CHUNK_MAGIC
+        // This chunk is not compressed, leave it untouched
+        return;
+    }
+    p.in += (CL842_CHUNK_SIZE - p.in[2]) / 8;
+    #endif
+
 
     p.buffer = 0;
+    #ifdef INPLACE
+    p.lookAheadBuffer[0] = bswap(*p.in++);
+    p.lookAheadBuffer[1] = bswap(*p.in++);
+    p.lookAheadBuffer[2] = bswap(*p.in++);
+    p.lookAheadBuffer[3] = bswap(*p.in++);
+    p.lookAheadBuffer[4] = bswap(*p.in++);
+    p.lookAheadBuffer[5] = bswap(*p.in++);
+    #endif
     p.bits = 0;
 
     uint64_t op;

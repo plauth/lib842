@@ -26,14 +26,15 @@ class CL842DeviceDecompressor
         CL842DeviceDecompressor(const cl::Context& context,
                                 const VECTOR_CLASS<cl::Device>& devices,
                                 size_t inputChunkStride,
-                                bool verbose = false);
+                                bool verbose = false,
+                                bool inPlace = false);
         void decompress(const cl::CommandQueue& commandQueue,
                         const cl::Buffer& inputBuffer, size_t inputSize,
                         const cl::Buffer& outputBuffer, size_t outputSize,
                         const VECTOR_CLASS<cl::Event>* events = nullptr, cl::Event* event = nullptr);
 
     private:
-        bool m_verbose;
+        bool m_verbose, m_inPlace;
         cl::Program m_program;
 
         size_t m_inputChunkStride;
@@ -50,11 +51,13 @@ class CL842HostDecompressor
     public:
         static size_t paddedSize(size_t size);
 
-        CL842HostDecompressor(size_t inputChunkStride, bool verbose = false);
+        CL842HostDecompressor(size_t inputChunkStride,
+                              bool verbose = false,
+                              bool inPlace = false);
         void decompress(const uint8_t* input, size_t inputSize, uint8_t* output, size_t outputSize);
 
     private:
-        bool m_verbose;
+        bool m_verbose, m_inPlace;
         VECTOR_CLASS<cl::Device> m_devices;
         cl::Context m_context;
         cl::CommandQueue m_queue;

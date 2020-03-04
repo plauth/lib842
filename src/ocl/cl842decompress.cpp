@@ -16,8 +16,9 @@
 CL842DeviceDecompressor::CL842DeviceDecompressor(const cl::Context& context,
                                                  const VECTOR_CLASS<cl::Device>& devices,
                                                  size_t inputChunkStride,
-                                                 bool verbose)
-    : m_verbose(verbose),
+                                                 bool verbose,
+                                                 bool inPlace)
+    : m_verbose(verbose), m_inPlace(inPlace),
       m_inputChunkStride(inputChunkStride)
 {
     buildProgram(context, devices);
@@ -29,6 +30,11 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue& commandQueue,
                                          const cl::Buffer& outputBuffer, size_t outputSize,
                                          const VECTOR_CLASS<cl::Event>* events, cl::Event* event)
 {
+    if (m_inPlace) {
+        if (inputBuffer() != outputBuffer() || inputSize != outputSize) {
+            throw cl::Error(CL_INVALID_VALUE);
+        }
+    }
     size_t numChunks = (inputSize + m_inputChunkStride - 1) / (m_inputChunkStride); 
 
     cl::Kernel decompressKernel(m_program, "decompress");
@@ -69,6 +75,8 @@ void CL842DeviceDecompressor::buildProgram(const cl::Context& context, const VEC
     std::ostringstream options;
     options<<"-D CL842_CHUNK_SIZE="<< CL842_CHUNK_SIZE;
     options<<" -D CL842_CHUNK_STRIDE=" << m_inputChunkStride;
+    if (m_inPlace)
+        options<<" -D INPLACE=1";
 
     m_program = cl::Program(context, std::string(CL842_DECOMPRESS_SOURCE));
     try {
@@ -85,12 +93,12 @@ size_t CL842HostDecompressor::paddedSize(size_t size) {
     return (size + (CL842_CHUNK_SIZE-1)) & ~(CL842_CHUNK_SIZE-1);
 }
 
-CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkStride, bool verbose) :
-    m_verbose(verbose),
+CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkStride, bool verbose, bool inPlace) :
+    m_verbose(verbose), m_inPlace(inPlace),
     m_devices(findDevices()),
     m_context(m_devices),
     m_queue(m_context, m_devices[0]),
-    deviceCompressor(m_context, m_devices, inputChunkStride, verbose)
+    deviceCompressor(m_context, m_devices, inputChunkStride, verbose, inPlace)
 { }
 
 VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices() {
@@ -139,11 +147,23 @@ VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices() {
 
 
 void CL842HostDecompressor::decompress(const uint8_t* input, size_t inputSize, uint8_t* output, size_t outputSize) {
+    if (m_inPlace) {
+        if (input != output || inputSize != outputSize) {
+            throw cl::Error(CL_INVALID_VALUE);
+        }
 
-    cl::Buffer inputBuffer(m_context, CL_MEM_READ_ONLY, inputSize);
-    cl::Buffer outputBuffer(m_context, CL_MEM_READ_WRITE, outputSize);
+        // Add some more bytes for potential excess lookahead
+        cl::Buffer buffer(m_context, CL_MEM_READ_WRITE, inputSize + 64);
 
-    m_queue.enqueueWriteBuffer(inputBuffer, CL_TRUE, 0, inputSize, input);
-    deviceCompressor.decompress(m_queue, inputBuffer, inputSize, outputBuffer, outputSize);
-    m_queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, outputSize, output);
+        m_queue.enqueueWriteBuffer(buffer, CL_TRUE, 0, inputSize, input);
+        deviceCompressor.decompress(m_queue, buffer, inputSize, buffer, outputSize);
+        m_queue.enqueueReadBuffer(buffer, CL_TRUE, 0, outputSize, output);
+    } else {
+        cl::Buffer inputBuffer(m_context, CL_MEM_READ_ONLY, inputSize);
+        cl::Buffer outputBuffer(m_context, CL_MEM_READ_WRITE, outputSize);
+
+        m_queue.enqueueWriteBuffer(inputBuffer, CL_TRUE, 0, inputSize, input);
+        deviceCompressor.decompress(m_queue, inputBuffer, inputSize, outputBuffer, outputSize);
+        m_queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, outputSize, output);
+    }
 }
