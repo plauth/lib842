@@ -4,6 +4,9 @@ option(USE_OPTIMIZED_SERIAL_IMPLEMENTATION "Use optimized sw842_(de)compress imp
 
 project(lib842)
 
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 find_package(OpenCL)
 if (OpenCL_FOUND)
     include_directories(${OpenCL_INCLUDE_DIRS})
