@@ -50,9 +50,9 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue& commandQueue,
         std::cerr << "Using " << numChunks << " chunks of " << CL842_CHUNK_SIZE << " bytes, " << LOCAL_SIZE << " threads per workgroup" << std::endl;
     }
 
-    std::chrono::high_resolution_clock::time_point t1;
+    std::chrono::steady_clock::time_point t1;
     if (m_verbose) {
-        t1 = std::chrono::high_resolution_clock::now();
+        t1 = std::chrono::steady_clock::now();
     }
 
     commandQueue.enqueueNDRangeKernel(decompressKernel, cl::NullRange, globalSize, localSize, events, event);
@@ -60,7 +60,7 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue& commandQueue,
     if (m_verbose) {
         commandQueue.finish();
 
-        std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+        std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
 
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1).count();
 
