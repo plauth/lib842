@@ -9,9 +9,6 @@ using namespace std;
 #define STRLEN 32
 
 #ifdef INPLACE
-static const uint8_t CHUNK_MAGIC[16] = {
-        0xbe, 0x5a, 0x46, 0xbf, 0x97, 0xe5, 0x2d, 0xd7, 0xb2, 0x7c, 0x94, 0x1a, 0xee, 0xd6, 0x70, 0x76
-};
 #endif
 
 int main(int argc, char *argv[]) {
@@ -82,15 +79,15 @@ int main(int argc, char *argv[]) {
         A file is compressed as follows: It is first chunked into chunks of size
         CL842_CHUNK_SIZE, and each chunk is compressed with 842. Chunks are
         classified as compressible if the compressed size is
-        <= CL842_CHUNK_SIZE - sizeof(CHUNK_MAGIC) - sizeof(uint64_t),
+        <= CL842_CHUNK_SIZE - sizeof(CL842_COMPRESSED_CHUNK_MAGIC) - sizeof(uint64_t),
         otherwise they are considered incompressible.
 
         The chunks are placed into the decompression buffer as follows:
         * For incompressible chunks, the compressed version is thrown away
           and the uncompressed data is written directly to the buffer.
         * For compressible chunks, the following is written to the buffer:
-          CHUNK_MAGIC: A sequence of bytes (similar to a UUID)
-                       that allows recognizing that this is a compressed chunk.
+          CL842_COMPRESSED_CHUNK_MAGIC: A sequence of bytes (similar to a UUID) that allows
+                                        recognizing that this is a compressed chunk.
           Size (64-bit): The size of the data after compression.
           *BLANK*: All unused space in the chunk is placed here.
           Compressed data: All compressed data is placed at the end of the buffer.
@@ -98,7 +95,7 @@ int main(int argc, char *argv[]) {
         The INPLACE flag is propagated to the OpenCL decompression kernel,
         which recognizes this format and does a little more work to handle it.
         Mostly, it ignores uncompressed/incompressible chunks
-        (because it sees that CHUNK_MAGIC is not present),
+        (because it sees that CL842_COMPRESSED_CHUNK_MAGIC is not present),
         and decompresses compressed chunks in-place, using some lookahead
         bytes to ensure that the output pointer doesn't 'catch up' the input pointer.
     */
@@ -110,9 +107,9 @@ int main(int argc, char *argv[]) {
         uint8_t* chunk_out = compressOut + (CL842_CHUNK_SIZE * chunk_num);
         
         sw842_compress(chunk_in, CL842_CHUNK_SIZE, &temp_buffer[0], &chunk_olen);
-        if (chunk_olen <= CL842_CHUNK_SIZE - sizeof(CHUNK_MAGIC) - sizeof(uint64_t)) {
-            memcpy(chunk_out, CHUNK_MAGIC, sizeof(CHUNK_MAGIC));
-            *reinterpret_cast<uint64_t *>(chunk_out + sizeof(CHUNK_MAGIC)) = chunk_olen;
+        if (chunk_olen <= CL842_CHUNK_SIZE - sizeof(CL842_COMPRESSED_CHUNK_MAGIC) - sizeof(uint64_t)) {
+            memcpy(chunk_out, CL842_COMPRESSED_CHUNK_MAGIC, sizeof(CL842_COMPRESSED_CHUNK_MAGIC));
+            *reinterpret_cast<uint64_t *>(chunk_out + sizeof(CL842_COMPRESSED_CHUNK_MAGIC)) = chunk_olen;
             memcpy(&chunk_out[CL842_CHUNK_SIZE - chunk_olen], &temp_buffer[0], chunk_olen);
         } else {
             memcpy(&chunk_out[0], &chunk_in[0], CL842_CHUNK_SIZE);

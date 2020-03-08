@@ -235,7 +235,7 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out, ulong nu
     p.in = (in + ((CL842_CHUNK_STRIDE / 8) * chunk_num));
 
     #ifdef INPLACE
-    if (p.in[0] != 0xd72de597bf465abe || p.in[1] != 0x7670d6ee1a947cb2) { // CHUNK_MAGIC
+    if (p.in[0] != 0xd72de597bf465abe || p.in[1] != 0x7670d6ee1a947cb2) { // = CL842_COMPRESSED_CHUNK_MAGIC
         // This chunk is not compressed, leave it untouched
         return;
     }

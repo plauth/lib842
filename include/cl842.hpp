@@ -16,6 +16,10 @@
 #define CL842_CHUNK_SIZE 1024
 #endif
 
+static const uint8_t CL842_COMPRESSED_CHUNK_MAGIC[16] = {
+        0xbe, 0x5a, 0x46, 0xbf, 0x97, 0xe5, 0x2d, 0xd7, 0xb2, 0x7c, 0x94, 0x1a, 0xee, 0xd6, 0x70, 0x76
+};
+
 /**
  * Low-level interface to CL842, for integration into existing OpenCL applications
  * where context, command queue, buffers, etc. are already available.
