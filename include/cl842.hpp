@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 #ifndef CL842_CHUNK_SIZE
-#define CL842_CHUNK_SIZE 1024
+#define CL842_CHUNK_SIZE 65536
 #endif
 
 static const uint8_t CL842_COMPRESSED_CHUNK_MAGIC[16] = {
