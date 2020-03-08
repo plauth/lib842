@@ -223,7 +223,7 @@ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uint64_t i
     return offset;
 }
 
-__kernel void decompress(__global uint64_t *in, __global uint64_t *out, ulong numChunks)
+__kernel void decompress(__global uint64_t *in, ulong inOffset, __global uint64_t *out, ulong outOffset, ulong numChunks)
 {
     unsigned int chunk_num = get_global_id(0);
     if (chunk_num >= numChunks) {
@@ -231,8 +231,8 @@ __kernel void decompress(__global uint64_t *in, __global uint64_t *out, ulong nu
     }
 
     struct sw842_param_decomp p;
-    p.ostart = p.out = out + ((CL842_CHUNK_SIZE / 8) * chunk_num);
-    p.in = (in + ((CL842_CHUNK_STRIDE / 8) * chunk_num));
+    p.ostart = p.out = out + (outOffset / 8) + ((CL842_CHUNK_SIZE / 8) * chunk_num);
+    p.in = (in + (inOffset / 8) + ((CL842_CHUNK_STRIDE / 8) * chunk_num));
 
     #ifdef INPLACE
     if (p.in[0] != 0xd72de597bf465abe || p.in[1] != 0x7670d6ee1a947cb2) { // = CL842_COMPRESSED_CHUNK_MAGIC

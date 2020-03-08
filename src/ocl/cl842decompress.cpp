@@ -26,12 +26,12 @@ CL842DeviceDecompressor::CL842DeviceDecompressor(const cl::Context& context,
 
 
 void CL842DeviceDecompressor::decompress(const cl::CommandQueue& commandQueue,
-                                         const cl::Buffer& inputBuffer, size_t inputSize,
-                                         const cl::Buffer& outputBuffer, size_t outputSize,
+                                         const cl::Buffer& inputBuffer, size_t inputOffset, size_t inputSize,
+                                         const cl::Buffer& outputBuffer, size_t outputOffset, size_t outputSize,
                                          const VECTOR_CLASS<cl::Event>* events, cl::Event* event)
 {
     if (m_inPlace) {
-        if (inputBuffer() != outputBuffer() || inputSize != outputSize) {
+        if (inputBuffer() != outputBuffer() || inputOffset != outputOffset || inputSize != outputSize) {
             throw cl::Error(CL_INVALID_VALUE);
         }
     }
@@ -40,8 +40,10 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue& commandQueue,
     cl::Kernel decompressKernel(m_program, "decompress");
 
     decompressKernel.setArg(0, inputBuffer);
-    decompressKernel.setArg(1, outputBuffer);
-    decompressKernel.setArg(2, static_cast<cl_ulong>(numChunks));
+    decompressKernel.setArg(1, static_cast<cl_ulong>(inputOffset));
+    decompressKernel.setArg(2, outputBuffer);
+    decompressKernel.setArg(3, static_cast<cl_ulong>(outputOffset));
+    decompressKernel.setArg(4, static_cast<cl_ulong>(numChunks));
 
     cl::NDRange globalSize((numChunks + (LOCAL_SIZE-1)) & ~(LOCAL_SIZE-1));
     cl::NDRange localSize(LOCAL_SIZE);
@@ -156,14 +158,14 @@ void CL842HostDecompressor::decompress(const uint8_t* input, size_t inputSize, u
         cl::Buffer buffer(m_context, CL_MEM_READ_WRITE, inputSize + 64);
 
         m_queue.enqueueWriteBuffer(buffer, CL_TRUE, 0, inputSize, input);
-        deviceCompressor.decompress(m_queue, buffer, inputSize, buffer, outputSize);
+        deviceCompressor.decompress(m_queue, buffer, 0, inputSize, buffer, 0, outputSize);
         m_queue.enqueueReadBuffer(buffer, CL_TRUE, 0, outputSize, output);
     } else {
         cl::Buffer inputBuffer(m_context, CL_MEM_READ_ONLY, inputSize);
         cl::Buffer outputBuffer(m_context, CL_MEM_READ_WRITE, outputSize);
 
         m_queue.enqueueWriteBuffer(inputBuffer, CL_TRUE, 0, inputSize, input);
-        deviceCompressor.decompress(m_queue, inputBuffer, inputSize, outputBuffer, outputSize);
+        deviceCompressor.decompress(m_queue, inputBuffer, 0, inputSize, outputBuffer, 0, outputSize);
         m_queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, outputSize, output);
     }
 }
