@@ -99,23 +99,29 @@ int main(int argc, char *argv[]) {
         and decompresses compressed chunks in-place, using some lookahead
         bytes to ensure that the output pointer doesn't 'catch up' the input pointer.
     */
-    std::vector<uint8_t> temp_buffer(CL842_CHUNK_SIZE * 2);
 
-    for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
-        size_t chunk_olen = CL842_CHUNK_SIZE * 2;
-        uint8_t* chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
-        uint8_t* chunk_out = compressOut + (CL842_CHUNK_SIZE * chunk_num);
-        
-        sw842_compress(chunk_in, CL842_CHUNK_SIZE, &temp_buffer[0], &chunk_olen);
-        if (chunk_olen <= CL842_CHUNK_SIZE - sizeof(CL842_COMPRESSED_CHUNK_MAGIC) - sizeof(uint64_t)) {
-            memcpy(chunk_out, CL842_COMPRESSED_CHUNK_MAGIC, sizeof(CL842_COMPRESSED_CHUNK_MAGIC));
-            *reinterpret_cast<uint64_t *>(chunk_out + sizeof(CL842_COMPRESSED_CHUNK_MAGIC)) = chunk_olen;
-            memcpy(&chunk_out[CL842_CHUNK_SIZE - chunk_olen], &temp_buffer[0], chunk_olen);
-        } else {
-            memcpy(&chunk_out[0], &chunk_in[0], CL842_CHUNK_SIZE);
+    #pragma omp parallel
+    {
+        std::vector<uint8_t> temp_buffer(CL842_CHUNK_SIZE * 2);
+
+        #pragma omp for
+        for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
+            size_t chunk_olen = CL842_CHUNK_SIZE * 2;
+            uint8_t* chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
+            uint8_t* chunk_out = compressOut + (CL842_CHUNK_SIZE * chunk_num);
+            
+            sw842_compress(chunk_in, CL842_CHUNK_SIZE, &temp_buffer[0], &chunk_olen);
+            if (chunk_olen <= CL842_CHUNK_SIZE - sizeof(CL842_COMPRESSED_CHUNK_MAGIC) - sizeof(uint64_t)) {
+                memcpy(chunk_out, CL842_COMPRESSED_CHUNK_MAGIC, sizeof(CL842_COMPRESSED_CHUNK_MAGIC));
+                *reinterpret_cast<uint64_t *>(chunk_out + sizeof(CL842_COMPRESSED_CHUNK_MAGIC)) = chunk_olen;
+                memcpy(&chunk_out[CL842_CHUNK_SIZE - chunk_olen], &temp_buffer[0], chunk_olen);
+            } else {
+                memcpy(&chunk_out[0], &chunk_in[0], CL842_CHUNK_SIZE);
+            }
         }
     }
 #else
+    #pragma omp parallel for
     for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
         size_t chunk_olen = CL842_CHUNK_SIZE * 2;
         uint8_t* chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
