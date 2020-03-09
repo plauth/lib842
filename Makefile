@@ -132,12 +132,12 @@ goldenunit: checkdirs $(OBJ_FILES_SERIAL_OPT) $(OBJ_FILES_CRYPTODEV)
 	bin/serial_optimized/goldenunit1
 	bin/serial_optimized/goldenunit2
 
-bin/tools/cl2h: checkdirs src/tools/cl2h.cpp
-	$(CXX) $(CXX_FLAGS) src/tools/cl2h.cpp -o bin/tools/cl2h
+bin/tools/cl2c: checkdirs src/tools/cl2c.cpp
+	$(CXX) $(CXX_FLAGS) src/tools/cl2c.cpp -o bin/tools/cl2c
 
-ocl: bin/tools/cl2h
-	bin/tools/cl2h src/ocl/decompress.cl src/ocl/decompress.cl.h CL842_DECOMPRESS_SOURCE
-	$(CXX) $(CXX_FLAGS) src/serial_optimized/842_compress.cpp src/serial_optimized/bitstream.cpp src/ocl/cl842decompress.cpp src/ocl/compdecomp.cpp $(LDFLAGS_OCL) -o ocl_test -I./include
+ocl: bin/tools/cl2c
+	bin/tools/cl2c src/ocl/decompress.cl src/ocl/decompress.cl.c CL842_DECOMPRESS_SOURCE
+	$(CXX) $(CXX_FLAGS) src/serial_optimized/842_compress.cpp src/serial_optimized/bitstream.cpp src/ocl/cl842decompress.cpp src/ocl/compdecomp.cpp src/ocl/decompress.cl.c $(LDFLAGS_OCL) -o ocl_test  -I./include
 
 cuda:
 	$(NVCC) test/transferbench.cu  -g -O3 obj/serial_optimized/842_decompress.o obj/serial_optimized/842_compress.o -o transferbench -I./include -D_FORCE_INLINES
