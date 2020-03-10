@@ -8,9 +8,6 @@ using namespace std;
 
 #define STRLEN 32
 
-#ifdef INPLACE
-#endif
-
 int main(int argc, char *argv[]) {
     uint8_t *compressIn, *compressOut, *decompressIn, *decompressOut;
     size_t flen, ilen, olen, dlen;
@@ -36,7 +33,7 @@ int main(int argc, char *argv[]) {
         printf("original file length (padded): %zu\n", ilen);
     }
 
-#ifdef INPLACE
+#if defined(USE_INPLACE_COMPRESSED_CHUNKS) || defined(USE_MAYBE_COMPRESSED_CHUNKS)
     olen = ilen;
 #else
     olen = ilen * 2;
@@ -70,9 +67,9 @@ int main(int argc, char *argv[]) {
 
     printf("Using %zu chunks of %d bytes\n", num_chunks, CL842_CHUNK_SIZE);
 
-#ifdef INPLACE
-    /** The objective of INPLACE is to define a format that allows easy network
-        transmission of compressed data without excessive copying,
+#if defined(USE_INPLACE_COMPRESSED_CHUNKS) || defined(USE_MAYBE_COMPRESSED_CHUNKS)
+    /** The objective of (MAYBE|INPLACE)_COMPRESSED_CHUNKS is to define a format that allows
+        easy network transmission of compressed data without excessive copying,
         buffer overallocation, etc..
         As part of this, as the name mentions, chunks are decompressed in-place.
 
@@ -92,7 +89,7 @@ int main(int argc, char *argv[]) {
           *BLANK*: All unused space in the chunk is placed here.
           Compressed data: All compressed data is placed at the end of the buffer.
 
-        The INPLACE flag is propagated to the OpenCL decompression kernel,
+        The (MAYBE|INPLACE)_COMPRESSED_CHUNKS flag is propagated to the OpenCL decompression kernel,
         which recognizes this format and does a little more work to handle it.
         Mostly, it ignores uncompressed/incompressible chunks
         (because it sees that CL842_COMPRESSED_CHUNK_MAGIC is not present),
@@ -135,12 +132,15 @@ int main(int argc, char *argv[]) {
     memcpy(decompressIn, compressOut, olen);
 
     try {
-        #ifdef INPLACE
-        CL842HostDecompressor clDecompress(CL842_CHUNK_SIZE, true, true);
+        #if defined(USE_INPLACE_COMPRESSED_CHUNKS)
+        CL842HostDecompressor clDecompress(CL842_CHUNK_SIZE, CL842InputFormat::INPLACE_COMPRESSED_CHUNKS, true);
         clDecompress.decompress(decompressIn, olen, decompressIn, dlen);
         memcpy(decompressOut, decompressIn, olen);
+        #elif defined(USE_MAYBE_COMPRESSED_CHUNKS)
+        CL842HostDecompressor clDecompress(CL842_CHUNK_SIZE, CL842InputFormat::MAYBE_COMPRESSED_CHUNKS, true);
+        clDecompress.decompress(decompressIn, olen, decompressOut, dlen);
         #else
-        CL842HostDecompressor clDecompress(CL842_CHUNK_SIZE * 2, true);
+        CL842HostDecompressor clDecompress(CL842_CHUNK_SIZE * 2, CL842InputFormat::ALWAYS_COMPRESSED_CHUNKS, true);
         clDecompress.decompress(decompressIn, olen, decompressOut, dlen);
         #endif
     } catch (const cl::Error &ex) {

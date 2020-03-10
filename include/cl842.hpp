@@ -20,6 +20,26 @@ static const uint8_t CL842_COMPRESSED_CHUNK_MAGIC[16] = {
         0xbe, 0x5a, 0x46, 0xbf, 0x97, 0xe5, 0x2d, 0xd7, 0xb2, 0x7c, 0x94, 0x1a, 0xee, 0xd6, 0x70, 0x76
 };
 
+enum class CL842InputFormat {
+    // This is the simplest format, in which the input buffer contains blocks
+    // of size (CL842_CHUNK_SIZE*2), which are always compressed
+    // This format is typically not useful for realistic scenarios, due to
+    // being suboptimal when dealing with uncompressible (e.g. random) data
+    ALWAYS_COMPRESSED_CHUNKS,
+    // In this format, the input buffer contains blocks of size CL842_CHUNK_SIZE
+    // Inside this buffer, uncompressible data is stored as-is and compressible
+    // data is stored with a "marker" header (see CL842_COMPRESSED_CHUNK_MAGIC et al.)
+    // This format allows mixing compressed and uncompressed chunks, which minimizes
+    // the space overhead. However, uncompressed chunks still need to be copied
+    // from the input to the output buffer
+    MAYBE_COMPRESSED_CHUNKS,
+    // In this format, the input and the output buffer are the same and data is
+    // uncompressed in-place in the same buffer. However, this fails with some
+    // data where the output pointer "catches up" with the input pointer
+    // (TODOXXX: Fix or delete this mode)
+    INPLACE_COMPRESSED_CHUNKS,
+};
+
 /**
  * Low-level interface to CL842, for integration into existing OpenCL applications
  * where context, command queue, buffers, etc. are already available.
@@ -30,18 +50,18 @@ class CL842DeviceDecompressor
         CL842DeviceDecompressor(const cl::Context& context,
                                 const VECTOR_CLASS<cl::Device>& devices,
                                 size_t inputChunkStride,
-                                bool verbose = false,
-                                bool inPlace = false);
+                                CL842InputFormat inputFormat,
+                                bool verbose = false);
         void decompress(const cl::CommandQueue& commandQueue,
                         const cl::Buffer& inputBuffer, size_t inputOffset, size_t inputSize,
                         const cl::Buffer& outputBuffer, size_t outputOffset, size_t outputSize,
                         const VECTOR_CLASS<cl::Event>* events = nullptr, cl::Event* event = nullptr);
 
     private:
-        bool m_verbose, m_inPlace;
-        cl::Program m_program;
-
         size_t m_inputChunkStride;
+        CL842InputFormat m_inputFormat;
+        bool m_verbose;
+        cl::Program m_program;
 
         void buildProgram(const cl::Context& context, const VECTOR_CLASS<cl::Device>& devices);
 };
@@ -56,17 +76,18 @@ class CL842HostDecompressor
         static size_t paddedSize(size_t size);
 
         CL842HostDecompressor(size_t inputChunkStride,
-                              bool verbose = false,
-                              bool inPlace = false);
+                              CL842InputFormat inputFormat,
+                              bool verbose = false);
         void decompress(const uint8_t* input, size_t inputSize,
                         uint8_t* output, size_t outputSize);
 
     private:
-        bool m_verbose, m_inPlace;
+        CL842InputFormat m_inputFormat;
+        bool m_verbose;
         VECTOR_CLASS<cl::Device> m_devices;
         cl::Context m_context;
         cl::CommandQueue m_queue;
-        CL842DeviceDecompressor deviceCompressor;
+        CL842DeviceDecompressor m_deviceCompressor;
 
         VECTOR_CLASS<cl::Device> findDevices();
 };

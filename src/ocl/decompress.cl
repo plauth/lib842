@@ -89,7 +89,7 @@ struct sw842_param_decomp {
     __global uint64_t *in;
     uint32_t bits;
     uint64_t buffer;
-    #ifdef INPLACE
+    #ifdef USE_INPLACE_COMPRESSED_CHUNKS
     // FIXME: Determined experimentally. Is this enough for the worst possible case?
     uint64_t lookAheadBuffer[6];
     #endif
@@ -173,7 +173,7 @@ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
     value = 0;
 
   if (p->bits < n) {
-    #ifdef INPLACE
+    #ifdef USE_INPLACE_COMPRESSED_CHUNKS
     p->buffer = p->lookAheadBuffer[0];
     p->lookAheadBuffer[0] = p->lookAheadBuffer[1];
     p->lookAheadBuffer[1] = p->lookAheadBuffer[2];
@@ -234,9 +234,13 @@ __kernel void decompress(__global uint64_t *in, ulong inOffset, __global uint64_
     p.ostart = p.out = out + (outOffset / 8) + ((CL842_CHUNK_SIZE / 8) * chunk_num);
     p.in = (in + (inOffset / 8) + ((CL842_CHUNK_STRIDE / 8) * chunk_num));
 
-    #ifdef INPLACE
+    #if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
     if (p.in[0] != 0xd72de597bf465abe || p.in[1] != 0x7670d6ee1a947cb2) { // = CL842_COMPRESSED_CHUNK_MAGIC
-        // This chunk is not compressed, leave it untouched
+        #ifdef USE_MAYBE_COMPRESSED_CHUNKS
+        for (size_t i = 0; i < CL842_CHUNK_SIZE; i++) {
+            p.out[i] = p.in[i];
+        }
+        #endif
         return;
     }
     p.in += (CL842_CHUNK_SIZE - p.in[2]) / 8;
@@ -244,7 +248,7 @@ __kernel void decompress(__global uint64_t *in, ulong inOffset, __global uint64_
 
 
     p.buffer = 0;
-    #ifdef INPLACE
+    #ifdef USE_INPLACE_COMPRESSED_CHUNKS
     p.lookAheadBuffer[0] = bswap(*p.in++);
     p.lookAheadBuffer[1] = bswap(*p.in++);
     p.lookAheadBuffer[2] = bswap(*p.in++);

@@ -76,8 +76,12 @@ if (OpenCL_FOUND)
     target_link_libraries (test_ocl 842 ${OpenCL_LIBRARY})
 
     add_executable(test_ocl_inplace src/ocl/compdecomp.cpp)
-    set_target_properties(test_ocl_inplace PROPERTIES COMPILE_DEFINITIONS "INPLACE")
+    set_target_properties(test_ocl_inplace PROPERTIES COMPILE_DEFINITIONS "USE_INPLACE_COMPRESSED_CHUNKS")
     target_link_libraries (test_ocl_inplace 842 ${OpenCL_LIBRARY})
+
+    add_executable(test_ocl_maybe src/ocl/compdecomp.cpp)
+    set_target_properties(test_ocl_maybe PROPERTIES COMPILE_DEFINITIONS "USE_MAYBE_COMPRESSED_CHUNKS")
+    target_link_libraries (test_ocl_maybe 842 ${OpenCL_LIBRARY})
 
 endif()
 
