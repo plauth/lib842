@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-option(USE_OPTIMIZED_SERIAL_IMPLEMENTATION "Use optimized sw842_(de)compress implementation" OFF)
+option(USE_OPTIMIZED_SERIAL_IMPLEMENTATION "Use optimized sw842_(de)compress implementation" ON)
 
 project(lib842)
 
