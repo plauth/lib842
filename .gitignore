@@ -7,7 +7,7 @@ test/simple_test
 vec.out
 a.out
 *.ptx
-src/ocl/decompress.cl.h
+src/ocl/decompress.cl.c
 
 ocl_test
 ocl_test.dSYM
