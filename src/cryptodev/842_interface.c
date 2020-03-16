@@ -59,6 +59,7 @@ int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, voi
 {
 	struct crypt_op cryp;
 	void* p;
+	__u32 useddlen;
 	
 	/* check input and output alignment */
 	if (ctx->alignmask) {
@@ -92,13 +93,15 @@ int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, voi
 	cryp.dlen = (__u32)*olen;
 	cryp.src = (__u8*)input;
 	cryp.dst = (__u8*)output;
+	cryp.iv = (__u8*)&useddlen; // FIXME: Using an existing "recycled" field from cryptodev
+	                            //        for returning the used size fo the destination buffer
 	cryp.op = COP_ENCRYPT;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
 		fprintf(stderr, "ioctl(CIOCCRYPT)\n");
 		return -1;
 	}
 
-	*olen = cryp.dlen;
+	*olen = useddlen;
 
 	return 0;
 }
@@ -107,6 +110,7 @@ int c842_decompress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, v
 {
 	struct crypt_op cryp;
 	void* p;
+	__u32 useddlen;
 	
 	/* check input and output alignment */
 	if (ctx->alignmask) {
@@ -140,13 +144,15 @@ int c842_decompress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, v
 	cryp.dlen = (__u32)*olen;
 	cryp.src = (__u8*)input;
 	cryp.dst = (__u8*)output;
+	cryp.iv = (__u8*)&useddlen; // FIXME: Using an existing "recycled" field from cryptodev
+	                            //        for returning the used size fo the destination buffer
 	cryp.op = COP_DECRYPT;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
 		fprintf(stderr, "ioctl(CIOCCRYPT)\n");
 		return -1;
 	}
 
-	*olen = cryp.dlen;
+	*olen = useddlen;
 
 	return 0;
 }
