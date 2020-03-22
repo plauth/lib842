@@ -138,8 +138,8 @@ __global__ void cuda842_decompress(__restrict__ uint64_t *in, __restrict__ uint6
 	unsigned int chunk_num = blockIdx.x * blockDim.x + threadIdx.x;
 
 	struct sw842_param_decomp p;
-	p.ostart = p.out = out + ((CHUNK_SIZE / 8) * chunk_num);
-  	p.in = (in + ((CHUNK_SIZE / 8 * 2) * chunk_num));
+	p.ostart = p.out = out + ((CUDA842_CHUNK_SIZE / 8) * chunk_num);
+  	p.in = (in + ((CUDA842_CHUNK_SIZE / 8 * 2) * chunk_num));
 
 
 	p.buffer = 0;

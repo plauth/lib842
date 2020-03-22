@@ -2,10 +2,6 @@
 #ifndef __842_INTERNAL_H__
 #define __842_INTERNAL_H__
 
-#ifndef CHUNK_SIZE
-#define CHUNK_SIZE 1024
-#endif
-
 /* The 842 compressed format is made up of multiple blocks, each of
  * which have the format:
  *
@@ -84,8 +80,7 @@
 #include <errno.h>
 #include <string.h>
 
-
-#include "../../include/sw842.h"
+#include "../../include/cuda842.h"
 
 #include "../common/memaccess.h"
 #include "../common/endianness.h"
@@ -108,7 +103,7 @@
 #define I4_BITS		(9)
 #define I8_BITS		(8)
 #else
-#define STATIC_LOG2_ARG CHUNK_SIZE
+#define STATIC_LOG2_ARG CUDA842_CHUNK_SIZE
 #include "../common/static_log2.h"
 #define I2_BITS		(STATIC_LOG2_VALUE-1)
 #define I4_BITS		(STATIC_LOG2_VALUE-2)
@@ -211,7 +206,5 @@ struct sw842_param {
  	uint32_t bits;
  	uint64_t buffer;
  };
-
- __global__ void cuda842_decompress(uint64_t *in, uint64_t *out);
 
 #endif

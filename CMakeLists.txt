@@ -13,6 +13,8 @@ if (OpenCL_FOUND)
     link_directories(${OpenCL_LIBRARY})
 endif()
 
+find_package(CUDA)
+
 find_package(OpenMP REQUIRED)
 Set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -52,7 +54,16 @@ if (OpenCL_FOUND)
     set(SRCFILES ${SRCFILES} src/ocl/cl842decompress.cpp decompress_cl.c)
 endif()
 
-add_library(842 STATIC ${SRCFILES})
+# CUDA implementation
+if (CUDA_FOUND)
+    set(SRCFILES ${SRCFILES} src/cuda/842_decompress.cu)
+endif()
+
+if (CUDA_FOUND)
+    cuda_add_library(842 STATIC ${SRCFILES})
+else ()
+    add_library(842 STATIC ${SRCFILES})
+endif()
 set_property(TARGET 842 PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_include_directories(842 PUBLIC include)
 if (OpenCL_FOUND)
@@ -71,6 +82,11 @@ if (HAVE_CRYPTODEV_LINUX_COMP)
     target_link_libraries (test_cryptodev 842)
 endif()
 
+if (CUDA_FOUND)
+    cuda_add_executable(test_cuda src/cuda/compdecomp.cu)
+    target_link_libraries (test_cuda 842)
+endif()
+
 if (OpenCL_FOUND)
     add_executable(test_ocl src/ocl/compdecomp.cpp)
     target_link_libraries (test_ocl 842 ${OpenCL_LIBRARY})
@@ -82,7 +98,6 @@ if (OpenCL_FOUND)
     add_executable(test_ocl_maybe src/ocl/compdecomp.cpp)
     set_target_properties(test_ocl_maybe PROPERTIES COMPILE_DEFINITIONS "USE_MAYBE_COMPRESSED_CHUNKS")
     target_link_libraries (test_ocl_maybe 842 ${OpenCL_LIBRARY})
-
 endif()
 
 # TODOXXX: Integrate all options from the GNU Makefile here and then remove it
