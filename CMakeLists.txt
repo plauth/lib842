@@ -7,18 +7,31 @@ project(lib842)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(OpenCL)
-if (OpenCL_FOUND)
-    include_directories(${OpenCL_INCLUDE_DIRS})
-    link_directories(${OpenCL_LIBRARY})
+# Avoid 'ignoring attributes on template argument' spam because of types such as std::vector<cl_int>
+# See https://github.com/KhronosGroup/OpenCL-CLHPP/issues/37 for more information
+if (CMAKE_COMPILER_IS_GNUCXX AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 6.0)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 endif()
 
+################
+# DEPENDENCIES #
+################
+try_compile(CRYPTODEV_LINUX_COMP_FOUND
+            "${CMAKE_BINARY_DIR}/temp"
+            "${PROJECT_SOURCE_DIR}/check_cryptodev_linux_comp.c")
+
+include(CheckSymbolExists)
+check_symbol_exists(accel_compress "sys/types.h;sys/vminfo.h" AIX_HWCOMPRESSION_FOUND)
+
+find_package(OpenCL)
 find_package(CUDA)
 
-find_package(OpenMP REQUIRED)
-Set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+find_package(OpenMP)
+if (OpenMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
 
 ###########
 # LIBRARY #
@@ -36,14 +49,9 @@ else()
 endif()
 
 # In-kernel, possibly hardware-accelerated implementation (cryptodev)
-try_compile(HAVE_CRYPTODEV_LINUX_COMP
-            "${CMAKE_BINARY_DIR}/temp"
-            "${PROJECT_SOURCE_DIR}/check_cryptodev_linux_comp.c")
-if(HAVE_CRYPTODEV_LINUX_COMP)
+if(CRYPTODEV_LINUX_COMP_FOUND)
     set(SRCFILES ${SRCFILES} src/cryptodev/842_interface.c)
 endif()
-
-check_symbol_exists(accel_compress "sys/types.h;sys/vminfo.h" HAVE_AIX_HWCOMPRESSION)
 
 # OpenCL implementation
 if (OpenCL_FOUND)
@@ -69,6 +77,8 @@ endif()
 set_property(TARGET 842 PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_include_directories(842 PUBLIC include)
 if (OpenCL_FOUND)
+    target_include_directories(842 PUBLIC ${OpenCL_INCLUDE_DIRS})
+    target_link_directories(842 PUBLIC ${OpenCL_LIBRARY})
     target_link_libraries (842 ${OpenCL_LIBRARY})
 endif()
 
@@ -81,7 +91,7 @@ target_link_libraries (test_serial 842)
 add_executable(test_diffuse_pattern test/diffuse_pattern.c)
 target_link_libraries (test_diffuse_pattern 842)
 
-if (HAVE_CRYPTODEV_LINUX_COMP)
+if (CRYPTODEV_LINUX_COMP_FOUND)
     add_executable(test_cryptodev test/compdecomp.c)
     set_target_properties(test_cryptodev PROPERTIES COMPILE_DEFINITIONS "USEHW")
     target_link_libraries (test_cryptodev 842)
@@ -93,7 +103,7 @@ if (HAVE_CRYPTODEV_LINUX_COMP)
     target_link_libraries (test_goldenunit2 842)
 endif()
 
-if (HAVE_AIX_HWCOMPRESSION)
+if (AIX_HWCOMPRESSION_FOUND)
     add_executable(test_aix_standalone test/compdecomp_aix.c)
 endif()
 
