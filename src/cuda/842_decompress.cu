@@ -133,13 +133,13 @@ __device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 }
 #endif
 
-__global__ void cuda842_decompress(__restrict__ uint64_t *in, __restrict__ uint64_t *out)
+__global__ void cuda842_decompress(__restrict__ const uint64_t *in, __restrict__ uint64_t *out)
 {
 	unsigned int chunk_num = blockIdx.x * blockDim.x + threadIdx.x;
 
 	struct sw842_param_decomp p;
 	p.ostart = p.out = out + ((CUDA842_CHUNK_SIZE / 8) * chunk_num);
-  	p.in = (in + ((CUDA842_CHUNK_SIZE / 8 * 2) * chunk_num));
+  	p.in = (uint64_t *)(in + ((CUDA842_CHUNK_SIZE / 8 * 2) * chunk_num));
 
 
 	p.buffer = 0;
