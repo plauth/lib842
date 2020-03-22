@@ -43,6 +43,8 @@ if(HAVE_CRYPTODEV_LINUX_COMP)
     set(SRCFILES ${SRCFILES} src/cryptodev/842_interface.c)
 endif()
 
+check_symbol_exists(accel_compress "sys/types.h;sys/vminfo.h" HAVE_AIX_HWCOMPRESSION)
+
 # OpenCL implementation
 if (OpenCL_FOUND)
     add_executable(cl2c src/tools/cl2c.cpp)
@@ -76,10 +78,23 @@ endif()
 add_executable(test_serial test/compdecomp.c)
 target_link_libraries (test_serial 842)
 
+add_executable(test_diffuse_pattern test/diffuse_pattern.c)
+target_link_libraries (test_diffuse_pattern 842)
+
 if (HAVE_CRYPTODEV_LINUX_COMP)
     add_executable(test_cryptodev test/compdecomp.c)
     set_target_properties(test_cryptodev PROPERTIES COMPILE_DEFINITIONS "USEHW")
     target_link_libraries (test_cryptodev 842)
+
+    add_executable(test_goldenunit1 test/goldenunit1.c)
+    target_link_libraries (test_goldenunit1 842)
+
+    add_executable(test_goldenunit2 test/goldenunit2.c)
+    target_link_libraries (test_goldenunit2 842)
+endif()
+
+if (HAVE_AIX_HWCOMPRESSION)
+    add_executable(test_aix_standalone test/compdecomp_aix.c)
 endif()
 
 if (CUDA_FOUND)
