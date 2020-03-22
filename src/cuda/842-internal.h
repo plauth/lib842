@@ -88,7 +88,6 @@
 
 #define BRANCH_FREE (1)
 //#define DEBUG 1
-#define STRICT
 
 /* special templates */
 #define OP_REPEAT	(0x1B)
@@ -98,7 +97,7 @@
 /* additional bits of each op param */
 #define OP_BITS		(5)
 #define REPEAT_BITS	(6)
-#ifdef STRICT
+#ifdef CUDA842_STRICT
 #define I2_BITS		(8)
 #define I4_BITS		(9)
 #define I8_BITS		(8)

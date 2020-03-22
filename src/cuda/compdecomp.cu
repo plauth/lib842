@@ -35,7 +35,7 @@ size_t nextMultipleOfChunkSize(size_t input) {
 
 int main( int argc, const char* argv[])
 {
-	#ifdef STRICT
+	#ifdef CUDA842_STRICT
 	printf("Running in strict mode (i.e. fully compatible to the hardware-based nx842 unit).\n");
 	#endif
 	uint8_t *in, *compressed, *decompressed;

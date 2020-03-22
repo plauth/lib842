@@ -73,7 +73,7 @@
  * code is detected.
  */
 
-#define STRICT
+#define CUDA842_STRICT
 
 #include <stdio.h>
 #include <stdlib.h>

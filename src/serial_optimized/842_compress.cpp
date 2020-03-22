@@ -563,7 +563,7 @@ int sw842_compress(const uint8_t *in, size_t ilen,
 		 */
 		get_next_data(p);
 
-#ifdef STRICT
+#ifdef CUDA842_STRICT
 		/* we don't care about endianness in last or next;
 		 * we're just comparing 8 bytes to another 8 bytes,
 		 * they're both the same endianness
