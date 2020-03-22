@@ -73,7 +73,7 @@
  * code is detected.
  */
 
-//#define STRICT
+#define STRICT
 
 #include <stdio.h>
 #include <stdlib.h>
