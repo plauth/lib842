@@ -41,9 +41,9 @@ int main( int argc, const char* argv[])
 		fseek(fp, 0, SEEK_END);
 		size_t flen = (size_t)ftell(fp);
 		ilen = flen;
-		printf("original file length: %d\n", ilen);
+		printf("original file length: %zu\n", ilen);
 		ilen = nextMultipleOfChunkSize(ilen);
-		printf("original file length (padded): %d\n", ilen);
+		printf("original file length (padded): %zu\n", ilen);
 		olen = ilen * 2;
 		dlen = ilen * 2;
 		fseek(fp, 0, SEEK_SET);
