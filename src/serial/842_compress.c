@@ -31,7 +31,7 @@
  * decompressor.  Unless you have a specific need for that, leave this disabled
  * so that any length buffer can be compressed.
  */
-#define SW842_STRICT 1
+#define SW842_STRICT 0
 
 /* If defined, avoid (ab)using undefined behaviour (as defined by the standard),
  * which nevertheless works on our target platforms and provides better performance.
