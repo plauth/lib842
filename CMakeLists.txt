@@ -4,6 +4,8 @@ option(USE_OPTIMIZED_SERIAL_IMPLEMENTATION "Use optimized sw842_(de)compress imp
 
 project(lib842)
 
+enable_testing()
+
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -127,4 +129,43 @@ if (OpenCL_FOUND)
     target_link_libraries (test_ocl_maybe 842 ${OpenCL_LIBRARY})
 endif()
 
-# TODOXXX: Integrate all options from the GNU Makefile here and then remove it
+###################
+# AUTOMATIC TESTS #
+###################
+foreach(test test_compress_pattern
+             test_compress_pattern_unaligned
+             test_compress_pattern_halfsmall
+             test_compress_pattern_barelysmall
+             test_compress_notmultipleof8
+             test_decompress_pattern
+             test_decompress_pattern_unaligned
+             test_decompress_pattern_halfsmall
+             test_decompress_pattern_barelysmall
+             test_decompress_invalid
+             test_decompress_crcerror)
+    add_executable(${test} test/${test}.c test/test_patterns.c test/test_util.c)
+    target_link_libraries (${test} 842)
+endforeach()
+
+set(PATTERNS empty zeros random mixed limit text)
+
+foreach (IMPL sw) # TODOXXX: Add hw, distinguish sw-fallback and sw-optimized
+    foreach(PATTERN ${PATTERNS})
+        add_test(test_compress_pattern_${PATTERN} test_compress_pattern ${IMPL} ${PATTERN})
+        add_test(test_compress_pattern_unaligned_${PATTERN} test_compress_pattern_unaligned ${IMPL} ${PATTERN})
+        add_test(test_compress_pattern_halfsmall_${PATTERN} test_compress_pattern_halfsmall ${IMPL} ${PATTERN})
+        add_test(test_compress_pattern_barelysmall_${PATTERN} test_compress_pattern_barelysmall ${IMPL} ${PATTERN})
+    endforeach()
+    add_test(test_compress_notmultipleof8 test_compress_notmultipleof8 ${IMPL})
+
+    foreach(PATTERN ${PATTERNS})
+        add_test(test_decompress_pattern_${PATTERN} test_decompress_pattern ${IMPL} ${PATTERN})
+        add_test(test_decompress_pattern_unaligned_${PATTERN} test_decompress_pattern_unaligned ${IMPL} ${PATTERN})
+        if (NOT ("${PATTERN}" STREQUAL "empty"))
+            add_test(test_decompress_pattern_halfsmall_${PATTERN} test_decompress_pattern_halfsmall ${IMPL} ${PATTERN})
+            add_test(test_decompress_pattern_barelysmall_${PATTERN} test_decompress_pattern_barelysmall ${IMPL} ${PATTERN})
+        endif()
+    endforeach()
+    add_test(test_decompress_invalid test_decompress_invalid ${IMPL})
+    add_test(test_decompress_crcerror test_decompress_crcerror ${IMPL})
+endforeach()
