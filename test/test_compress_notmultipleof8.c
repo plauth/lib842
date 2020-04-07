@@ -5,7 +5,7 @@
 #include <errno.h>
 #include "test_util.h"
 
-static uint8_t NOT_MULTIPLE_OF_8[] = { 0x11, 0x11, 0x11, 0x12, 0x12};
+static uint8_t NOT_MULTIPLE_OF_8[] = { 0x11, 0x11, 0x11, 0x12, 0x12 };
 
 int main(int argc, char *argv[]) {
     const struct test842_impl *impl;
@@ -17,8 +17,13 @@ int main(int argc, char *argv[]) {
 
     uint8_t out[32];
     size_t olen = sizeof(out);
-    if (impl->compress(NOT_MULTIPLE_OF_8, sizeof(NOT_MULTIPLE_OF_8), out, &olen) != -EINVAL) {
-        printf("Compression should have failed with EINVAL\n");
+    int ret = impl->compress(NOT_MULTIPLE_OF_8, sizeof(NOT_MULTIPLE_OF_8), out, &olen);
+
+    // This is a tricky one: The actual hardware can't compress input streams
+    // that are not multiples of 8, but software implementations can, depending
+    // on a flag. So simply allow both behaviors in the test.
+    if (ret != 0 && ret != -EINVAL) {
+        printf("Compression should have either succeeded or failed with EINVAL\n");
         return EXIT_FAILURE;
     }
 

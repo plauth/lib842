@@ -18,8 +18,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    uint8_t out[pattern->ref_compressed_len/2];
-    size_t olen = pattern->ref_compressed_len/2;
+    uint8_t out[pattern->compressed_len/2];
+    size_t olen = pattern->compressed_len/2;
     if (impl->compress(pattern->uncompressed, pattern->uncompressed_len, out, &olen) != -ENOSPC) {
         printf("Compression should have failed with ENOSPC\n");
         return EXIT_FAILURE;

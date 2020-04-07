@@ -21,7 +21,9 @@ int main(int argc, char *argv[]) {
 
     uint8_t out[sizeof(INVALID_BITSTREAM)*2];
     size_t olen = sizeof(out);
-    if (impl->decompress(INVALID_BITSTREAM, sizeof(INVALID_BITSTREAM), out, &olen) != -EINVAL) {
+    int ret = impl->decompress(INVALID_BITSTREAM, sizeof(INVALID_BITSTREAM), out, &olen);
+    printf("ret is %d\n", ret);
+    if (ret != -EINVAL) {
         printf("Decompression should have failed with EINVAL\n");
         return EXIT_FAILURE;
     }

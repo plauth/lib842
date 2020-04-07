@@ -18,24 +18,29 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    alignas(8) uint8_t inb[pattern->uncompressed_len+3], outb[pattern->ref_compressed_len+3];
-    uint8_t *in = inb + 3, *out = outb + 3;
+    alignas(8) uint8_t inb[pattern->uncompressed_len+3],
+                       outb[pattern->compressed_len+3],
+                       recovered_inb[pattern->uncompressed_len+3];
+    uint8_t *in = inb + 3, *out = outb + 3, *recovered_in = recovered_inb + 3;
     memcpy(in, pattern->uncompressed, pattern->uncompressed_len);
-    size_t olen = pattern->ref_compressed_len;
+    size_t olen = pattern->compressed_len,
+           recovered_ilen = pattern->uncompressed_len;
     if (impl->compress(in, pattern->uncompressed_len, out, &olen) != 0) {
         printf("Compression failed\n");
         return EXIT_FAILURE;
     }
+    if (impl->decompress(out, olen, recovered_in, &recovered_ilen) != 0) {
+        printf("Decompression failed\n");
+        return EXIT_FAILURE;
+    }
 
-    if (olen != pattern->ref_compressed_len ||
-        memcmp(out, pattern->ref_compressed, pattern->ref_compressed_len) != 0) {
+    if (recovered_ilen != pattern->uncompressed_len ||
+        memcmp(recovered_in, pattern->uncompressed, pattern->uncompressed_len) != 0) {
         printf("Invalid compression result\n");
-        printf("Input (%zu bytes):\n", pattern->uncompressed_len);
+        printf("Input & expected output (%zu bytes):\n", pattern->uncompressed_len);
         test842_hexdump(pattern->uncompressed, pattern->uncompressed_len);
-        printf("Expected output (%zu bytes):\n", pattern->ref_compressed_len);
-        test842_hexdump(pattern->ref_compressed, pattern->ref_compressed_len);
         printf("Actual output (%zu bytes):\n", olen);
-        test842_hexdump(out, olen);
+        test842_hexdump(recovered_in, recovered_ilen);
         return EXIT_FAILURE;
     }
 

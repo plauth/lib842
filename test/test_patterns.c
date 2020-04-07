@@ -2,42 +2,42 @@
 #include <string.h>
 
 // Pattern of length zero
-static const uint8_t PATTERN_EMPTY_INPUT[] = { };
-static const uint8_t PATTERN_EMPTY_EXPECTED_OUTPUT[] = {
+static const uint8_t PATTERN_EMPTY_UNCOMPRESSED[] = { };
+static const uint8_t PATTERN_EMPTY_COMPRESSED[] = {
         0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 static const struct test842_pattern PATTERN_EMPTY = {
-        .uncompressed = PATTERN_EMPTY_INPUT,
-        .uncompressed_len = sizeof(PATTERN_EMPTY_INPUT),
-        .ref_compressed = PATTERN_EMPTY_EXPECTED_OUTPUT,
-        .ref_compressed_len = sizeof(PATTERN_EMPTY_EXPECTED_OUTPUT)
+        .uncompressed = PATTERN_EMPTY_UNCOMPRESSED,
+        .uncompressed_len = sizeof(PATTERN_EMPTY_UNCOMPRESSED),
+        .compressed = PATTERN_EMPTY_COMPRESSED,
+        .compressed_len = sizeof(PATTERN_EMPTY_COMPRESSED)
 };
 
 // Pattern containing just zeros
-static const uint8_t PATTERN_ZEROS_INPUT[] = {
+static const uint8_t PATTERN_ZEROS_UNCOMPRESSED[] = {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
-static const uint8_t PATTERN_ZEROS_EXPECTED_OUTPUT[] = {
+static const uint8_t PATTERN_ZEROS_COMPRESSED[] = {
         0xe6, 0xc2, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 static const struct test842_pattern PATTERN_ZEROS = {
-        .uncompressed = PATTERN_ZEROS_INPUT,
-        .uncompressed_len = sizeof(PATTERN_ZEROS_INPUT),
-        .ref_compressed = PATTERN_ZEROS_EXPECTED_OUTPUT,
-        .ref_compressed_len = sizeof(PATTERN_ZEROS_EXPECTED_OUTPUT)
+        .uncompressed = PATTERN_ZEROS_UNCOMPRESSED,
+        .uncompressed_len = sizeof(PATTERN_ZEROS_UNCOMPRESSED),
+        .compressed = PATTERN_ZEROS_COMPRESSED,
+        .compressed_len = sizeof(PATTERN_ZEROS_COMPRESSED)
 };
 
 // Pattern containing random data
-static const uint8_t PATTERN_RANDOM_INPUT[] = {
+static const uint8_t PATTERN_RANDOM_UNCOMPRESSED[] = {
         0x0f, 0x07, 0x32, 0xb4, 0xaf, 0x6b, 0xe4, 0x0c,
         0x5f, 0x8b, 0x4e, 0x4c, 0x4e, 0x3f, 0xfd, 0x44,
         0xf0, 0x5f, 0xd6, 0x60, 0x22, 0x4d, 0xc5, 0x2f,
         0x37, 0x8c, 0xbb, 0x3d, 0xd2, 0x17, 0x9b, 0xde
 };
-static const uint8_t PATTERN_RANDOM_EXPECTED_OUTPUT[] = {
+static const uint8_t PATTERN_RANDOM_COMPRESSED[] = {
         0x00, 0x78, 0x39, 0x95, 0xa5, 0x7b, 0x5f, 0x20,
         0x60, 0x17, 0xe2, 0xd3, 0x93, 0x13, 0x8f, 0xff,
         0x51, 0x01, 0xe0, 0xbf, 0xac, 0xc0, 0x44, 0x9b,
@@ -45,34 +45,34 @@ static const uint8_t PATTERN_RANDOM_EXPECTED_OUTPUT[] = {
         0x79, 0xbd, 0xef, 0x47, 0xe0, 0xe6, 0xe6, 0x00
 };
 static const struct test842_pattern PATTERN_RANDOM = {
-        .uncompressed = PATTERN_RANDOM_INPUT,
-        .uncompressed_len = sizeof(PATTERN_RANDOM_INPUT),
-        .ref_compressed = PATTERN_RANDOM_EXPECTED_OUTPUT,
-        .ref_compressed_len = sizeof(PATTERN_RANDOM_EXPECTED_OUTPUT)
+        .uncompressed = PATTERN_RANDOM_UNCOMPRESSED,
+        .uncompressed_len = sizeof(PATTERN_RANDOM_UNCOMPRESSED),
+        .compressed = PATTERN_RANDOM_COMPRESSED,
+        .compressed_len = sizeof(PATTERN_RANDOM_COMPRESSED)
 };
 
 // Pattern that compresses to exactly the same size as the input
-static const uint8_t PATTERN_LIMIT_INPUT[] = {
+static const uint8_t PATTERN_LIMIT_UNCOMPRESSED[] = {
         0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
         0x12, 0x12, 0x12, 0x12, 0x13, 0x13, 0x14, 0x15,
         0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17,
         0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17, 0x17
 };
-static const uint8_t PATTERN_LIMIT_EXPECTED_OUTPUT[] = {
+static const uint8_t PATTERN_LIMIT_COMPRESSED[] = {
         0x00, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88,
         0x88, 0x04, 0x84, 0x84, 0x84, 0x84, 0xc4, 0xc5,
         0x05, 0x40, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e, 0x2e,
         0x2e, 0x2f, 0xb0, 0x3d, 0x6a, 0xe4, 0xe2, 0x58
 };
 static const struct test842_pattern PATTERN_LIMIT = {
-        .uncompressed = PATTERN_LIMIT_INPUT,
-        .uncompressed_len = sizeof(PATTERN_LIMIT_INPUT),
-        .ref_compressed = PATTERN_LIMIT_EXPECTED_OUTPUT,
-        .ref_compressed_len = sizeof(PATTERN_LIMIT_EXPECTED_OUTPUT)
+        .uncompressed = PATTERN_LIMIT_UNCOMPRESSED,
+        .uncompressed_len = sizeof(PATTERN_LIMIT_UNCOMPRESSED),
+        .compressed = PATTERN_LIMIT_COMPRESSED,
+        .compressed_len = sizeof(PATTERN_LIMIT_COMPRESSED)
 };
 
 // Pattern that compresses to exactly the same size as the input
-static const uint8_t PATTERN_MIXED_INPUT[] = {
+static const uint8_t PATTERN_MIXED_UNCOMPRESSED[] = {
         0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
         0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
         0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
@@ -82,7 +82,7 @@ static const uint8_t PATTERN_MIXED_INPUT[] = {
         0xf0, 0x5f, 0xd6, 0x60, 0x22, 0x4d, 0xc5, 0x2f,
         0x37, 0x8c, 0xbb, 0x3d, 0xd2, 0x17, 0x9b, 0xde
 };
-static const uint8_t PATTERN_MIXED_EXPECTED_OUTPUT[] = {
+static const uint8_t PATTERN_MIXED_COMPRESSED[] = {
         0x00, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88,
         0x8e, 0xc2, 0x00, 0x78, 0x39, 0x95, 0xa5, 0x7b,
         0x5f, 0x20, 0x60, 0x17, 0xe2, 0xd3, 0x93, 0x13,
@@ -92,14 +92,14 @@ static const uint8_t PATTERN_MIXED_EXPECTED_OUTPUT[] = {
         0x09, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 static const struct test842_pattern PATTERN_MIXED = {
-        .uncompressed = PATTERN_MIXED_INPUT,
-        .uncompressed_len = sizeof(PATTERN_MIXED_INPUT),
-        .ref_compressed = PATTERN_MIXED_EXPECTED_OUTPUT,
-        .ref_compressed_len = sizeof(PATTERN_MIXED_EXPECTED_OUTPUT)
+        .uncompressed = PATTERN_MIXED_UNCOMPRESSED,
+        .uncompressed_len = sizeof(PATTERN_MIXED_UNCOMPRESSED),
+        .compressed = PATTERN_MIXED_COMPRESSED,
+        .compressed_len = sizeof(PATTERN_MIXED_COMPRESSED)
 };
 
 // Pattern that compresses to exactly the same size as the input
-static const uint8_t PATTERN_TEXT_INPUT[] = {
+static const uint8_t PATTERN_TEXT_UNCOMPRESSED[] = {
         "When my father returned from Milan, he found playing with me in "
         "the hall of our villa a child fairer than pictured cherub—a crea"
         "ture who seemed to shed radiance from her looks and whose form a"
@@ -114,7 +114,7 @@ static const uint8_t PATTERN_TEXT_INPUT[] = {
         "sister—the beautiful and adored companion of all my occupations "
         "and my pleasures.      "
 };
-static const uint8_t PATTERN_TEXT_EXPECTED_OUTPUT[] = {
+static const uint8_t PATTERN_TEXT_COMPRESSED[] = {
         0x02, 0xbb, 0x43, 0x2b, 0x71, 0x03, 0x6b, 0xc9,
         0x00, 0x19, 0x98, 0x5d, 0x1a, 0x19, 0x5c, 0x88,
         0x1c, 0x80, 0xca, 0xe8, 0xea, 0xe4, 0xdc, 0xca,
@@ -197,10 +197,10 @@ static const uint8_t PATTERN_TEXT_EXPECTED_OUTPUT[] = {
         0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 static const struct test842_pattern PATTERN_TEXT = {
-        .uncompressed = PATTERN_TEXT_INPUT,
-        .uncompressed_len = sizeof(PATTERN_TEXT_INPUT),
-        .ref_compressed = PATTERN_TEXT_EXPECTED_OUTPUT,
-        .ref_compressed_len = sizeof(PATTERN_TEXT_EXPECTED_OUTPUT)
+        .uncompressed = PATTERN_TEXT_UNCOMPRESSED,
+        .uncompressed_len = sizeof(PATTERN_TEXT_UNCOMPRESSED),
+        .compressed = PATTERN_TEXT_COMPRESSED,
+        .compressed_len = sizeof(PATTERN_TEXT_COMPRESSED)
 };
 
 const struct test842_pattern *test842_get_pattern_by_name(const char *name) {

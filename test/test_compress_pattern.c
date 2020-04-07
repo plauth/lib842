@@ -1,4 +1,5 @@
-// Tests that the result of compressing some data matches the expected reference output
+// Tests that the result of compressing some data and uncompressing it
+// matches the expected reference output
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -17,23 +18,28 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    alignas(8) uint8_t in[pattern->uncompressed_len], out[pattern->ref_compressed_len];
+    alignas(8) uint8_t in[pattern->uncompressed_len],
+                       out[pattern->compressed_len],
+                       recovered_in[pattern->uncompressed_len];
     memcpy(in, pattern->uncompressed, pattern->uncompressed_len);
-    size_t olen = pattern->ref_compressed_len;
+    size_t olen = pattern->compressed_len,
+           recovered_ilen = pattern->uncompressed_len;
     if (impl->compress(in, pattern->uncompressed_len, out, &olen) != 0) {
         printf("Compression failed\n");
         return EXIT_FAILURE;
     }
+    if (impl->decompress(out, olen, recovered_in, &recovered_ilen) != 0) {
+        printf("Decompression failed\n");
+        return EXIT_FAILURE;
+    }
 
-    if (olen != pattern->ref_compressed_len ||
-        memcmp(out, pattern->ref_compressed, pattern->ref_compressed_len) != 0) {
+    if (recovered_ilen != pattern->uncompressed_len ||
+        memcmp(recovered_in, pattern->uncompressed, pattern->uncompressed_len) != 0) {
         printf("Invalid compression result\n");
-        printf("Input (%zu bytes):\n", pattern->uncompressed_len);
+        printf("Input & expected output (%zu bytes):\n", pattern->uncompressed_len);
         test842_hexdump(pattern->uncompressed, pattern->uncompressed_len);
-        printf("Expected output (%zu bytes):\n", pattern->ref_compressed_len);
-        test842_hexdump(pattern->ref_compressed, pattern->ref_compressed_len);
         printf("Actual output (%zu bytes):\n", olen);
-        test842_hexdump(out, olen);
+        test842_hexdump(recovered_in, recovered_ilen);
         return EXIT_FAILURE;
     }
 

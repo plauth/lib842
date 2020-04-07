@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
 
     uint8_t out[pattern->uncompressed_len-1];
     size_t olen = pattern->uncompressed_len-1;
-    if (impl->decompress(pattern->ref_compressed, pattern->ref_compressed_len, out, &olen) != -ENOSPC) {
+    if (impl->decompress(pattern->compressed, pattern->compressed_len, out, &olen) != -ENOSPC) {
         printf("Decompression should have failed with ENOSPC\n");
         return EXIT_FAILURE;
     }
