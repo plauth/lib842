@@ -23,6 +23,12 @@ static const struct test842_impl IMPL_SW = {
         .compress = sw842_compress,
         .decompress = sw842_decompress
 };
+
+static const struct test842_impl IMPL_OPTSW = {
+        .compress = optsw842_compress,
+        .decompress = optsw842_decompress
+};
+
 static const struct test842_impl IMPL_HW = {
         .compress = hw842_compress,
         .decompress = hw842_decompress
@@ -31,6 +37,8 @@ static const struct test842_impl IMPL_HW = {
 const struct test842_impl *test842_get_impl_by_name(const char *name) {
     if (strcmp(name, "sw") == 0) {
         return &IMPL_SW;
+    } else if (strcmp(name, "optsw") == 0) {
+        return &IMPL_OPTSW;
     } else if (strcmp(name, "hw") == 0) {
         return &IMPL_HW;
     }

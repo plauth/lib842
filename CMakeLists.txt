@@ -1,7 +1,5 @@
 cmake_minimum_required(VERSION 3.1)
 
-option(USE_OPTIMIZED_SERIAL_IMPLEMENTATION "Use optimized sw842_(de)compress implementation" ON)
-
 project(lib842)
 
 enable_testing()
@@ -44,15 +42,14 @@ endif()
 ###########
 set(SRCFILES)
 
-# Serial implementation
-if (USE_OPTIMIZED_SERIAL_IMPLEMENTATION)
-    set(SRCFILES ${SRCFILES} src/serial_optimized/842_compress.cpp
-                             src/serial_optimized/842_decompress.cpp
-                             src/serial_optimized/bitstream.cpp)
-else()
-    set(SRCFILES ${SRCFILES} src/serial/842_compress.c
-                             src/serial/842_decompress.c)
-endif()
+# Serial (unoptimized / fallback) implementation
+set(SRCFILES ${SRCFILES} src/serial/842_compress.c
+                         src/serial/842_decompress.c)
+
+# Optimized implementation
+set(SRCFILES ${SRCFILES} src/serial_optimized/842_compress.cpp
+                         src/serial_optimized/842_decompress.cpp
+                         src/serial_optimized/bitstream.cpp)
 
 # In-kernel, possibly hardware-accelerated implementation (cryptodev)
 if(CRYPTODEV_LINUX_COMP_FOUND)
@@ -147,7 +144,7 @@ foreach(test test_compress_pattern
     target_link_libraries (${test} 842)
 endforeach()
 
-set(IMPLS sw)
+set(IMPLS sw optsw)
 if (CRYPTODEV_LINUX_COMP_FOUND)
     set(IMPLS ${IMPLS} hw)
 endif()

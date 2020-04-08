@@ -511,7 +511,7 @@ static inline void process_next(struct sw842_param *p)
  * will contain the number of output bytes written on success, or
  * 0 on error.
  */
-int sw842_compress(const uint8_t *in, size_t ilen,
+int optsw842_compress(const uint8_t *in, size_t ilen,
 		   uint8_t *out, size_t *olen)
 {
 	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param)); 
