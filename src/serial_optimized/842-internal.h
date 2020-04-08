@@ -75,6 +75,11 @@
 
 #define CUDA842_STRICT
 
+// If enabled, enables handling of invalid bitstreams and undersized
+// input or output buffers, which are exceptional errors that can be
+// avoided in a controlled environment. This has a performance penalty.
+#define ENABLE_ERROR_HANDLING
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -199,6 +204,10 @@ struct sw842_param_decomp {
 	const uint8_t *ostart;
 	uint64_t* in; 
 	const uint64_t* istart;
+	#ifdef ENABLE_ERROR_HANDLING
+	size_t ilen;
+	size_t olen;
+	#endif
 	uint8_t bits;
 	uint64_t buffer;
 };

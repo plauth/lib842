@@ -89,6 +89,11 @@ static uint8_t dec_templates[26][4][2] = { // params size in bits
 /* read a single uint64_t from memory */
 static inline uint64_t read_word(struct sw842_param_decomp *p)
 {
+  #ifdef ENABLE_ERROR_HANDLING
+  if ((p->in - p->istart + 1) * sizeof(uint64_t) > p->ilen) {
+    throw -EINVAL;
+  }
+  #endif
   uint64_t w = swap_be_to_native64(*p->in++);
   return w;
 }
@@ -121,6 +126,11 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 #if (defined(BRANCH_FREE) && BRANCH_FREE == 0) || not defined(BRANCH_FREE)
 template<uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
 {
+	#ifdef ENABLE_ERROR_HANDLING
+	if (p->out - p->ostart + N > p->olen)
+		throw -ENOSPC;
+	#endif
+
 	switch (N) {
 	case 2:
 		write16(p->out, swap_be_to_native16(read_bits(p, 16)));
@@ -159,6 +169,14 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t 
 
 		offset += section;
 	}
+
+	#ifdef ENABLE_ERROR_HANDLING
+	if (offset + size > total) {
+		fprintf(stderr, "index%x %lx points past end %lx\n", size,
+			 (unsigned long)offset, (unsigned long)total);
+		throw -EINVAL;
+	}
+	#endif
 
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;
@@ -210,15 +228,23 @@ static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uin
 int optsw842_decompress(const uint8_t *in, size_t ilen,
 		     uint8_t *out, size_t *olen)
 {
-	*olen = 0;
+	#ifdef ENABLE_ERROR_HANDLING
+	try {
+	#endif
 
 	struct sw842_param_decomp p;
 	p.out = out;
 	p.ostart = out;
   	p.in = (uint64_t*)in;
 	p.istart = (const uint64_t*)in;
+	#ifdef ENABLE_ERROR_HANDLING
+	p.ilen = ilen;
+	p.olen = *olen;
+	#endif
 	p.buffer = 0;
 	p.bits = 0;
+
+	*olen = 0;
 
 	uint64_t op, rep;
 
@@ -377,8 +403,19 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 	    	#endif
 	    	case OP_REPEAT:
 				rep = read_bits(&p, REPEAT_BITS);
+
+				#ifdef ENABLE_ERROR_HANDLING
+				if (p.out == out) /* no previous bytes */
+					return -EINVAL;
+				#endif
+
 				/* copy rep + 1 */
 				rep++;
+
+				#ifdef ENABLE_ERROR_HANDLING
+				if (p.out - p.ostart + rep * 8 > p.olen)
+					throw -ENOSPC;
+				#endif
 
 				while (rep-- > 0) {
 					memcpy(p.out, p.out - 8, 8);
@@ -386,6 +423,11 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 				}
 				break;
 			case OP_ZEROS:
+				#ifdef ENABLE_ERROR_HANDLING
+				if (p.out - p.ostart + 8 > p.olen)
+					throw -ENOSPC;
+				#endif
+
 				memset(p.out, 0, 8);
 				p.out += 8;
 				break;
@@ -413,6 +455,10 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 					output_word |= values[i] << (64 - (dst_size<<3) - bits);
 					bits += dst_size<<3;
 				}
+				#ifdef ENABLE_ERROR_HANDLING
+				if (p.out - p.ostart + 8 > p.olen)
+					throw -ENOSPC;
+				#endif
 				write64(p.out, swap_native_to_be64(output_word));
 				p.out += 8;
 			#else
@@ -439,6 +485,12 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 	#endif
 
 	*olen = p.out - p.ostart;
+
+	#ifdef ENABLE_ERROR_HANDLING
+	} catch (int x) {
+		return x;
+	}
+	#endif
 
 	return 0;
 }

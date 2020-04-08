@@ -514,6 +514,10 @@ static inline void process_next(struct sw842_param *p)
 int optsw842_compress(const uint8_t *in, size_t ilen,
 		   uint8_t *out, size_t *olen)
 {
+	#ifdef ENABLE_ERROR_HANDLING
+	try {
+	#endif
+
 	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param)); 
 
 	#ifdef ONLY_WELL_DEFINED_BEHAVIOUR
@@ -620,6 +624,12 @@ repeat:
 
 	stream_close(p->stream);
 	free(p);
+
+	#ifdef ENABLE_ERROR_HANDLING
+	} catch (int x) {
+		return x;
+	}
+	#endif
 
 	return 0;
 }

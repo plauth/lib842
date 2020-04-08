@@ -1,7 +1,12 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include "842-internal.h"
 #include "../common/endianness.h"
+
+#ifdef ENABLE_ERROR_HANDLING
+#include <errno.h>
+#endif
 
 /* If defined, (ab)use undefined behaviour (as defined by the standard), which
  * nevertheless works on our target platforms and provides better performance.
@@ -17,7 +22,9 @@ struct bitstream {
   uint64_t buffer; /* buffer for incoming/outgoing bits (buffer < 2^bits) */
   uint64_t* ptr;   /* pointer to next uint64_t to be read/written */
   uint64_t* begin; /* beginning of stream */
-  uint64_t* end;   /* end of stream (currently unused) */
+  #ifdef ENABLE_ERROR_HANDLING
+  uint64_t* end;   /* end of stream */
+  #endif
 };
 
 /* private functions ------------------------------------------------------- */
@@ -25,6 +32,11 @@ struct bitstream {
 /* write a single uint64_t to memory */
 static void stream_write_word(struct bitstream* s, uint64_t value)
 {
+  #ifdef ENABLE_ERROR_HANDLING
+  if (s->ptr == s->end)
+    throw -ENOSPC;
+  #endif
+
   *s->ptr++ = swap_native_to_be64(value);
 }
 
@@ -95,7 +107,9 @@ struct bitstream* stream_open(void* buffer, size_t bytes)
   struct bitstream* s = (struct bitstream*)malloc(sizeof(struct bitstream));
   if (s) {
     s->begin = (uint64_t*)buffer;
+    #ifdef ENABLE_ERROR_HANDLING
     s->end = s->begin + bytes / sizeof(uint64_t);
+    #endif
     stream_rewind(s);
     s->buffer = 0;
   }
