@@ -1,5 +1,7 @@
 // Tests that the result of compressing some data and uncompressing it
-// matches the expected reference output
+// returns back the same data.
+// Compression and decompression can be done with different implementations,
+// which allows validating that they are mutually compatible
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -9,12 +11,13 @@
 #include "test_util.h"
 
 int main(int argc, char *argv[]) {
-    const struct test842_impl *impl;
+    const struct test842_impl *impl_compression, *impl_decompression;
     const struct test842_pattern *pattern;
-    if (argc != 3 ||
-        (impl = test842_get_impl_by_name(argv[1])) == NULL ||
-        (pattern = test842_get_pattern_by_name(argv[2])) == NULL) {
-        printf("test_compress_pattern IMPL PATTERN\n");
+    if (argc != 4 ||
+        (impl_compression = test842_get_impl_by_name(argv[1])) == NULL ||
+        (impl_decompression = test842_get_impl_by_name(argv[2])) == NULL ||
+        (pattern = test842_get_pattern_by_name(argv[3])) == NULL) {
+        printf("test_compress_pattern IMPL_COMPRESSION IMPL_DECOMPRESSION PATTERN\n");
         return EXIT_FAILURE;
     }
 
@@ -24,11 +27,11 @@ int main(int argc, char *argv[]) {
     memcpy(in, pattern->uncompressed, pattern->uncompressed_len);
     size_t olen = pattern->uncompressed_len*2+8,
            recovered_ilen = pattern->uncompressed_len;
-    if (impl->compress(in, pattern->uncompressed_len, out, &olen) != 0) {
+    if (impl_compression->compress(in, pattern->uncompressed_len, out, &olen) != 0) {
         printf("Compression failed\n");
         return EXIT_FAILURE;
     }
-    if (impl->decompress(out, olen, recovered_in, &recovered_ilen) != 0) {
+    if (impl_decompression->decompress(out, olen, recovered_in, &recovered_ilen) != 0) {
         printf("Decompression failed\n");
         return EXIT_FAILURE;
     }

@@ -158,9 +158,11 @@ if (CRYPTODEV_LINUX_COMP_FOUND)
 endif()
 set(PATTERNS empty zeros random mixed limit text)
 
-foreach (IMPL ${IMPLS}) # TODOXXX: Distinguish sw-fallback and sw-optimized
+foreach (IMPL ${IMPLS})
     foreach(PATTERN ${PATTERNS})
-        add_test(test_compress_pattern_${IMPL}_${PATTERN} test_compress_pattern ${IMPL} ${PATTERN})
+        foreach (IMPL2 ${IMPLS})
+            add_test(test_compress_pattern_${IMPL}_${IMPL2}_${PATTERN} test_compress_pattern ${IMPL} ${IMPL2} ${PATTERN})
+        endforeach()
         add_test(test_compress_pattern_unaligned_${IMPL}_${PATTERN} test_compress_pattern_unaligned ${IMPL} ${PATTERN})
         add_test(test_compress_pattern_halfsmall_${IMPL}_${PATTERN} test_compress_pattern_halfsmall ${IMPL} ${PATTERN})
         add_test(test_compress_pattern_barelysmall_${IMPL}_${PATTERN} test_compress_pattern_barelysmall ${IMPL} ${PATTERN})
