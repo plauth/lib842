@@ -127,7 +127,7 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 template<uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
 {
 	#ifdef ENABLE_ERROR_HANDLING
-	if (p->out - p->ostart + N > p->olen)
+	if (static_cast<size_t>(p->out - p->ostart + N) > p->olen)
 		throw -ENOSPC;
 	#endif
 
@@ -424,7 +424,7 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 				break;
 			case OP_ZEROS:
 				#ifdef ENABLE_ERROR_HANDLING
-				if (p.out - p.ostart + 8 > p.olen)
+				if (static_cast<size_t>(p.out - p.ostart + 8) > p.olen)
 					throw -ENOSPC;
 				#endif
 
