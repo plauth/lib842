@@ -54,6 +54,8 @@ static int c842_ctx_deinit(struct cryptodev_ctx* ctx)
 		fprintf(stderr, "ioctl(CIOCFSESSION) errno=%d\n", errno);
 		return -errno;
 	}
+
+	return 0;
 }
 
 static int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, void* output, size_t *olen)
