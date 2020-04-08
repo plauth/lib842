@@ -30,9 +30,9 @@ int main(int argc, char *argv[]) {
     if (olen != pattern->uncompressed_len ||
         memcmp(out, pattern->uncompressed, pattern->uncompressed_len) != 0) {
         printf("Invalid decompression result\n");
-        printf("Input (%zu bytes):\n", pattern->compressed);
+        printf("Input (%zu bytes):\n", pattern->compressed_len);
         test842_hexdump(pattern->compressed, pattern->compressed_len);
-        printf("Expected output (%zu bytes):\n", pattern->uncompressed);
+        printf("Expected output (%zu bytes):\n", pattern->uncompressed_len);
         test842_hexdump(pattern->uncompressed, pattern->uncompressed_len);
         printf("Actual output (%zu bytes):\n", olen);
         test842_hexdump(out, olen);
