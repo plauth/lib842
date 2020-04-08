@@ -1,4 +1,4 @@
-// Tests that decompressing an invalid bitstream fails
+// Tests that decompressing an invalid bitstream fails (simple test with a fixed bitstream)
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
     const struct test842_impl *impl;
     if (argc != 2 ||
         (impl = test842_get_impl_by_name(argv[1])) == NULL) {
-        printf("test_decompress_crcerror IMPL\n");
+        printf("test_decompress_invalid_simple IMPL\n");
         return EXIT_FAILURE;
     }
 

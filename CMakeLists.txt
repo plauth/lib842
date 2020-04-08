@@ -138,7 +138,8 @@ foreach(test test_compress_pattern
              test_decompress_pattern_unaligned
              test_decompress_pattern_halfsmall
              test_decompress_pattern_barelysmall
-             test_decompress_invalid
+             test_decompress_invalid_simple
+             test_decompress_invalid_generator
              test_decompress_crcerror)
     add_executable(${test} test/${test}.c test/test_patterns.c test/test_util.c)
     target_link_libraries (${test} 842)
@@ -167,6 +168,7 @@ foreach (IMPL ${IMPLS}) # TODOXXX: Distinguish sw-fallback and sw-optimized
             add_test(test_decompress_pattern_barelysmall_${IMPL}_${PATTERN} test_decompress_pattern_barelysmall ${IMPL} ${PATTERN})
         endif()
     endforeach()
-    add_test(test_decompress_invalid_${IMPL} test_decompress_invalid ${IMPL})
+    add_test(test_decompress_invalid_simple_${IMPL} test_decompress_invalid_simple ${IMPL})
+    add_test(test_decompress_invalid_generator_${IMPL} test_decompress_invalid_generator ${IMPL})
     add_test(test_decompress_crcerror_${IMPL} test_decompress_crcerror ${IMPL})
 endforeach()
