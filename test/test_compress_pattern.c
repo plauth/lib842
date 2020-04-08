@@ -19,10 +19,10 @@ int main(int argc, char *argv[]) {
     }
 
     alignas(8) uint8_t in[pattern->uncompressed_len],
-                       out[pattern->compressed_len],
+                       out[pattern->uncompressed_len*2+8],
                        recovered_in[pattern->uncompressed_len];
     memcpy(in, pattern->uncompressed, pattern->uncompressed_len);
-    size_t olen = pattern->compressed_len,
+    size_t olen = pattern->uncompressed_len*2+8,
            recovered_ilen = pattern->uncompressed_len;
     if (impl->compress(in, pattern->uncompressed_len, out, &olen) != 0) {
         printf("Compression failed\n");
