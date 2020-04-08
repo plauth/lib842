@@ -3,9 +3,17 @@
 #include <string.h>
 #include <sys/time.h>
 
-#ifdef USEHW
+#if defined(USEHW)
 #include "hw842.h"
+#define lib842_decompress hw842_decompress
+#define lib842_compress hw842_compress
+#elif defined(USEOPTSW)
+#define lib842_decompress optsw842_decompress
+#define lib842_compress optsw842_compress
+#include "sw842.h"
 #else
+#define lib842_decompress sw842_decompress
+#define lib842_compress sw842_compress
 #include "sw842.h"
 #endif
 
@@ -101,11 +109,7 @@ int main( int argc, const char* argv[])
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 			
-			#ifdef USEHW
-			hw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
-			#else
-			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
-			#endif
+			lib842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
 			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
 		timeend_comp = timestamp();
@@ -140,11 +144,7 @@ int main( int argc, const char* argv[])
 			uint8_t* chunk_decomp = decompressed + (CHUNK_SIZE * chunk_num);
 			
 			
-			#ifdef USEHW
-			hw842_decompress(chunk_condensed, compressedChunkSizes[chunk_num], chunk_decomp, &chunk_dlen);
-			#else
-			sw842_decompress(chunk_condensed, compressedChunkSizes[chunk_num], chunk_decomp, &chunk_dlen);
-			#endif
+			lib842_decompress(chunk_condensed, compressedChunkSizes[chunk_num], chunk_decomp, &chunk_dlen);
 
 			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) == 0)) {
 				fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
@@ -166,17 +166,8 @@ int main( int argc, const char* argv[])
 		printf("Compression- and decompression was successful!\n");
 	} else {
 
-		#ifdef USEHW
-		hw842_compress(in, ilen, out, &olen);
-		#else
-		sw842_compress(in, ilen, out, &olen);
-		#endif
-
-		#ifdef USEHW
-		hw842_decompress(out, olen, decompressed, &dlen);
-		#else
-		sw842_decompress(out, olen, decompressed, &dlen);
-		#endif
+		lib842_compress(in, ilen, out, &olen);
+		lib842_decompress(out, olen, decompressed, &dlen);
 
 		printf("Input: %zu bytes\n", ilen);
 		printf("Output: %zu bytes\n", olen);

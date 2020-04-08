@@ -89,6 +89,10 @@ endif()
 add_executable(test_serial test/compdecomp.c)
 target_link_libraries (test_serial 842)
 
+add_executable(test_serial_optimized test/compdecomp.c)
+set_target_properties(test_serial_optimized PROPERTIES COMPILE_DEFINITIONS "USEOPTSW")
+target_link_libraries (test_serial_optimized 842)
+
 add_executable(test_diffuse_pattern test/diffuse_pattern.c)
 target_link_libraries (test_diffuse_pattern 842)
 

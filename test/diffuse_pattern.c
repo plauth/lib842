@@ -3,14 +3,18 @@
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
-#ifdef USEHW
+#if defined(USEHW)
 #include "hw842.h"
-#define lib842_compress hw842_compress
 #define lib842_decompress hw842_decompress
-#else
+#define lib842_compress hw842_compress
+#elif defined(USEOPTSW)
+#define lib842_decompress optsw842_compress
+#define lib842_compress optsw842_compress
 #include "sw842.h"
+#else
+#define lib842_decompress sw842_compress
 #define lib842_compress sw842_compress
-#define lib842_decompress sw842_decompress
+#include "sw842.h"
 #endif
 
 #define BUFFER_SIZE 65536
