@@ -541,7 +541,7 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
             p->hashTable64[i] = NO_ENTRY;
     }
 
-	p->in = (uint8_t *) in;
+	p->in = in;
 	p->instart = in;
 	p->ilen = ilen;
 

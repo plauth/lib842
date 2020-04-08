@@ -170,8 +170,8 @@ struct hlist_node8 {
 };
 
 struct sw842_param {
-	uint8_t *in;
-	uint8_t *instart;
+	const uint8_t *in;
+	const uint8_t *instart;
 	uint64_t ilen;
 	uint8_t *out;
 	uint64_t olen;
@@ -191,11 +191,11 @@ struct sw842_param {
 };
 
 struct sw842_param_decomp {
-	uint8_t *in;
+	const uint8_t *in;
 	uint8_t bit;
 	uint64_t ilen;
 	uint8_t *out;
-	uint8_t *ostart;
+	const uint8_t *ostart;
 	uint64_t olen;
 };
 

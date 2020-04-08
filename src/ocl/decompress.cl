@@ -86,7 +86,7 @@ typedef ulong   uint64_t;
 struct sw842_param_decomp {
     __global uint64_t *out;
     __global const uint64_t* ostart;
-    __global uint64_t *in;
+    __global const uint64_t *in;
     uint32_t bits;
     uint64_t buffer;
     #ifdef USE_INPLACE_COMPRESSED_CHUNKS
@@ -223,7 +223,7 @@ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uint64_t i
     return offset;
 }
 
-__kernel void decompress(__global uint64_t *in, ulong inOffset, __global uint64_t *out, ulong outOffset, ulong numChunks)
+__kernel void decompress(__global const uint64_t *in, ulong inOffset, __global uint64_t *out, ulong outOffset, ulong numChunks)
 {
     unsigned int chunk_num = get_global_id(0);
     if (chunk_num >= numChunks) {

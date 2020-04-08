@@ -176,7 +176,7 @@ typedef ulong	uint64_t;
 struct sw842_param {
 	struct bitstream* stream;
 
-	uint8_t *in;
+	const uint8_t *in;
 	const uint8_t *instart;
 	uint64_t ilen;
 	uint8_t *out;

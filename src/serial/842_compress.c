@@ -73,7 +73,7 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 #define INDEX_NOT_CHECKED	(-2)
 
 #define get_input_data(p, o, b)						\
-	swap_be_to_native##b(get_unaligned##b((__be##b *)((p)->in + (o))))
+	swap_be_to_native##b(get_unaligned##b((const __be##b *)((p)->in + (o))))
 
 #define UINT_TYPE(b) UINT_TYPE_##b
 #define UINT_TYPE_2 uint16_t
@@ -485,7 +485,7 @@ int sw842_compress(const uint8_t *in, size_t ilen,
 	memset(p->node8, 0, sizeof(p->node8));
 	#endif
 
-	p->in = (uint8_t *)in;
+	p->in = in;
 	p->instart = p->in;
 	p->ilen = ilen;
 	p->out = out;
@@ -507,10 +507,10 @@ int sw842_compress(const uint8_t *in, size_t ilen,
 		goto skip_comp;
 
 	/* make initial 'last' different so we don't match the first time */
-	last = ~get_unaligned64((uint64_t *)p->in);
+	last = ~get_unaligned64((const uint64_t *)p->in);
 
 	while (p->ilen > 7) {
-		next = get_unaligned64((uint64_t *)p->in);
+		next = get_unaligned64((const uint64_t *)p->in);
 
 		/* must get the next data, as we need to update the hashtable
 		 * entries with the new data every time

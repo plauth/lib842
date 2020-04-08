@@ -235,7 +235,7 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 	struct sw842_param_decomp p;
 	p.out = out;
 	p.ostart = out;
-  	p.in = (uint64_t*)in;
+  	p.in = (const uint64_t*)in;
 	p.istart = (const uint64_t*)in;
 	#ifdef ENABLE_ERROR_HANDLING
 	p.ilen = ilen;

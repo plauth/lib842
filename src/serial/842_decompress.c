@@ -55,9 +55,9 @@ static uint8_t decomp_ops[OPS_MAX][4] = {
 
 
 #define beN_to_cpu(d, s)					\
-	((s) == 2 ? swap_be_to_native16(get_unaligned16((__be16 *)d)) :	\
-	 (s) == 4 ? swap_be_to_native32(get_unaligned32((__be32 *)d)) :	\
-	 (s) == 8 ? swap_be_to_native64(get_unaligned64((__be64 *)d)) :	\
+	((s) == 2 ? swap_be_to_native16(get_unaligned16((const __be16 *)d)) :	\
+	 (s) == 4 ? swap_be_to_native32(get_unaligned32((const __be32 *)d)) :	\
+	 (s) == 8 ? swap_be_to_native64(get_unaligned64((const __be64 *)d)) :	\
 	 0)
 
 static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n);
@@ -84,7 +84,8 @@ static int __split_next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t 
 
 static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n)
 {
-	uint8_t *in = p->in, b = p->bit, bits = b + n;
+	const uint8_t *in = p->in;
+	uint8_t b = p->bit, bits = b + n;
 
 	if (n > 64) {
 		fprintf(stderr, "next_bits invalid n %u\n", n);
@@ -107,11 +108,11 @@ static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n)
 	if (bits <= 8)
 		*d = *in >> (8 - bits);
 	else if (bits <= 16)
-		*d = swap_be_to_native16(get_unaligned16((__be16 *)in)) >> (16 - bits);
+		*d = swap_be_to_native16(get_unaligned16((const __be16 *)in)) >> (16 - bits);
 	else if (bits <= 32)
-		*d = swap_be_to_native32(get_unaligned32((__be32 *)in)) >> (32 - bits);
+		*d = swap_be_to_native32(get_unaligned32((const __be32 *)in)) >> (32 - bits);
 	else
-		*d = swap_be_to_native64(get_unaligned64((__be64 *)in)) >> (64 - bits);
+		*d = swap_be_to_native64(get_unaligned64((const __be64 *)in)) >> (64 - bits);
 
 	*d &= GENMASK_ULL(n - 1, 0);
 
@@ -281,7 +282,7 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 	uint64_t op, rep, tmp, bytes, total;
 	uint64_t crc;
 
-	p.in = (uint8_t *)in;
+	p.in = in;
 	p.bit = 0;
 	p.ilen = ilen;
 	p.out = out;

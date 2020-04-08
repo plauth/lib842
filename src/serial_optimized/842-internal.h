@@ -179,7 +179,7 @@
 struct sw842_param {
 	struct bitstream* stream;
 
-	uint8_t *in;
+	const uint8_t *in;
 	const uint8_t *instart;
 	uint64_t ilen;
 	uint64_t olen;
@@ -202,7 +202,7 @@ struct sw842_param {
 struct sw842_param_decomp {
 	uint8_t *out;
 	const uint8_t *ostart;
-	uint64_t* in; 
+	const uint64_t* in; 
 	const uint64_t* istart;
 	#ifdef ENABLE_ERROR_HANDLING
 	size_t ilen;

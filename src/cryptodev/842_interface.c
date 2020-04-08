@@ -59,17 +59,17 @@ static int c842_ctx_deinit(struct cryptodev_ctx* ctx)
 static int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, void* output, size_t *olen)
 {
 	struct crypt_op cryp;
-	void* p;
+	const void* p;
 	
 	/* check input and output alignment */
 	if (ctx->alignmask) {
-		p = (void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);
+		p = (const void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);
 		if (input != p) {
 			fprintf(stderr, "input is not aligned\n");
 			return -EINVAL;
 		}
 
-		p = (void*)(((unsigned long)output + ctx->alignmask) & ~ctx->alignmask);
+		p = (const void*)(((unsigned long)output + ctx->alignmask) & ~ctx->alignmask);
 		if (output != p) {
 			fprintf(stderr, "output is not aligned\n");
 			return -EINVAL;
@@ -107,17 +107,17 @@ static int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t il
 static int c842_decompress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, void* output, size_t *olen)
 {
 	struct crypt_op cryp;
-	void* p;
+	const void* p;
 	
 	/* check input and output alignment */
 	if (ctx->alignmask) {
-		p = (void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);
+		p = (const void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);
 		if (input != p) {
 			fprintf(stderr, "input is not aligned\n");
 			return -EINVAL;
 		}
 
-		p = (void*)(((unsigned long)output + ctx->alignmask) & ~ctx->alignmask);
+		p = (const void*)(((unsigned long)output + ctx->alignmask) & ~ctx->alignmask);
 		if (output != p) {
 			fprintf(stderr, "output is not aligned\n");
 			return -EINVAL;
