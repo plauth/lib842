@@ -149,7 +149,7 @@ endforeach()
 
 set(IMPLS sw)
 if (CRYPTODEV_LINUX_COMP_FOUND)
-    set(IMPLS hw)
+    set(IMPLS ${IMPLS} hw)
 endif()
 set(PATTERNS empty zeros random mixed limit text)
 
