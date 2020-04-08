@@ -19,6 +19,9 @@ endif()
 try_compile(CRYPTODEV_LINUX_COMP_FOUND
             "${CMAKE_BINARY_DIR}/temp"
             "${PROJECT_SOURCE_DIR}/check_cryptodev_linux_comp.c")
+if(CRYPTODEV_LINUX_COMP_FOUND)
+    add_definitions(-DHAVE_CRYPTODEV_LINUX_COMP)
+endif()
 
 include(CheckSymbolExists)
 check_symbol_exists(accel_compress "sys/types.h;sys/vminfo.h" AIX_HWCOMPRESSION_FOUND)

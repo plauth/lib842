@@ -29,18 +29,22 @@ static const struct test842_impl IMPL_OPTSW = {
         .decompress = optsw842_decompress
 };
 
+#ifdef HAVE_CRYPTODEV_LINUX_COMP
 static const struct test842_impl IMPL_HW = {
         .compress = hw842_compress,
         .decompress = hw842_decompress
 };
+#endif
 
 const struct test842_impl *test842_get_impl_by_name(const char *name) {
     if (strcmp(name, "sw") == 0) {
         return &IMPL_SW;
     } else if (strcmp(name, "optsw") == 0) {
         return &IMPL_OPTSW;
+    #ifdef HAVE_CRYPTODEV_LINUX_COMP
     } else if (strcmp(name, "hw") == 0) {
         return &IMPL_HW;
+    #endif
     }
     return NULL;
 }

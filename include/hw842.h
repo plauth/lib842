@@ -1,6 +1,8 @@
 #ifndef __HW842_H__
 #define __HW842_H__
 
+#ifdef HAVE_CRYPTODEV_LINUX_COMP
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -15,6 +17,8 @@ int hw842_decompress(const uint8_t *in, size_t ilen,
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 #endif
