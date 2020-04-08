@@ -613,7 +613,7 @@ repeat:
 	 * compressed data.
 	 */
     #ifndef DISABLE_CRC
-    uint32_t crc = crc32_be(0, (const unsigned char *) in, ilen);
+    uint32_t crc = crc32_be(0, in, ilen);
 
 	stream_write_bits(p->stream, crc, CRC_BITS);
     #endif

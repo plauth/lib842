@@ -575,7 +575,7 @@ skip_comp:
 	 * same here so that sw842 decompression can be used for both
 	 * compressed data.
 	 */
-	crc = crc32_be(0, (const void*) in, ilen);
+	crc = crc32_be(0, in, ilen);
 
 	ret = add_bits(p, crc, CRC_BITS);
 	if (ret)
