@@ -104,9 +104,6 @@ add_executable(test_serial_optimized sample/compdecomp.c)
 set_target_properties(test_serial_optimized PROPERTIES COMPILE_DEFINITIONS "USEOPTSW")
 target_link_libraries (test_serial_optimized 842)
 
-add_executable(test_diffuse_pattern contrib/diffuse_pattern.c)
-target_link_libraries (test_diffuse_pattern 842)
-
 if (CRYPTODEV_LINUX_COMP_FOUND)
     add_executable(test_cryptodev sample/compdecomp.c)
     set_target_properties(test_cryptodev PROPERTIES COMPILE_DEFINITIONS "USEHW")
@@ -142,6 +139,7 @@ foreach(test test_compress_pattern
              test_compress_pattern_unaligned
              test_compress_pattern_halfsmall
              test_compress_pattern_barelysmall
+             test_compress_diffuse
              test_compress_notmultipleof8
              test_decompress_pattern
              test_decompress_pattern_unaligned
@@ -169,6 +167,7 @@ foreach (IMPL ${IMPLS})
         add_test(test_compress_pattern_halfsmall_${IMPL}_${PATTERN} test_compress_pattern_halfsmall ${IMPL} ${PATTERN})
         add_test(test_compress_pattern_barelysmall_${IMPL}_${PATTERN} test_compress_pattern_barelysmall ${IMPL} ${PATTERN})
     endforeach()
+    add_test(test_compress_diffuse_${IMPL} test_compress_diffuse ${IMPL})
     add_test(test_compress_notmultipleof8_${IMPL} test_compress_notmultipleof8 ${IMPL})
 
     foreach(PATTERN ${PATTERNS})
