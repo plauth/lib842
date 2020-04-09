@@ -1,0 +1,3 @@
+#cmakedefine LIB842_HAVE_CRYPTODEV_LINUX_COMP
+#cmakedefine LIB842_HAVE_OPENCL
+#cmakedefine LIB842_HAVE_CUDA

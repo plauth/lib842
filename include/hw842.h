@@ -1,7 +1,9 @@
 #ifndef __HW842_H__
 #define __HW842_H__
 
-#ifdef HAVE_CRYPTODEV_LINUX_COMP
+#include "include/config842.h"
+
+#ifdef LIB842_HAVE_CRYPTODEV_LINUX_COMP
 
 #include <stdint.h>
 

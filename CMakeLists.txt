@@ -19,9 +19,6 @@ endif()
 try_compile(CRYPTODEV_LINUX_COMP_FOUND
             "${CMAKE_BINARY_DIR}/temp"
             "${PROJECT_SOURCE_DIR}/check_cryptodev_linux_comp.c")
-if(CRYPTODEV_LINUX_COMP_FOUND)
-    add_definitions(-DHAVE_CRYPTODEV_LINUX_COMP)
-endif()
 
 include(CheckSymbolExists)
 check_symbol_exists(accel_compress "sys/types.h;sys/vminfo.h" AIX_HWCOMPRESSION_FOUND)
@@ -56,11 +53,14 @@ set(SRCFILES ${SRCFILES} src/serial_optimized/842_compress.cpp
 
 # In-kernel, possibly hardware-accelerated implementation (cryptodev)
 if(CRYPTODEV_LINUX_COMP_FOUND)
+    set(LIB842_HAVE_CRYPTODEV_LINUX_COMP ON)
     set(SRCFILES ${SRCFILES} src/cryptodev/842_interface.c)
 endif()
 
 # OpenCL implementation
 if (OpenCL_FOUND)
+    set(LIB842_HAVE_OPENCL ON)
+
     add_executable(cl2c src/tools/cl2c.cpp)
     add_custom_command(
         OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl.c
@@ -72,8 +72,12 @@ endif()
 
 # CUDA implementation
 if (CUDA_FOUND)
+    set(LIB842_HAVE_CUDA ON)
     set(SRCFILES ${SRCFILES} src/cuda/842_decompress.cu)
 endif()
+
+configure_file(include/config842.h.in include/config842.h @ONLY)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 if (CUDA_FOUND)
     cuda_add_library(842 STATIC ${SRCFILES})

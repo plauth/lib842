@@ -1,6 +1,10 @@
 #ifndef __CL842_H__
 #define __CL842_H__
 
+#include "include/config842.h"
+
+#ifdef LIB842_HAVE_OPENCL
+
 #define CL_HPP_MINIMUM_OPENCL_VERSION 120
 #define CL_HPP_TARGET_OPENCL_VERSION 120
 #define __CL_ENABLE_EXCEPTIONS
@@ -89,5 +93,7 @@ class CL842HostDecompressor
 
         VECTOR_CLASS<cl::Device> findDevices();
 };
+
+#endif
 
 #endif
