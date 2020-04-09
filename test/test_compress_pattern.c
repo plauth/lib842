@@ -22,12 +22,14 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	// Note: We overallocate recovered_in a bit (5 bytes), to make sure
+	// the decompressor recovers the correct uncompressed length
 	alignas(8) uint8_t in[pattern->uncompressed_len],
 		out[pattern->uncompressed_len * 2 + 8],
-		recovered_in[pattern->uncompressed_len];
+		recovered_in[pattern->uncompressed_len + 5];
 	memcpy(in, pattern->uncompressed, pattern->uncompressed_len);
 	size_t olen = pattern->uncompressed_len * 2 + 8,
-	       recovered_ilen = pattern->uncompressed_len;
+	       recovered_ilen = pattern->uncompressed_len + 5;
 	if (impl_compression->compress(in, pattern->uncompressed_len, out,
 				       &olen) != 0) {
 		printf("Compression failed\n");
