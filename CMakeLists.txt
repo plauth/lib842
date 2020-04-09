@@ -81,7 +81,7 @@ if (CUDA_FOUND)
 endif()
 
 configure_file(include/config842.h.in include/config842.h @ONLY)
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
 
 if (CUDA_FOUND)
     cuda_add_library(842 STATIC ${SRCFILES})

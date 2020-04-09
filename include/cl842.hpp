@@ -1,7 +1,7 @@
 #ifndef __CL842_H__
 #define __CL842_H__
 
-#include "include/config842.h"
+#include "config842.h"
 
 #ifdef LIB842_HAVE_OPENCL
 
