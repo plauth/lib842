@@ -184,7 +184,7 @@ struct sw842_param {
 	int index2[4];
 	struct hlist_node8 *htable8;
 	struct hlist_node4 *htable4;
-	struct hlist_node2 *htable2;	
+	struct hlist_node2 *htable2;
 	uint64_t node8[1 << I8_BITS];
 	uint32_t node4[1 << I4_BITS];
 	uint16_t node2[1 << I2_BITS];

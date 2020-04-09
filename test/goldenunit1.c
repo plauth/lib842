@@ -10,7 +10,7 @@
 
 size_t nextMultipleOfChunkSize(size_t input) {
 	return (input + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
-} 
+}
 
 int main( int argc, const char* argv[])
 {
@@ -69,11 +69,11 @@ int main( int argc, const char* argv[])
 		size_t num_chunks = ilen / CHUNK_SIZE;
 
 		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			
+
 			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
-			
+
 			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
 			acc_olen += chunk_olen;
 		}
@@ -85,7 +85,7 @@ int main( int argc, const char* argv[])
 
 		for(size_t out_chunk_pos = 0; out_chunk_pos < olen; out_chunk_pos+=(CHUNK_SIZE * 2)) {
 			chunk_dlen = CHUNK_SIZE;
-			
+
 			hw842_decompress(chunk_out, chunk_olen, chunk_decomp, &chunk_dlen);
 
 			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) == 0)) {
@@ -112,5 +112,5 @@ int main( int argc, const char* argv[])
 		}
 
 	}
-	
+
 }

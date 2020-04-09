@@ -32,7 +32,7 @@ inline void cErrorCheck(const char *file, int line) {
     printf(" @ %s: %d\n", file, line);
     exit(-1);
   }
-} 
+}
 
 int main( int argc, const char* argv[])
 {
@@ -42,7 +42,7 @@ int main( int argc, const char* argv[])
   	printf(" %d CUDA devices found\n", count);
   	if(!count)
     		::exit(EXIT_FAILURE);
-  	
+
 	uint8_t *cuda_uncompressed, *cuda_compressed;
 	uint8_t *in, *out, *decompressed;
 	in = out = decompressed = NULL;
@@ -102,18 +102,18 @@ int main( int argc, const char* argv[])
 
 	if(ilen > CHUNK_SIZE) {
 		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
-	
+
 		size_t num_chunks = ilen / CHUNK_SIZE;
 		size_t *compressedChunkPositions = (size_t*) malloc(sizeof(size_t) * num_chunks);
 		size_t *compressedChunkSizes = (size_t*) malloc(sizeof(size_t) * num_chunks);
 
 		#pragma omp parallel for
 		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			
+
 			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
-			
+
 			#ifdef USEHW
 			hw842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
 			#else
@@ -125,7 +125,7 @@ int main( int argc, const char* argv[])
 		cudaDeviceSynchronize();
         CHECK_ERROR(cuda_error);
         ERRORCHECK();
-		
+
 		size_t currentChunkPos = 0;
 		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			compressedChunkPositions[chunk_num] = currentChunkPos;
@@ -140,7 +140,7 @@ int main( int argc, const char* argv[])
 			uint8_t * chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
 			memcpy(chunk_condensed, chunk_out, compressedChunkSizes[chunk_num]);
 		}
-		
+
 		cudaMalloc((void**) &cuda_compressed, ilen);
 
 		#pragma omp parallel for
@@ -150,8 +150,8 @@ int main( int argc, const char* argv[])
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
 			uint8_t* chunk_decomp = in + (CHUNK_SIZE * chunk_num);
-			
-			
+
+
 			#ifdef USEHW
 			hw842_decompress(chunk_condensed, compressedChunkSizes[chunk_num], chunk_decomp, &chunk_dlen);
 			#else
@@ -206,8 +206,8 @@ int main( int argc, const char* argv[])
 		}
 
 		printf("\n\n");
-		*/ 
-		
+		*/
+
 		if (memcmp(in, decompressed, ilen) == 0) {
 			printf("Compression- and decompression was successful!\n");
 		} else {
@@ -216,5 +216,5 @@ int main( int argc, const char* argv[])
 		}
 
 	}
-	
+
 }

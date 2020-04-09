@@ -37,7 +37,7 @@
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
 static uint16_t fifo_sizes[9] = {
-	0, 
+	0,
 	0,
 	I2_FIFO_SIZE,
 	0,
@@ -69,17 +69,17 @@ static uint8_t dec_templates[26][4][2] = { // params size in bits
 	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2}, // 0x0d: { I2, D2, I2, I2 }, 40 bits
 	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0}, // 0x0e: { I2, D2, I4, N0 }, 33 bits
 	{OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0}, // 0x0f: { I2, I2, D4, N0 }, 48 bits
-	
+
 	{OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2}, // 0x10: { I2, I2, D2, I2 }, 40 bits
 	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2}, // 0x11: { I2, I2, I2, D2 }, 40 bits
 	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2}, // 0x12: { I2, I2, I2, I2 }, 32 bits
 	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0}, // 0x13: { I2, I2, I4, N0 }, 25 bits
-	
+
 	{OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0}, // 0x14: { I4, D4, N0, N0 }, 41 bits
 	{OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x15: { I4, D2, I2, N0 }, 33 bits
 	{OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0}, // 0x16: { I4, I2, D2, N0 }, 33 bits
 	{OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0}, // 0x17: { I4, I2, I2, N0 }, 25 bits
-	
+
 
 	{OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0}, // 0x18: { I4, I4, N0, N0 }, 18 bits
 	{OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x19: { I8, N0, N0, N0 }, 8 bits
@@ -260,7 +260,7 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 		#ifdef DEBUG
 		printf("template is %llx\n", op);
 		#endif
-		
+
 		#if defined(BRANCH_FREE) && BRANCH_FREE == 1
 		output_word = 0;
 		bits = 0;
@@ -438,19 +438,19 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 				for(int i = 0; i < 4; i++) {
 					// 0-initialize all values-fields
 					values[i] = 0;
-					values[4 + i] = 0; 
+					values[4 + i] = 0;
 
 					uint8_t dec_template = dec_templates[op][i][0];
-					uint8_t is_index = (dec_template >> 7); 
+					uint8_t is_index = (dec_template >> 7);
 					uint8_t num_bits = dec_template & 0x7F;
 					uint8_t dst_size = dec_templates[op][i][1];
 
 					values[(4 * is_index) + i] = read_bits(&p, num_bits);
-					
+
 					uint64_t offset = get_index(&p, dst_size, values[4 + i], fifo_sizes[dst_size]);
 					memcpy(&values[4 + i], &p.ostart[offset], dst_size);
 					values[4 + i] = swap_be_to_native64(values[4 + i] << (WSIZE - (dst_size << 3)));
-					
+
 					values[i] = values[4 + i] * is_index | values[i];
 					output_word |= values[i] << (64 - (dst_size<<3) - bits);
 					bits += dst_size<<3;
@@ -474,7 +474,7 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 	 */
 	#ifndef DISABLE_CRC
 	uint64_t crc = read_bits(&p, CRC_BITS);
-	
+
 	/*
 	 * Validate CRC saved in compressed data.
 	 */

@@ -32,7 +32,7 @@ long long timestamp() {
 
 size_t nextMultipleOfChunkSize(size_t input) {
 	return (input + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
-} 
+}
 
 int main( int argc, const char* argv[])
 {
@@ -97,7 +97,7 @@ int main( int argc, const char* argv[])
 
 	if(ilen > CHUNK_SIZE) {
 		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
-	
+
 		size_t num_chunks = ilen / CHUNK_SIZE;
 		size_t *compressedChunkPositions = (size_t*) malloc(sizeof(size_t) * num_chunks);
 		size_t *compressedChunkSizes = (size_t*) malloc(sizeof(size_t) * num_chunks);
@@ -105,20 +105,20 @@ int main( int argc, const char* argv[])
 		timestart_comp = timestamp();
 		#pragma omp parallel for
 		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			
+
 			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
-			
+
 			lib842_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen);
 			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
 		timeend_comp = timestamp();
-		
+
 		timestart_condense = timeend_comp;
 
 		size_t currentChunkPos = 0;
-		
+
 		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			compressedChunkPositions[chunk_num] = currentChunkPos;
 			currentChunkPos += compressedChunkSizes[chunk_num];
@@ -133,7 +133,7 @@ int main( int argc, const char* argv[])
 			memcpy(chunk_condensed, chunk_out, compressedChunkSizes[chunk_num]);
 		}
 		timeend_condense = timestamp();
-		
+
 
 		timestart_decomp = timestamp();
 		#pragma omp parallel for
@@ -143,8 +143,8 @@ int main( int argc, const char* argv[])
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_condensed = out_condensed + compressedChunkPositions[chunk_num];
 			uint8_t* chunk_decomp = decompressed + (CHUNK_SIZE * chunk_num);
-			
-			
+
+
 			lib842_decompress(chunk_condensed, compressedChunkSizes[chunk_num], chunk_decomp, &chunk_dlen);
 
 			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) == 0)) {
@@ -174,7 +174,7 @@ int main( int argc, const char* argv[])
 		printf("Output: %zu bytes\n", olen);
 		printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
-		
+
 		//if(argc <= 1) {
 			for (int i = 0; i < 64; i++) {
 				printf("%02x:", out[i]);
@@ -188,8 +188,8 @@ int main( int argc, const char* argv[])
 		//}
 
 		printf("\n\n");
-		
-		
+
+
 		if (memcmp(in, decompressed, ilen) == 0) {
 			printf("Compression- and decompression was successful!\n");
 		} else {
@@ -198,5 +198,5 @@ int main( int argc, const char* argv[])
 		}
 
 	}
-	
+
 }

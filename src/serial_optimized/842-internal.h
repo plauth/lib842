@@ -144,7 +144,7 @@
 #define I8N (149)
 
 //1st value: position of payload in dataAndIndices
-//2nd value: number of bits 
+//2nd value: number of bits
 #define D20_OP	{0,  D2_BITS}
 #define D21_OP	{1,  D2_BITS}
 #define D22_OP	{2,  D2_BITS}
@@ -202,7 +202,7 @@ struct sw842_param {
 struct sw842_param_decomp {
 	uint8_t *out;
 	const uint8_t *ostart;
-	const uint64_t* in; 
+	const uint64_t* in;
 	const uint64_t* istart;
 	#ifdef ENABLE_ERROR_HANDLING
 	size_t ilen;

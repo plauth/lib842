@@ -10,7 +10,7 @@
 
 static size_t nextMultipleOfEight(size_t input) {
         return (input + 7) & ~7;
-} 
+}
 
 int main(int argc, char **argv) {
 	if(argc <= 1) {
@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
 			}
 			fclose(fp);
 
-			
+
 
                         int16_t  hashTable16[1 << DICT16_BITS], hashTable32[1 << DICT32_BITS], hashTable64[1 << DICT64_BITS];
                         uint16_t ringBuffer16[1 << BUFFER16_BITS];
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
                         }
                         memset(ringBuffer64, 0, (1 << BUFFER64_BITS) *sizeof(uint32_t));
                         uint64_t collisions64 = 0;
-			
+
 
 			uint8_t *p = buffer;
 

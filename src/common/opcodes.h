@@ -225,7 +225,7 @@ static const uint8_t ops_dict[224] = {
 /*	220	*/	0	,
 /*	221	*/	0	,
 /*	222	*/	0	,
-/*	223	*/	0x19	
+/*	223	*/	0x19
 };
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1

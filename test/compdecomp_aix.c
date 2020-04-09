@@ -5,7 +5,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/vminfo.h> 
+#include <sys/vminfo.h>
 
 #define CHUNK_SIZE ((size_t)262144) //32768
 //#define CHUNK_SIZE ((size_t)524288) //65536
@@ -22,7 +22,7 @@ long long timestamp() {
 
 size_t nextMultipleOfChunkSize(size_t input) {
 	return (input + (CHUNK_SIZE-1)) & ~(CHUNK_SIZE-1);
-} 
+}
 
 int main( int argc, const char* argv[])
 {
@@ -34,7 +34,7 @@ int main( int argc, const char* argv[])
 	long long timestart_decomp, timeend_decomp;
 	long long timestart_condense, timeend_condense;
 	int ret = 0;
-	
+
 	if(argc <= 1) {
 		ilen = 32;
 		olen = ilen * 2;
@@ -114,7 +114,7 @@ int main( int argc, const char* argv[])
 		#endif
 		size_t acc_olen = 0;
 		ret = 0;
-	
+
 		size_t num_chunks = ilen / CHUNK_SIZE;
 		size_t *compressedChunkSizes = (size_t*) malloc(sizeof(size_t) * num_chunks);
 
@@ -124,9 +124,9 @@ int main( int argc, const char* argv[])
 			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
-			
+
 			ret = accel_compress(chunk_in, CHUNK_SIZE, chunk_out, &chunk_olen, 0);
-			
+
 			if (ret != ERANGE && ret < 0 && ret != ERANGE ) {
 				printf( "Error calling 'accel_compress' (%d): %s\n", errno, strerror( errno ) );
 			}
@@ -134,13 +134,13 @@ int main( int argc, const char* argv[])
 			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
 		timeend_comp = timestamp();
-		
+
 		size_t currentChunkPos = 0;
 		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			currentChunkPos += compressedChunkSizes[chunk_num];
-		}	
+		}
 		size_t chunk_olen = CHUNK_SIZE * 2;
-		
+
 		timestart_decomp = timestamp();
 		#pragma omp parallel for
 		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
@@ -149,12 +149,12 @@ int main( int argc, const char* argv[])
 			uint8_t* chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 			uint8_t* chunk_decomp = in + (CHUNK_SIZE * chunk_num);
-			
-			ret = accel_decompress(chunk_out, compressedChunkSizes[chunk_num], chunk_decomp, &chunk_dlen, 0);	
+
+			ret = accel_decompress(chunk_out, compressedChunkSizes[chunk_num], chunk_decomp, &chunk_dlen, 0);
 			if (ret < 0) {
 		            printf( "Error calling 'accel_decompress' (%d): %s\n", errno, strerror( errno ) );
-			}	
-	
+			}
+
 			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) == 0)) {
 				fprintf(stderr, "FAIL: Decompressed data differs from the original input data.\n");
 				//return -1;
@@ -178,16 +178,16 @@ int main( int argc, const char* argv[])
 	            printf( "Error calling 'accel_compress' (%d): %s\n", errno, strerror( errno ) );
 		}
 
-		ret = accel_decompress(out, olen, decompressed, &dlen, 0);	
+		ret = accel_decompress(out, olen, decompressed, &dlen, 0);
 		if (ret < 0) {
 	            printf( "Error calling 'accel_decompress' (%d): %s\n", errno, strerror( errno ) );
-		}	
+		}
 
 		printf("Input: %zu bytes\n", ilen);
 		printf("Output: %zu bytes\n", olen);
 		printf("Compression factor: %f\n", (float) olen / (float) ilen);
 
-		/*	
+		/*
 		for (size_t i = 0; i < ilen; i++) {
 			printf("%02x:", in[i]);
 		}
@@ -199,8 +199,8 @@ int main( int argc, const char* argv[])
 		}
 
 		printf("\n\n");
-		*/ 
-		
+		*/
+
 		if (memcmp(in, decompressed, ilen) == 0) {
 			printf("Compression- and decompression was successful!\n");
 		} else {
@@ -209,5 +209,5 @@ int main( int argc, const char* argv[])
 		}
 
 	}
-	
+
 }

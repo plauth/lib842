@@ -57,7 +57,7 @@ void stream_write_bits(struct bitstream* s, uint64_t value, uint8_t n)
   #endif
   //shift value with MSB
   value <<= wsize - n;
-  /* append bit string to buffer */ 
+  /* append bit string to buffer */
   s->buffer |= value >> s->bits;
   s->bits += n;
 

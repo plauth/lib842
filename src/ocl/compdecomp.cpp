@@ -27,9 +27,9 @@ int main(int argc, char *argv[]) {
         flen = (size_t)is.tellg();
         is.seekg (0, is.beg);
         is.close();
-        
+
         ilen = CL842HostDecompressor::paddedSize(flen);
-        
+
         printf("original file length: %zu\n", flen);
         printf("original file length (padded): %zu\n", ilen);
     }
@@ -103,11 +103,11 @@ int main(int argc, char *argv[]) {
         std::vector<uint8_t> temp_buffer(CL842_CHUNK_SIZE * 2);
 
         #pragma omp for
-        for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
+        for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
             size_t chunk_olen = CL842_CHUNK_SIZE * 2;
             uint8_t* chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
             uint8_t* chunk_out = compressOut + (CL842_CHUNK_SIZE * chunk_num);
-            
+
             sw842_compress(chunk_in, CL842_CHUNK_SIZE, &temp_buffer[0], &chunk_olen);
             if (chunk_olen <= CL842_CHUNK_SIZE - sizeof(CL842_COMPRESSED_CHUNK_MAGIC) - sizeof(uint64_t)) {
                 memcpy(chunk_out, CL842_COMPRESSED_CHUNK_MAGIC, sizeof(CL842_COMPRESSED_CHUNK_MAGIC));
@@ -120,11 +120,11 @@ int main(int argc, char *argv[]) {
     }
 #else
     #pragma omp parallel for
-    for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) { 
+    for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
         size_t chunk_olen = CL842_CHUNK_SIZE * 2;
         uint8_t* chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
         uint8_t* chunk_out = compressOut + ((CL842_CHUNK_SIZE * 2) * chunk_num);
-        
+
         sw842_compress(chunk_in, CL842_CHUNK_SIZE, chunk_out, &chunk_olen);
     }
 #endif
@@ -180,5 +180,5 @@ int main(int argc, char *argv[]) {
     }
 
     return 0;
-    
+
 }

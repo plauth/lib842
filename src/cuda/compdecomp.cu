@@ -32,7 +32,7 @@ long long timestamp() {
 size_t nextMultipleOfChunkSize(size_t input) {
 	size_t size = CUDA842_CHUNK_SIZE * CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
 	return (input + (size-1)) & ~(size-1);
-} 
+}
 
 int main( int argc, const char* argv[])
 {
@@ -88,7 +88,7 @@ int main( int argc, const char* argv[])
 		memset(decompressed, 0, dlen);
 
 		uint8_t tmp[] = {0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33, 0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37, 0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41, 0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45};//"0011223344556677889900AABBCCDDEE";
-		
+
 		memcpy(in, tmp, STRLEN);
 
 	} else if (argc == 2) {
@@ -135,15 +135,15 @@ int main( int argc, const char* argv[])
 		size_t num_chunks = ilen / CUDA842_CHUNK_SIZE;
 		size_t *compressedChunkPositions = (size_t*) malloc(sizeof(size_t) * num_chunks);
 		size_t *compressedChunkSizes = (size_t*) malloc(sizeof(size_t) * num_chunks);
-	
+
 		timestart_comp = timestamp();
 		#pragma omp parallel for
 		for(size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			
+
 			size_t chunk_olen = CUDA842_CHUNK_SIZE * 2;
 			uint8_t* chunk_in = in + (CUDA842_CHUNK_SIZE * chunk_num);
 			uint8_t* chunk_out = compressed + ((CUDA842_CHUNK_SIZE * 2) * chunk_num);
-			
+
 			sw842_compress(chunk_in, CUDA842_CHUNK_SIZE, chunk_out, &chunk_olen);
 			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
@@ -187,7 +187,7 @@ int main( int argc, const char* argv[])
 			cuda_error = cudaGetLastError();
 			CHECK_ERROR(cuda_error);
 	        timeend_decomp = timestamp();
-			
+
 			cuda_error = cudaMemcpy(decompressed, decompressedD, dlen, cudaMemcpyDeviceToHost);
 			cudaDeviceSynchronize();
 	        CHECK_ERROR(cuda_error);
@@ -201,7 +201,7 @@ int main( int argc, const char* argv[])
 
 
 	} else {
-		
+
 		sw842_compress(in, ilen, compressed, &olen);
 		#ifdef USE_UNIFIED_MEM
 			cuda842_decompress<<<1,1>>>((uint64_t*)compressed, (uint64_t*)decompressed);
@@ -220,7 +220,7 @@ int main( int argc, const char* argv[])
         #endif
 
 	}
-	
+
 	if (memcmp(in, decompressed, ilen) == 0) {
 		printf("Compression- and decompression was successful!\n");
 	} else {

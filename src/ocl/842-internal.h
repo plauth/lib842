@@ -91,7 +91,7 @@ typedef uchar	uint8_t;
 typedef ushort	uint16_t;
 typedef short	int16_t;
 typedef uint 	uint32_t;
-typedef ulong	uint64_t; 
+typedef ulong	uint64_t;
 #endif
 
 //#define DEBUG 1
@@ -143,7 +143,7 @@ typedef ulong	uint64_t;
 #define I8N (149)
 
 //1st value: position of payload in dataAndIndices
-//2nd value: number of bits 
+//2nd value: number of bits
 #define D20_OP	{0,  D2_BITS}
 #define D21_OP	{1,  D2_BITS}
 #define D22_OP	{2,  D2_BITS}

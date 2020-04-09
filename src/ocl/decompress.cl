@@ -4,7 +4,7 @@ typedef uchar   uint8_t;
 typedef ushort  uint16_t;
 typedef short   int16_t;
 typedef uint    uint32_t;
-typedef ulong   uint64_t; 
+typedef ulong   uint64_t;
 
 /* special templates */
 #define OP_REPEAT   (0x1B)
@@ -53,7 +53,7 @@ typedef ulong   uint64_t;
 #define I8N (149)
 
 //1st value: position of payload in dataAndIndices
-//2nd value: number of bits 
+//2nd value: number of bits
 #define D20_OP  {0,  D2_BITS}
 #define D21_OP  {1,  D2_BITS}
 #define D22_OP  {2,  D2_BITS}
@@ -262,7 +262,7 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset, __global u
 
     uint64_t output_word;
     uint32_t bits;
-    
+
     do {
         op = read_bits(&p, OP_BITS);
         output_word = 0;
@@ -271,7 +271,7 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset, __global u
         switch (op) {
             case OP_REPEAT:
                 op = read_bits(&p, REPEAT_BITS);
-                // copy op + 1 
+                // copy op + 1
                 op++;
 
                 while (op-- > 0) {
@@ -300,7 +300,7 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset, __global u
                         uint64_t offset = get_index(&p, dst_size, value, fifo_sizes[dst_size >> 2]);
                         offset >>= 1;
                         __global uint16_t * ostart16 = (__global uint16_t *) p.ostart;
-                        value = 
+                        value =
                             (((uint64_t) ostart16[offset    ])) |
                             (((uint64_t) ostart16[offset + 1]) << 16) |
                             (((uint64_t) ostart16[offset + 2]) << 32) |

@@ -34,7 +34,7 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue& commandQueue,
             throw cl::Error(CL_INVALID_VALUE);
         }
     }
-    size_t numChunks = (inputSize + m_inputChunkStride - 1) / (m_inputChunkStride); 
+    size_t numChunks = (inputSize + m_inputChunkStride - 1) / (m_inputChunkStride);
 
     cl::Kernel decompressKernel(m_program, "decompress");
 

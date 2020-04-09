@@ -188,7 +188,7 @@ static int add_bits(struct sw842_param *p, uint64_t d, uint8_t n)
 
 	if (DIV_ROUND_UP(bits, 8) > p->olen)
 		return -ENOSPC;
- 
+
 	//outbits += n;
 	o = *out & bmask[b];
 	d <<= s;
@@ -468,7 +468,7 @@ static int process_next(struct sw842_param *p)
 int sw842_compress(const uint8_t *in, size_t ilen,
 		   uint8_t *out, size_t *olen)
 {
-	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param)); 
+	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param));
 
 	int ret;
 	uint64_t last, next, pad, total;

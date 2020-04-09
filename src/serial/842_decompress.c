@@ -195,7 +195,7 @@ static int __do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, 
 	if (size != 2 && size != 4 && size != 8)
 		printf("__do_index invalid size %x\n", size);
 	#ifdef DEBUG
-	else	
+	else
 		printf("index%x to %lx off %lx adjoff %lx tot %lx data %lx\n",
 			 size, (unsigned long)index,
 			 (unsigned long)(index * size), (unsigned long)offset,
@@ -367,7 +367,7 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 	 * next bit after End of stream template.
 	 */
 	ret = next_bits(&p, &crc, CRC_BITS);
-	
+
 	if (ret)
 		return ret;
 

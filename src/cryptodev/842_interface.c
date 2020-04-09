@@ -62,7 +62,7 @@ static int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t il
 {
 	struct crypt_op cryp;
 	const void* p;
-	
+
 	/* check input and output alignment */
 	if (ctx->alignmask) {
 		p = (const void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);
@@ -110,7 +110,7 @@ static int c842_decompress(struct cryptodev_ctx* ctx, const void* input, size_t 
 {
 	struct crypt_op cryp;
 	const void* p;
-	
+
 	/* check input and output alignment */
 	if (ctx->alignmask) {
 		p = (const void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);

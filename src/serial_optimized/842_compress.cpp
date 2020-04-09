@@ -122,7 +122,7 @@ static inline uint8_t get_template(struct sw842_param *p) {
         template_key = max(p->templateKeys[6], former+latter);
 
         template_key >>= 1;
-        
+
         return ops_dict[template_key];
 }
 
@@ -170,7 +170,7 @@ template<uint8_t TEMPLATE_KEY> static inline void add_template(struct sw842_para
         		 	(((uint64_t) p->dataAndIndices[0])  << (I2_BITS + D4_BITS))						|
         		 	(((uint64_t) p->dataAndIndices[8]) << (D4_BITS))								|
         		 	(((uint64_t) p->dataAndIndices[5]));
-        	stream_write_bits(p->stream, out, OP_BITS + D2_BITS + I2_BITS + D4_BITS); 
+        	stream_write_bits(p->stream, out, OP_BITS + D2_BITS + I2_BITS + D4_BITS);
     	    break;
 		case 0x06:	// { D2, I2, D2, I2 }, 48 bits
 			out =	(((uint64_t) TEMPLATE_KEY) << (D2_BITS + I2_BITS + D2_BITS + I2_BITS))	|
@@ -371,7 +371,7 @@ static inline void update_hashtables(struct sw842_param *p) {
     p->rollingFifo32[i32+1] = p->dataAndIndices[5];
     p->rollingFifo64[i64  ] = p->dataAndIndices[6];
 
-    p->hashTable16[p->hashes[0]] = i16;    
+    p->hashTable16[p->hashes[0]] = i16;
     p->hashTable16[p->hashes[1]] = i16+1;
     p->hashTable16[p->hashes[2]] = i16+2;
     p->hashTable16[p->hashes[3]] = i16+3;
@@ -518,7 +518,7 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 	try {
 	#endif
 
-	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param)); 
+	struct sw842_param *p = (struct sw842_param *) malloc(sizeof(struct sw842_param));
 
 	#ifdef ONLY_WELL_DEFINED_BEHAVIOUR
 	// TODOXXX: It appears that actually this memset should ALWAYS be done,
