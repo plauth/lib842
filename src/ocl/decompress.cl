@@ -31,71 +31,42 @@ struct sw842_param_decomp {
 #define __round_mask(x, y) ((y)-1)
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
-__constant uint16_t fifo_sizes[3] = { I2_FIFO_SIZE, I4_FIFO_SIZE,
-				      I8_FIFO_SIZE };
-
-__constant uint64_t masks[3] = { 0x000000000000FFFF, 0x00000000FFFFFFFF,
-				 0xFFFFFFFFFFFFFFFF };
+__constant uint16_t fifo_sizes[3] = { I2_FIFO_SIZE, I4_FIFO_SIZE, I8_FIFO_SIZE };
+__constant uint64_t masks[3] = { 0x000000000000FFFF, 0x00000000FFFFFFFF, 0xFFFFFFFFFFFFFFFF };
 __constant uint8_t dec_templates[26][4][2] = {
 	// params size in bits
-	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
-	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_N0 }, // 0x02: { D4, I2, D2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x03: { D4, I2, I2, N0 }, 48 bits
+	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
+	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
+	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x02: { D4, I2, D2, N0 }, 56 bits
+	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x03: { D4, I2, I2, N0 }, 48 bits
 
-	{ OP_DEC_D4, OP_DEC_I4, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x04: { D4, I4, N0, N0 }, 41 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D4,
-	  OP_DEC_N0 }, // 0x05: { D2, I2, D4, N0 }, 56 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_I2 }, // 0x06: { D2, I2, D2, I2 }, 48 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_D2 }, // 0x07: { D2, I2, I2, D2 }, 48 bits
+	{ OP_DEC_D4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x04: { D4, I4, N0, N0 }, 41 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x05: { D2, I2, D4, N0 }, 56 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x06: { D2, I2, D2, I2 }, 48 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x07: { D2, I2, I2, D2 }, 48 bits
 
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_I2 }, // 0x08: { D2, I2, I2, I2 }, 40 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I4,
-	  OP_DEC_N0 }, // 0x09: { D2, I2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_D4,
-	  OP_DEC_N0 }, // 0x0a: { I2, D2, D4, N0 }, 56 bits
-	{ OP_DEC_I2, OP_DEC_D4, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x0b: { I2, D4, I2, N0 }, 48 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x08: { D2, I2, I2, I2 }, 40 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x09: { D2, I2, I4, N0 }, 33 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_D4, OP_DEC_N0 }, // 0x0a: { I2, D2, D4, N0 }, 56 bits
+	{ OP_DEC_I2, OP_DEC_D4, OP_DEC_I2, OP_DEC_N0 }, // 0x0b: { I2, D4, I2, N0 }, 48 bits
 
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_D2 }, // 0x0c: { I2, D2, I2, D2 }, 48 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_I2 }, // 0x0d: { I2, D2, I2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I4,
-	  OP_DEC_N0 }, // 0x0e: { I2, D2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D4,
-	  OP_DEC_N0 }, // 0x0f: { I2, I2, D4, N0 }, 48 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_D2 }, // 0x0c: { I2, D2, I2, D2 }, 48 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2 }, // 0x0d: { I2, D2, I2, I2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0 }, // 0x0e: { I2, D2, I4, N0 }, 33 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x0f: { I2, I2, D4, N0 }, 48 bits
 
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_I2 }, // 0x10: { I2, I2, D2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_D2 }, // 0x11: { I2, I2, I2, D2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_I2 }, // 0x12: { I2, I2, I2, I2 }, 32 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I4,
-	  OP_DEC_N0 }, // 0x13: { I2, I2, I4, N0 }, 25 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x10: { I2, I2, D2, I2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x11: { I2, I2, I2, D2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x12: { I2, I2, I2, I2 }, 32 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x13: { I2, I2, I4, N0 }, 25 bits
 
-	{ OP_DEC_I4, OP_DEC_D4, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x14: { I4, D4, N0, N0 }, 41 bits
-	{ OP_DEC_I4, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x15: { I4, D2, I2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_N0 }, // 0x16: { I4, I2, D2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x17: { I4, I2, I2, N0 }, 25 bits
+	{ OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0 }, // 0x14: { I4, D4, N0, N0 }, 41 bits
+	{ OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x15: { I4, D2, I2, N0 }, 33 bits
+	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x16: { I4, I2, D2, N0 }, 33 bits
+	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x17: { I4, I2, I2, N0 }, 25 bits
 
-	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
-	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
+	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
+	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
 
 inline uint64_t bswap(uint64_t value)
@@ -160,8 +131,8 @@ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 		uint64_t pos = total - section;
 
 		/* if the offset is past/at the pos, we need to
-         * go back to the last fifo section
-         */
+		 * go back to the last fifo section
+		 */
 		if (offset >= pos)
 			section -= fsize;
 
@@ -185,8 +156,7 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset,
 		out + (outOffset / 8) + ((CL842_CHUNK_SIZE / 8) * chunk_num);
 	p.in = (in + (inOffset / 8) + ((CL842_CHUNK_STRIDE / 8) * chunk_num));
 
-#if defined(USE_MAYBE_COMPRESSED_CHUNKS) ||                                    \
-	defined(USE_INPLACE_COMPRESSED_CHUNKS)
+#if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
 	if (p.in[0] != 0xd72de597bf465abe ||
 	    p.in[1] != 0x7670d6ee1a947cb2) { // = CL842_COMPRESSED_CHUNK_MAGIC
 #ifdef USE_MAYBE_COMPRESSED_CHUNKS

@@ -48,64 +48,38 @@ static uint16_t fifo_sizes[9] = { 0, 0, I2_FIFO_SIZE, 0, I4_FIFO_SIZE, 0,
 
 static uint8_t dec_templates[26][4][2] = {
 	// params size in bits
-	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
-	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_N0 }, // 0x02: { D4, I2, D2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x03: { D4, I2, I2, N0 }, 48 bits
+	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
+	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
+	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x02: { D4, I2, D2, N0 }, 56 bits
+	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x03: { D4, I2, I2, N0 }, 48 bits
 
-	{ OP_DEC_D4, OP_DEC_I4, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x04: { D4, I4, N0, N0 }, 41 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D4,
-	  OP_DEC_N0 }, // 0x05: { D2, I2, D4, N0 }, 56 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_I2 }, // 0x06: { D2, I2, D2, I2 }, 48 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_D2 }, // 0x07: { D2, I2, I2, D2 }, 48 bits
+	{ OP_DEC_D4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x04: { D4, I4, N0, N0 }, 41 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x05: { D2, I2, D4, N0 }, 56 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x06: { D2, I2, D2, I2 }, 48 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x07: { D2, I2, I2, D2 }, 48 bits
 
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_I2 }, // 0x08: { D2, I2, I2, I2 }, 40 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I4,
-	  OP_DEC_N0 }, // 0x09: { D2, I2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_D4,
-	  OP_DEC_N0 }, // 0x0a: { I2, D2, D4, N0 }, 56 bits
-	{ OP_DEC_I2, OP_DEC_D4, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x0b: { I2, D4, I2, N0 }, 48 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x08: { D2, I2, I2, I2 }, 40 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x09: { D2, I2, I4, N0 }, 33 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_D4, OP_DEC_N0 }, // 0x0a: { I2, D2, D4, N0 }, 56 bits
+	{ OP_DEC_I2, OP_DEC_D4, OP_DEC_I2, OP_DEC_N0 }, // 0x0b: { I2, D4, I2, N0 }, 48 bits
 
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_D2 }, // 0x0c: { I2, D2, I2, D2 }, 48 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_I2 }, // 0x0d: { I2, D2, I2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I4,
-	  OP_DEC_N0 }, // 0x0e: { I2, D2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D4,
-	  OP_DEC_N0 }, // 0x0f: { I2, I2, D4, N0 }, 48 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_D2 }, // 0x0c: { I2, D2, I2, D2 }, 48 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2 }, // 0x0d: { I2, D2, I2, I2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0 }, // 0x0e: { I2, D2, I4, N0 }, 33 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x0f: { I2, I2, D4, N0 }, 48 bits
 
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_I2 }, // 0x10: { I2, I2, D2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_D2 }, // 0x11: { I2, I2, I2, D2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_I2 }, // 0x12: { I2, I2, I2, I2 }, 32 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I4,
-	  OP_DEC_N0 }, // 0x13: { I2, I2, I4, N0 }, 25 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x10: { I2, I2, D2, I2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x11: { I2, I2, I2, D2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x12: { I2, I2, I2, I2 }, 32 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x13: { I2, I2, I4, N0 }, 25 bits
 
-	{ OP_DEC_I4, OP_DEC_D4, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x14: { I4, D4, N0, N0 }, 41 bits
-	{ OP_DEC_I4, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x15: { I4, D2, I2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_N0 }, // 0x16: { I4, I2, D2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x17: { I4, I2, I2, N0 }, 25 bits
+	{ OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0 }, // 0x14: { I4, D4, N0, N0 }, 41 bits
+	{ OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x15: { I4, D2, I2, N0 }, 33 bits
+	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x16: { I4, I2, D2, N0 }, 33 bits
+	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x17: { I4, I2, I2, N0 }, 25 bits
 
-	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
-	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
+	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
+	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
 #endif
 
@@ -258,275 +232,275 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 	try {
 #endif
 
-		struct sw842_param_decomp p;
-		p.out = out;
-		p.ostart = out;
-		p.in = (const uint64_t *)in;
-		p.istart = (const uint64_t *)in;
+	struct sw842_param_decomp p;
+	p.out = out;
+	p.ostart = out;
+	p.in = (const uint64_t *)in;
+	p.istart = (const uint64_t *)in;
 #ifdef ENABLE_ERROR_HANDLING
-		p.ilen = ilen;
-		p.olen = *olen;
+	p.ilen = ilen;
+	p.olen = *olen;
 #endif
-		p.buffer = 0;
-		p.bits = 0;
+	p.buffer = 0;
+	p.bits = 0;
 
-		*olen = 0;
+	*olen = 0;
 
-		uint64_t op, rep;
+	uint64_t op, rep;
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
-		uint64_t output_word;
-		uint64_t values[8];
-		uint8_t bits;
+	uint64_t output_word;
+	uint64_t values[8];
+	uint8_t bits;
 #endif
 
-		do {
-			op = read_bits(&p, OP_BITS);
+	do {
+		op = read_bits(&p, OP_BITS);
 
 #ifdef DEBUG
-			printf("template is %llx\n", op);
+		printf("template is %llx\n", op);
 #endif
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
-			output_word = 0;
-			bits = 0;
-			memset(values, 0, 64);
+		output_word = 0;
+		bits = 0;
+		memset(values, 0, 64);
 #endif
 
-			switch (op) {
+		switch (op) {
 #if (defined(BRANCH_FREE) && BRANCH_FREE == 0) || not defined(BRANCH_FREE)
-			case 0x00: // { D8, N0, N0, N0 }, 64 bits
-				do_data<8>(&p);
-				break;
-			case 0x01: // { D4, D2, I2, N0 }, 56 bits
-				do_data<4>(&p);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x02: // { D4, I2, D2, N0 }, 56 bits
-				do_data<4>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				break;
-			case 0x03: // { D4, I2, I2, N0 }, 48 bits
-				do_data<4>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x04: // { D4, I4, N0, N0 }, 41 bits
-				do_data<4>(&p);
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				break;
-			case 0x05: // { D2, I2, D4, N0 }, 56 bits
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<4>(&p);
-				break;
-			case 0x06: // { D2, I2, D2, I2 }, 48 bits
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x07: // { D2, I2, I2, D2 }, 48 bits
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				break;
-			case 0x08: // { D2, I2, I2, I2 }, 40 bits
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x09: // { D2, I2, I4, N0 }, 33 bits
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				break;
-			case 0x0a: // { I2, D2, D4, N0 }, 56 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_data<4>(&p);
-				break;
-			case 0x0b: // { I2, D4, I2, N0 }, 48 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<4>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x0c: // { I2, D2, I2, D2 }, 48 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				break;
-			case 0x0d: // { I2, D2, I2, I2 }, 40 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x0e: // { I2, D2, I4, N0 }, 33 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				break;
-			case 0x0f: // { I2, I2, D4, N0 }, 48 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<4>(&p);
-				break;
-			case 0x10: // { I2, I2, D2, I2 }, 40 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x11: // { I2, I2, I2, D2 }, 40 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				break;
-			case 0x12: // { I2, I2, I2, I2 }, 32 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x13: // { I2, I2, I4, N0 }, 25 bits
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				break;
-			case 0x14: // { I4, D4, N0, N0 }, 41 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_data<4>(&p);
-				break;
-			case 0x15: // { I4, D2, I2, N0 }, 33 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_data<2>(&p);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x16: // { I4, I2, D2, N0 }, 33 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_data<2>(&p);
-				break;
-			case 0x17: // { I4, I2, I2, N0 }, 25 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-				break;
-			case 0x18: // { I4, I4, N0, N0 }, 18 bits
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-				break;
-			case 0x19: // { I8, N0, N0, N0 }, 8 bits
-				do_index(&p, 8, I8_BITS, I8_FIFO_SIZE);
-				break;
+		case 0x00: // { D8, N0, N0, N0 }, 64 bits
+			do_data<8>(&p);
+			break;
+		case 0x01: // { D4, D2, I2, N0 }, 56 bits
+			do_data<4>(&p);
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x02: // { D4, I2, D2, N0 }, 56 bits
+			do_data<4>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			break;
+		case 0x03: // { D4, I2, I2, N0 }, 48 bits
+			do_data<4>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x04: // { D4, I4, N0, N0 }, 41 bits
+			do_data<4>(&p);
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			break;
+		case 0x05: // { D2, I2, D4, N0 }, 56 bits
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<4>(&p);
+			break;
+		case 0x06: // { D2, I2, D2, I2 }, 48 bits
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x07: // { D2, I2, I2, D2 }, 48 bits
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			break;
+		case 0x08: // { D2, I2, I2, I2 }, 40 bits
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x09: // { D2, I2, I4, N0 }, 33 bits
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			break;
+		case 0x0a: // { I2, D2, D4, N0 }, 56 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			do_data<4>(&p);
+			break;
+		case 0x0b: // { I2, D4, I2, N0 }, 48 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<4>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x0c: // { I2, D2, I2, D2 }, 48 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			break;
+		case 0x0d: // { I2, D2, I2, I2 }, 40 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x0e: // { I2, D2, I4, N0 }, 33 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			break;
+		case 0x0f: // { I2, I2, D4, N0 }, 48 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<4>(&p);
+			break;
+		case 0x10: // { I2, I2, D2, I2 }, 40 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x11: // { I2, I2, I2, D2 }, 40 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			break;
+		case 0x12: // { I2, I2, I2, I2 }, 32 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x13: // { I2, I2, I4, N0 }, 25 bits
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			break;
+		case 0x14: // { I4, D4, N0, N0 }, 41 bits
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			do_data<4>(&p);
+			break;
+		case 0x15: // { I4, D2, I2, N0 }, 33 bits
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			do_data<2>(&p);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x16: // { I4, I2, D2, N0 }, 33 bits
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_data<2>(&p);
+			break;
+		case 0x17: // { I4, I2, I2, N0 }, 25 bits
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			break;
+		case 0x18: // { I4, I4, N0, N0 }, 18 bits
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			break;
+		case 0x19: // { I8, N0, N0, N0 }, 8 bits
+			do_index(&p, 8, I8_BITS, I8_FIFO_SIZE);
+			break;
 #endif
-			case OP_REPEAT:
-				rep = read_bits(&p, REPEAT_BITS);
+		case OP_REPEAT:
+			rep = read_bits(&p, REPEAT_BITS);
 
 #ifdef ENABLE_ERROR_HANDLING
-				if (p.out == out) /* no previous bytes */
-					return -EINVAL;
+			if (p.out == out) /* no previous bytes */
+				return -EINVAL;
 #endif
 
-				/* copy rep + 1 */
-				rep++;
+			/* copy rep + 1 */
+			rep++;
 
 #ifdef ENABLE_ERROR_HANDLING
-				if (p.out - p.ostart + rep * 8 > p.olen)
-					throw - ENOSPC;
+			if (p.out - p.ostart + rep * 8 > p.olen)
+				throw - ENOSPC;
 #endif
 
-				while (rep-- > 0) {
-					memcpy(p.out, p.out - 8, 8);
-					p.out += 8;
-				}
-				break;
-			case OP_ZEROS:
-#ifdef ENABLE_ERROR_HANDLING
-				if (static_cast<size_t>(p.out - p.ostart + 8) >
-				    p.olen)
-					throw - ENOSPC;
-#endif
-
-				memset(p.out, 0, 8);
+			while (rep-- > 0) {
+				memcpy(p.out, p.out - 8, 8);
 				p.out += 8;
-				break;
-			case OP_END:
-				break;
-			default:
-#if defined(BRANCH_FREE) && BRANCH_FREE == 1
-				for (int i = 0; i < 4; i++) {
-					// 0-initialize all values-fields
-					values[i] = 0;
-					values[4 + i] = 0;
-
-					uint8_t dec_template =
-						dec_templates[op][i][0];
-					uint8_t is_index = (dec_template >> 7);
-					uint8_t num_bits = dec_template & 0x7F;
-					uint8_t dst_size =
-						dec_templates[op][i][1];
-
-					values[(4 * is_index) + i] =
-						read_bits(&p, num_bits);
-
-					uint64_t offset =
-						get_index(&p, dst_size,
-							  values[4 + i],
-							  fifo_sizes[dst_size]);
-					memcpy(&values[4 + i],
-					       &p.ostart[offset], dst_size);
-					values[4 + i] = swap_be_to_native64(
-						values[4 + i]
-						<< (WSIZE - (dst_size << 3)));
-
-					values[i] = values[4 + i] * is_index |
-						    values[i];
-					output_word |=
-						values[i]
-						<< (64 - (dst_size << 3) -
-						    bits);
-					bits += dst_size << 3;
-				}
-#ifdef ENABLE_ERROR_HANDLING
-				if (p.out - p.ostart + 8 > p.olen)
-					throw - ENOSPC;
-#endif
-				write64(p.out,
-					swap_native_to_be64(output_word));
-				p.out += 8;
-#else
-			fprintf(stderr, "Invalid op template: %" PRIx64 "\n",
-				op);
-			return -EINVAL;
-#endif
 			}
-		} while (op != OP_END);
+			break;
+		case OP_ZEROS:
+#ifdef ENABLE_ERROR_HANDLING
+			if (static_cast<size_t>(p.out - p.ostart + 8) >
+			    p.olen)
+				throw - ENOSPC;
+#endif
 
-/*
+			memset(p.out, 0, 8);
+			p.out += 8;
+			break;
+		case OP_END:
+			break;
+		default:
+#if defined(BRANCH_FREE) && BRANCH_FREE == 1
+			for (int i = 0; i < 4; i++) {
+				// 0-initialize all values-fields
+				values[i] = 0;
+				values[4 + i] = 0;
+
+				uint8_t dec_template =
+					dec_templates[op][i][0];
+				uint8_t is_index = (dec_template >> 7);
+				uint8_t num_bits = dec_template & 0x7F;
+				uint8_t dst_size =
+					dec_templates[op][i][1];
+
+				values[(4 * is_index) + i] =
+					read_bits(&p, num_bits);
+
+				uint64_t offset =
+					get_index(&p, dst_size,
+						  values[4 + i],
+						  fifo_sizes[dst_size]);
+				memcpy(&values[4 + i],
+				       &p.ostart[offset], dst_size);
+				values[4 + i] = swap_be_to_native64(
+					values[4 + i]
+					<< (WSIZE - (dst_size << 3)));
+
+				values[i] = values[4 + i] * is_index |
+					    values[i];
+				output_word |=
+					values[i]
+					<< (64 - (dst_size << 3) -
+					    bits);
+				bits += dst_size << 3;
+			}
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.out - p.ostart + 8 > p.olen)
+				throw - ENOSPC;
+#endif
+			write64(p.out,
+				swap_native_to_be64(output_word));
+			p.out += 8;
+#else
+		fprintf(stderr, "Invalid op template: %" PRIx64 "\n",
+			op);
+		return -EINVAL;
+#endif
+		}
+	} while (op != OP_END);
+
+	/*
 	 * crc(0:31) is saved in compressed data starting with the
 	 * next bit after End of stream template.
 	 */
 #ifndef DISABLE_CRC
-		uint64_t crc = read_bits(&p, CRC_BITS);
+	uint64_t crc = read_bits(&p, CRC_BITS);
 
-		/*
+	/*
 	 * Validate CRC saved in compressed data.
 	 */
-		if (crc != (uint64_t)crc32_be(0, out, p.out - p.ostart)) {
-			fprintf(stderr, "CRC mismatch for decompression\n");
-			return -EINVAL;
-		}
+	if (crc != (uint64_t)crc32_be(0, out, p.out - p.ostart)) {
+		fprintf(stderr, "CRC mismatch for decompression\n");
+		return -EINVAL;
+	}
 #endif
 
-		*olen = p.out - p.ostart;
+	*olen = p.out - p.ostart;
 
 #ifdef ENABLE_ERROR_HANDLING
 	} catch (int x) {

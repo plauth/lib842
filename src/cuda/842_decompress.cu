@@ -12,70 +12,43 @@
 #define __round_mask(x, y) ((__typeof__(x))((y)-1))
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
-__constant__ uint16_t fifo_sizes[9] = { 0, 0, I2_FIFO_SIZE, 0, I4_FIFO_SIZE, 0,
-					0, 0, I8_FIFO_SIZE };
+__constant__ uint16_t fifo_sizes[9] = { 0, 0, I2_FIFO_SIZE, 0, I4_FIFO_SIZE, 0, 0, 0, I8_FIFO_SIZE };
 #endif
 
 __constant__ uint8_t dec_templates[26][4][2] = {
 	// params size in bits
-	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
-	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_N0 }, // 0x02: { D4, I2, D2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x03: { D4, I2, I2, N0 }, 48 bits
+	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
+	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
+	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x02: { D4, I2, D2, N0 }, 56 bits
+	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x03: { D4, I2, I2, N0 }, 48 bits
 
-	{ OP_DEC_D4, OP_DEC_I4, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x04: { D4, I4, N0, N0 }, 41 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D4,
-	  OP_DEC_N0 }, // 0x05: { D2, I2, D4, N0 }, 56 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_I2 }, // 0x06: { D2, I2, D2, I2 }, 48 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_D2 }, // 0x07: { D2, I2, I2, D2 }, 48 bits
+	{ OP_DEC_D4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x04: { D4, I4, N0, N0 }, 41 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x05: { D2, I2, D4, N0 }, 56 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x06: { D2, I2, D2, I2 }, 48 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x07: { D2, I2, I2, D2 }, 48 bits
 
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_I2 }, // 0x08: { D2, I2, I2, I2 }, 40 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I4,
-	  OP_DEC_N0 }, // 0x09: { D2, I2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_D4,
-	  OP_DEC_N0 }, // 0x0a: { I2, D2, D4, N0 }, 56 bits
-	{ OP_DEC_I2, OP_DEC_D4, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x0b: { I2, D4, I2, N0 }, 48 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x08: { D2, I2, I2, I2 }, 40 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x09: { D2, I2, I4, N0 }, 33 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_D4, OP_DEC_N0 }, // 0x0a: { I2, D2, D4, N0 }, 56 bits
+	{ OP_DEC_I2, OP_DEC_D4, OP_DEC_I2, OP_DEC_N0 }, // 0x0b: { I2, D4, I2, N0 }, 48 bits
 
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_D2 }, // 0x0c: { I2, D2, I2, D2 }, 48 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_I2 }, // 0x0d: { I2, D2, I2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I4,
-	  OP_DEC_N0 }, // 0x0e: { I2, D2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D4,
-	  OP_DEC_N0 }, // 0x0f: { I2, I2, D4, N0 }, 48 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_D2 }, // 0x0c: { I2, D2, I2, D2 }, 48 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2 }, // 0x0d: { I2, D2, I2, I2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0 }, // 0x0e: { I2, D2, I4, N0 }, 33 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x0f: { I2, I2, D4, N0 }, 48 bits
 
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_I2 }, // 0x10: { I2, I2, D2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_D2 }, // 0x11: { I2, I2, I2, D2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_I2 }, // 0x12: { I2, I2, I2, I2 }, 32 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I4,
-	  OP_DEC_N0 }, // 0x13: { I2, I2, I4, N0 }, 25 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x10: { I2, I2, D2, I2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x11: { I2, I2, I2, D2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x12: { I2, I2, I2, I2 }, 32 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x13: { I2, I2, I4, N0 }, 25 bits
 
-	{ OP_DEC_I4, OP_DEC_D4, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x14: { I4, D4, N0, N0 }, 41 bits
-	{ OP_DEC_I4, OP_DEC_D2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x15: { I4, D2, I2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_D2,
-	  OP_DEC_N0 }, // 0x16: { I4, I2, D2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_I2,
-	  OP_DEC_N0 }, // 0x17: { I4, I2, I2, N0 }, 25 bits
+	{ OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0 }, // 0x14: { I4, D4, N0, N0 }, 41 bits
+	{ OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x15: { I4, D2, I2, N0 }, 33 bits
+	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x16: { I4, I2, D2, N0 }, 33 bits
+	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x17: { I4, I2, I2, N0 }, 25 bits
 
-	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
-	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0,
-	  OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
+	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
+	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
 
 __device__ inline uint64_t bswap(uint64_t value)

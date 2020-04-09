@@ -77,57 +77,22 @@ static inline void find_index(struct sw842_param *p)
 	isIndexValid[6] = (index[6] >= 0) ? 0xFFFF : 0x0000;
 
 #ifdef ONLY_WELL_DEFINED_BEHAVIOUR
-	isDataValid[0] = (index[0] >= 0 &&
-			  p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[1] = (index[1] >= 0 &&
-			  p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[2] = (index[2] >= 0 &&
-			  p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[3] = (index[3] >= 0 &&
-			  p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[4] = (index[4] >= 0 &&
-			  p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[5] = (index[5] >= 0 &&
-			  p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[6] = (index[6] >= 0 &&
-			  p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ?
-				 0xFFFF :
-				 0x0000;
+	isDataValid[0] = (index[0] >= 0 && p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
+	isDataValid[1] = (index[1] >= 0 && p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
+	isDataValid[2] = (index[2] >= 0 && p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
+	isDataValid[3] = (index[3] >= 0 && p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ? 0xFFFF : 0x0000;
+	isDataValid[4] = (index[4] >= 0 && p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
+	isDataValid[5] = (index[5] >= 0 && p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
+	isDataValid[6] = (index[6] >= 0 && p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
 #else
 	// Causes (generally inocuous) out-of-bounds access when index[i] is negative
-	isDataValid[0] = (p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[1] = (p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[2] = (p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[3] = (p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[4] = (p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[5] = (p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ?
-				 0xFFFF :
-				 0x0000;
-	isDataValid[6] = (p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ?
-				 0xFFFF :
-				 0x0000;
+	isDataValid[0] = (p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
+	isDataValid[1] = (p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
+	isDataValid[2] = (p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
+	isDataValid[3] = (p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ? 0xFFFF : 0x0000;
+	isDataValid[4] = (p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
+	isDataValid[5] = (p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
+	isDataValid[6] = (p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
 #endif
 
 	p->validity[0] = isIndexValid[0] & isDataValid[0];
@@ -189,30 +154,24 @@ static inline void add_template(struct sw842_param *p)
 		stream_write_bits(p->stream, p->dataAndIndices[15], 0);
 		break;
 	case 0x01: // { D4, D2, I2, N0 }, 56 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (D4_BITS + D2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[4])
-		       << (D2_BITS + I2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (D4_BITS + D2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[4]) << (D2_BITS + I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[2]) << (I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
 				  OP_BITS + D4_BITS + D2_BITS + I2_BITS);
 		break;
 	case 0x02: // { D4, I2, D2, N0 }, 56 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (D4_BITS + I2_BITS + D2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[4])
-		       << (I2_BITS + D2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (D4_BITS + I2_BITS + D2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[4]) << (I2_BITS + D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[3]));
 		stream_write_bits(p->stream, out,
 				  OP_BITS + D4_BITS + I2_BITS + D2_BITS);
 		break;
 	case 0x03: // { D4, I2, I2, N0 }, 48 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (D4_BITS + I2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[4])
-		       << (I2_BITS + I2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (D4_BITS + I2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[4]) << (I2_BITS + I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
@@ -225,22 +184,17 @@ static inline void add_template(struct sw842_param *p)
 		stream_write_bits(p->stream, out, OP_BITS + D4_BITS + I4_BITS);
 		break;
 	case 0x05: // { D2, I2, D4, N0 }, 56 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (D2_BITS + I2_BITS + D4_BITS)) |
-		      (((uint64_t)p->dataAndIndices[0])
-		       << (I2_BITS + D4_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (D2_BITS + I2_BITS + D4_BITS)) |
+		      (((uint64_t)p->dataAndIndices[0]) << (I2_BITS + D4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[8]) << (D4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[5]));
 		stream_write_bits(p->stream, out,
 				  OP_BITS + D2_BITS + I2_BITS + D4_BITS);
 		break;
 	case 0x06: // { D2, I2, D2, I2 }, 48 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (D2_BITS + I2_BITS + D2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[0])
-		       << (I2_BITS + D2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[8])
-		       << (D2_BITS + I2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (D2_BITS + I2_BITS + D2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[0]) << (I2_BITS + D2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[8]) << (D2_BITS + I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[2]) << (I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
@@ -248,12 +202,9 @@ static inline void add_template(struct sw842_param *p)
 					  I2_BITS);
 		break;
 	case 0x07: // { D2, I2, I2, D2 }, 48 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (D2_BITS + I2_BITS + I2_BITS + D2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[0])
-		       << (I2_BITS + I2_BITS + D2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[8])
-		       << (I2_BITS + D2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (D2_BITS + I2_BITS + I2_BITS + D2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[0]) << (I2_BITS + I2_BITS + D2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[8]) << (I2_BITS + D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[3]));
 		stream_write_bits(p->stream, out,
@@ -261,12 +212,9 @@ static inline void add_template(struct sw842_param *p)
 					  D2_BITS);
 		break;
 	case 0x08: // { D2, I2, I2, I2 }, 40 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (D2_BITS + I2_BITS + I2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[0])
-		       << (I2_BITS + I2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[8])
-		       << (I2_BITS + I2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (D2_BITS + I2_BITS + I2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[0]) << (I2_BITS + I2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[8]) << (I2_BITS + I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
@@ -274,20 +222,16 @@ static inline void add_template(struct sw842_param *p)
 					  I2_BITS);
 		break;
 	case 0x09: // { D2, I2, I4, N0 }, 33 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (D2_BITS + I2_BITS + I4_BITS)) |
-		      (((uint64_t)p->dataAndIndices[0])
-		       << (I2_BITS + I4_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (D2_BITS + I2_BITS + I4_BITS)) |
+		      (((uint64_t)p->dataAndIndices[0]) << (I2_BITS + I4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[8]) << (I4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[12]));
 		stream_write_bits(p->stream, out,
 				  OP_BITS + D2_BITS + I2_BITS + I4_BITS);
 		break;
 	case 0x0a: // { I2, D2, D4, N0 }, 56 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + D2_BITS + D4_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (D2_BITS + D4_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + D2_BITS + D4_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (D2_BITS + D4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[1]) << (D4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[5]));
 		stream_write_bits(p->stream, out,
@@ -295,23 +239,17 @@ static inline void add_template(struct sw842_param *p)
 		break;
 	case 0x0b: // { I2, D4, I2, N0 }, 48 bits
 		//printf("template 0x0b!\n")
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + D4_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (D4_BITS + I2_BITS)) |
-		      (((uint64_t)swap_be_to_native32(read32(p->in + 2))))
-			      << (I2_BITS) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + D4_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (D4_BITS + I2_BITS)) |
+		      (((uint64_t)swap_be_to_native32(read32(p->in + 2)))) << (I2_BITS) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
 				  OP_BITS + I2_BITS + D4_BITS + I2_BITS);
 		break;
 	case 0x0c: // { I2, D2, I2, D2 }, 48 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + D2_BITS + I2_BITS + D2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (D2_BITS + I2_BITS + D2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[1])
-		       << (I2_BITS + D2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + D2_BITS + I2_BITS + D2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (D2_BITS + I2_BITS + D2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[1]) << (I2_BITS + D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[3]));
 		stream_write_bits(p->stream, out,
@@ -319,12 +257,9 @@ static inline void add_template(struct sw842_param *p)
 					  D2_BITS);
 		break;
 	case 0x0d: // { I2, D2, I2, I2 }, 40 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + D2_BITS + I2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (D2_BITS + I2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[1])
-		       << (I2_BITS + I2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + D2_BITS + I2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (D2_BITS + I2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[1]) << (I2_BITS + I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
@@ -332,32 +267,25 @@ static inline void add_template(struct sw842_param *p)
 					  I2_BITS);
 		break;
 	case 0x0e: // { I2, D2, I4, N0 }, 33 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + D2_BITS + I4_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (D2_BITS + I4_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + D2_BITS + I4_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (D2_BITS + I4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[1]) << (I4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[12]));
 		stream_write_bits(p->stream, out,
 				  OP_BITS + I2_BITS + D2_BITS + I4_BITS);
 		break;
 	case 0x0f: // { I2, I2, D4, N0 }, 48 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + I2_BITS + D4_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (I2_BITS + D4_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + I2_BITS + D4_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (I2_BITS + D4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[8]) << (D4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[5]));
 		stream_write_bits(p->stream, out,
 				  OP_BITS + I2_BITS + I2_BITS + D4_BITS);
 		break;
 	case 0x10: // { I2, I2, D2, I2 }, 40 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + I2_BITS + D2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (I2_BITS + D2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[8])
-		       << (D2_BITS + I2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + I2_BITS + D2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (I2_BITS + D2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[8]) << (D2_BITS + I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[2]) << (I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
@@ -365,12 +293,9 @@ static inline void add_template(struct sw842_param *p)
 					  I2_BITS);
 		break;
 	case 0x11: // { I2, I2, I2, D2 }, 40 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + I2_BITS + I2_BITS + D2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (I2_BITS + I2_BITS + D2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[8])
-		       << (I2_BITS + D2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + I2_BITS + I2_BITS + D2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (I2_BITS + I2_BITS + D2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[8]) << (I2_BITS + D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[3]));
 		stream_write_bits(p->stream, out,
@@ -378,12 +303,9 @@ static inline void add_template(struct sw842_param *p)
 					  D2_BITS);
 		break;
 	case 0x12: // { I2, I2, I2, I2 }, 32 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + I2_BITS + I2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (I2_BITS + I2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[8])
-		       << (I2_BITS + I2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + I2_BITS + I2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (I2_BITS + I2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[8]) << (I2_BITS + I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
@@ -391,10 +313,8 @@ static inline void add_template(struct sw842_param *p)
 					  I2_BITS);
 		break;
 	case 0x13: // { I2, I2, I4, N0 }, 25 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I2_BITS + I2_BITS + I4_BITS)) |
-		      (((uint64_t)p->dataAndIndices[7])
-		       << (I2_BITS + I4_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I2_BITS + I2_BITS + I4_BITS)) |
+		      (((uint64_t)p->dataAndIndices[7]) << (I2_BITS + I4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[8]) << (I4_BITS)) |
 		      (((uint64_t)p->dataAndIndices[12]));
 		stream_write_bits(p->stream, out,
@@ -407,30 +327,24 @@ static inline void add_template(struct sw842_param *p)
 		stream_write_bits(p->stream, out, OP_BITS + I4_BITS + D4_BITS);
 		break;
 	case 0x15: // { I4, D2, I2, N0 }, 33 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I4_BITS + D2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[11])
-		       << (D2_BITS + I2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I4_BITS + D2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[11]) << (D2_BITS + I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[2]) << (I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
 				  OP_BITS + I4_BITS + D2_BITS + I2_BITS);
 		break;
 	case 0x16: // { I4, I2, D2, N0 }, 33 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I4_BITS + I2_BITS + D2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[11])
-		       << (I2_BITS + D2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I4_BITS + I2_BITS + D2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[11]) << (I2_BITS + D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (D2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[3]));
 		stream_write_bits(p->stream, out,
 				  OP_BITS + I4_BITS + D2_BITS + I2_BITS);
 		break;
 	case 0x17: // { I4, I2, I2, N0 }, 25 bits
-		out = (((uint64_t)TEMPLATE_KEY)
-		       << (I4_BITS + I2_BITS + I2_BITS)) |
-		      (((uint64_t)p->dataAndIndices[11])
-		       << (I2_BITS + I2_BITS)) |
+		out = (((uint64_t)TEMPLATE_KEY) << (I4_BITS + I2_BITS + I2_BITS)) |
+		      (((uint64_t)p->dataAndIndices[11]) << (I2_BITS + I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[9]) << (I2_BITS)) |
 		      (((uint64_t)p->dataAndIndices[10]));
 		stream_write_bits(p->stream, out,
@@ -652,96 +566,96 @@ int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 	try {
 #endif
 
-		struct sw842_param *p = (struct sw842_param *)malloc(
-			sizeof(struct sw842_param));
+	struct sw842_param *p = (struct sw842_param *)malloc(
+		sizeof(struct sw842_param));
 
 #ifdef ONLY_WELL_DEFINED_BEHAVIOUR
-		// TODOXXX: It appears that actually this memset should ALWAYS be done,
-		//          because if one executes memset(..., 55, ...), the program crashes!
-		memset(&p->hashes, 0, sizeof(p->hashes));
+	// TODOXXX: It appears that actually this memset should ALWAYS be done,
+	//          because if one executes memset(..., 55, ...), the program crashes!
+	memset(&p->hashes, 0, sizeof(p->hashes));
 #endif
 
-		uint64_t last, next;
-		uint8_t repeat_count = 0;
+	uint64_t last, next;
+	uint8_t repeat_count = 0;
 
-		for (uint16_t i = 0; i < (1 << DICT16_BITS); i++) {
-			p->hashTable16[i] = NO_ENTRY;
-		}
+	for (uint16_t i = 0; i < (1 << DICT16_BITS); i++) {
+		p->hashTable16[i] = NO_ENTRY;
+	}
 
-		for (uint16_t i = 0; i < (1 << DICT32_BITS); i++) {
-			p->hashTable32[i] = NO_ENTRY;
-		}
+	for (uint16_t i = 0; i < (1 << DICT32_BITS); i++) {
+		p->hashTable32[i] = NO_ENTRY;
+	}
 
-		for (uint16_t i = 0; i < (1 << DICT64_BITS); i++) {
-			p->hashTable64[i] = NO_ENTRY;
-		}
+	for (uint16_t i = 0; i < (1 << DICT64_BITS); i++) {
+		p->hashTable64[i] = NO_ENTRY;
+	}
 
-		p->in = in;
-		p->instart = in;
-		p->ilen = ilen;
+	p->in = in;
+	p->instart = in;
+	p->ilen = ilen;
 
-		p->stream = stream_open(out, *olen);
+	p->stream = stream_open(out, *olen);
 
-		p->olen = *olen;
+	p->olen = *olen;
 
-		*olen = 0;
-		/* if using strict mode, we can only compress a multiple of 8 */
-		if (ilen % 8) {
-			fprintf(stderr,
-				"Can only compress multiples of 8 bytes, but len is len %zu (%% 8 = %zu)\n",
-				ilen, ilen % 8);
-			return -EINVAL;
-		}
+	*olen = 0;
+	/* if using strict mode, we can only compress a multiple of 8 */
+	if (ilen % 8) {
+		fprintf(stderr,
+			"Can only compress multiples of 8 bytes, but len is len %zu (%% 8 = %zu)\n",
+			ilen, ilen % 8);
+		return -EINVAL;
+	}
 
-		/* make initial 'last' different so we don't match the first time */
-		last = ~read64(p->in);
+	/* make initial 'last' different so we don't match the first time */
+	last = ~read64(p->in);
 
-		while (p->ilen > 7) {
-			next = read64(p->in);
+	while (p->ilen > 7) {
+		next = read64(p->in);
 
-			/* must get the next data, as we need to update the hashtable
+		/* must get the next data, as we need to update the hashtable
 		 * entries with the new data every time
 		 */
-			get_next_data(p);
+		get_next_data(p);
 
 #ifdef CUDA842_STRICT
-			/* we don't care about endianness in last or next;
+		/* we don't care about endianness in last or next;
 		 * we're just comparing 8 bytes to another 8 bytes,
 		 * they're both the same endianness
 		 */
-			if (next == last) {
-				/* repeat count bits are 0-based, so we stop at +1 */
-				if (++repeat_count <= REPEAT_BITS_MAX)
-					goto repeat;
-			}
-			if (repeat_count) {
-				add_repeat_template(p, repeat_count);
-				repeat_count = 0;
-				if (next == last) /* reached max repeat bits */
-					goto repeat;
-			}
+		if (next == last) {
+			/* repeat count bits are 0-based, so we stop at +1 */
+			if (++repeat_count <= REPEAT_BITS_MAX)
+				goto repeat;
+		}
+		if (repeat_count) {
+			add_repeat_template(p, repeat_count);
+			repeat_count = 0;
+			if (next == last) /* reached max repeat bits */
+				goto repeat;
+		}
 
-			if (next == 0)
-				add_zeros_template(p);
-			else
-				process_next(p);
+		if (next == 0)
+			add_zeros_template(p);
+		else
+			process_next(p);
 
-		repeat:
-			last = next;
+	repeat:
+		last = next;
 #else
 		process_next(p);
 #endif
-			update_hashtables(p);
-			p->in += 8;
-			p->ilen -= 8;
-		}
+		update_hashtables(p);
+		p->in += 8;
+		p->ilen -= 8;
+	}
 
-		if (repeat_count)
-			add_repeat_template(p, repeat_count);
+	if (repeat_count)
+		add_repeat_template(p, repeat_count);
 
-		add_end_template(p);
+	add_end_template(p);
 
-		/*
+	/*
 	 * crc(0:31) is appended to target data starting with the next
 	 * bit after End of stream template.
 	 * nx842 calculates CRC for data in big-endian format. So doing
@@ -749,17 +663,17 @@ int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 	 * compressed data.
 	 */
 #ifndef DISABLE_CRC
-		uint32_t crc = crc32_be(0, in, ilen);
+	uint32_t crc = crc32_be(0, in, ilen);
 
-		stream_write_bits(p->stream, crc, CRC_BITS);
+	stream_write_bits(p->stream, crc, CRC_BITS);
 #endif
 
-		stream_flush(p->stream);
+	stream_flush(p->stream);
 
-		*olen = stream_size(p->stream);
+	*olen = stream_size(p->stream);
 
-		stream_close(p->stream);
-		free(p);
+	stream_close(p->stream);
+	free(p);
 
 #ifdef ENABLE_ERROR_HANDLING
 	} catch (int x) {

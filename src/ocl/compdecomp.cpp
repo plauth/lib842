@@ -35,8 +35,7 @@ int main(int argc, char *argv[])
 		printf("original file length (padded): %zu\n", ilen);
 	}
 
-#if defined(USE_INPLACE_COMPRESSED_CHUNKS) ||                                  \
-	defined(USE_MAYBE_COMPRESSED_CHUNKS)
+#if defined(USE_INPLACE_COMPRESSED_CHUNKS) || defined(USE_MAYBE_COMPRESSED_CHUNKS)
 	olen = ilen;
 #else
 	olen = ilen * 2;
@@ -77,8 +76,7 @@ int main(int argc, char *argv[])
 
 	printf("Using %zu chunks of %d bytes\n", num_chunks, CL842_CHUNK_SIZE);
 
-#if defined(USE_INPLACE_COMPRESSED_CHUNKS) ||                                  \
-	defined(USE_MAYBE_COMPRESSED_CHUNKS)
+#if defined(USE_INPLACE_COMPRESSED_CHUNKS) || defined(USE_MAYBE_COMPRESSED_CHUNKS)
 	/** The objective of (MAYBE|INPLACE)_COMPRESSED_CHUNKS is to define a format that allows
         easy network transmission of compressed data without excessive copying,
         buffer overallocation, etc..
@@ -189,22 +187,22 @@ int main(int argc, char *argv[])
 		printf("Compression- and decompression was successful!\n");
 	} else {
 		/*
-        for (size_t i = 0; i < ilen; i++) {
-            printf("%02x:", compressIn[i]);
-        }
+		for (size_t i = 0; i < ilen; i++) {
+			printf("%02x:", compressIn[i]);
+		}
 
-        printf("\n\n");
+		printf("\n\n");
 
-        for (size_t i = 0; i < olen; i++) {
-            printf("%02x:", compressOut[i]);
-        }
+		for (size_t i = 0; i < olen; i++) {
+			printf("%02x:", compressOut[i]);
+		}
 
-        printf("\n\n");
+		printf("\n\n");
 
-        for (size_t i = 0; i < dlen; i++) {
-            printf("%02x:", decompressOut[i]);
-        }
-        */
+		for (size_t i = 0; i < dlen; i++) {
+			printf("%02x:", decompressOut[i]);
+		}
+		*/
 
 		printf("\n\n");
 
