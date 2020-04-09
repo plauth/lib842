@@ -62,4 +62,3 @@ static inline void put_unaligned_le64(uint64_t val, void *p)
 }
 
 #endif /* _KERNELDEPS_H */
-

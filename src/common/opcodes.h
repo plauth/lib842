@@ -288,4 +288,3 @@ static uint8_t templates[26][4][2] = { // params size in bits
 
 #endif
 #endif
-

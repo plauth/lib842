@@ -11,8 +11,8 @@
 //#define DEBUG 1
 
 struct node2_el {
-    uint8_t index;
-    struct node2_el *next, *prev;
+	uint8_t index;
+	struct node2_el *next, *prev;
 };
 
 struct hlist_node2 {
@@ -22,8 +22,8 @@ struct hlist_node2 {
 };
 
 struct node4_el {
-    uint16_t index;
-    struct node4_el *next, *prev;
+	uint16_t index;
+	struct node4_el *next, *prev;
 };
 
 struct hlist_node4 {
@@ -33,8 +33,8 @@ struct hlist_node4 {
 };
 
 struct node8_el {
-    uint8_t index;
-    struct node8_el *next, *prev;
+	uint8_t index;
+	struct node8_el *next, *prev;
 };
 
 struct hlist_node8 {

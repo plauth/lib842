@@ -195,20 +195,20 @@ static int __do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, 
 
 	if (offset + size > total) {
 		fprintf(stderr, "index%x %lx points past end %lx\n", size,
-			 (unsigned long)offset, (unsigned long)total);
+			(unsigned long)offset, (unsigned long)total);
 		return -EINVAL;
 	}
 
 	if (size != 2 && size != 4 && size != 8)
 		printf("__do_index invalid size %x\n", size);
-	#ifdef DEBUG
+#ifdef DEBUG
 	else
 		printf("index%x to %lx off %lx adjoff %lx tot %lx data %lx\n",
-			 size, (unsigned long)index,
-			 (unsigned long)(index * size), (unsigned long)offset,
-			 (unsigned long)total,
-			 (unsigned long)beN_to_cpu(&p->ostart[offset], size));
-	#endif
+		       size, (unsigned long)index,
+		       (unsigned long)(index * size), (unsigned long)offset,
+		       (unsigned long)total,
+		       (unsigned long)beN_to_cpu(&p->ostart[offset], size));
+#endif
 
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;
@@ -241,9 +241,9 @@ static int do_op(struct sw842_param_decomp *p, uint8_t o)
 	for (i = 0; i < 4; i++) {
 		uint8_t op = decomp_ops[o][i];
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		printf("op is %x\n", op);
-		#endif
+#endif
 
 		switch (op & OP_ACTION) {
 		case OP_ACTION_DATA:
@@ -281,8 +281,8 @@ static int do_op(struct sw842_param_decomp *p, uint8_t o)
  * will contain the number of output bytes written on success, or
  * 0 on error.
  */
-int sw842_decompress(const uint8_t *in, size_t ilen,
-		     uint8_t *out, size_t *olen)
+int sw842_decompress(const uint8_t *in, unsigned int ilen,
+		     uint8_t *out, unsigned int *olen)
 {
 	struct sw842_param_decomp p;
 	int ret;
@@ -305,9 +305,9 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 		if (ret)
 			return ret;
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		printf("template is %lx\n", (unsigned long)op);
-		#endif
+#endif
 
 		switch (op) {
 		case OP_REPEAT:
@@ -381,7 +381,7 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 	/*
 	 * Validate CRC saved in compressed data.
 	 */
-	if (crc != (uint64_t) crc32_be(0, out, total - p.olen)) {
+	if (crc != (uint64_t)crc32_be(0, out, total - p.olen)) {
 		fprintf(stderr, "CRC mismatch for decompression\n");
 		return -EINVAL;
 	}
@@ -393,5 +393,3 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 
 	return 0;
 }
-
-
