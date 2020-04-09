@@ -5,9 +5,10 @@
 #include <string>
 #include <chrono>
 
-// This symbol is generated during the build process and defines a
-// CL842_DECOMPRESS_SOURCE with the source of the decompression OpenCL kernel
-extern const char *CL842_DECOMPRESS_SOURCE;
+// Those two symbols are generated during the build process and define
+// the source of the decompression OpenCL kernel and the common 842 definitions
+extern const char *CL842_DECOMPRESS_842DEFS_SOURCE;
+extern const char *CL842_DECOMPRESS_KERNEL_SOURCE;
 
 #ifndef LOCAL_SIZE
 #define LOCAL_SIZE 256
@@ -81,7 +82,13 @@ void CL842DeviceDecompressor::buildProgram(const cl::Context& context, const VEC
     else if (m_inputFormat == CL842InputFormat::INPLACE_COMPRESSED_CHUNKS)
         options<<" -D USE_INPLACE_COMPRESSED_CHUNKS=1";
 
-    m_program = cl::Program(context, std::string(CL842_DECOMPRESS_SOURCE));
+    std::string src(CL842_DECOMPRESS_KERNEL_SOURCE);
+    // Instead of using OpenCL's include mechanism, or duplicating the common 842
+    // definitions, we just paste the entire header file on top ourselves
+    // This works nicely and avoids us many headaches due to OpenCL headers
+    // (most importantly, that for our project, dOpenCL doesn't support them)
+    src.insert(0, CL842_DECOMPRESS_842DEFS_SOURCE);
+    m_program = cl::Program(context, src);
     try {
         m_program.build(devices, options.str().c_str());
     } catch (const cl::Error& ex) {

@@ -1,64 +1,12 @@
-//R"=====(
+// NB: When we build the program, we prepend the 842 definitions,
+//     i.e. we kind of do the equivalent to this include:
+// #include "../common/842.h"
 
 typedef uchar   uint8_t;
 typedef ushort  uint16_t;
 typedef short   int16_t;
 typedef uint    uint32_t;
 typedef ulong   uint64_t;
-
-/* special templates */
-#define OP_REPEAT   (0x1B)
-#define OP_ZEROS    (0x1C)
-#define OP_END      (0x1E)
-
-/* additional bits of each op param */
-#define OP_BITS     (5)
-#define REPEAT_BITS (6)
-#define I2_BITS     (8)
-#define I4_BITS     (9)
-#define I8_BITS     (8)
-#define D2_BITS     (16)
-#define D4_BITS     (32)
-#define D8_BITS     (64)
-#define CRC_BITS    (32)
-#define N0_BITS     (0)
-
-#define REPEAT_BITS_MAX     (0x3f)
-
-/* Arbitrary values used to indicate action */
-#define OP_ACTION   (0x70)
-#define OP_ACTION_INDEX (0x10)
-#define OP_ACTION_DATA  (0x20)
-#define OP_ACTION_NOOP  (0x40)
-#define OP_AMOUNT   (0x0f)
-#define OP_AMOUNT_0 (0x00)
-#define OP_AMOUNT_2 (0x02)
-#define OP_AMOUNT_4 (0x04)
-#define OP_AMOUNT_8 (0x08)
-
-#define D2      (OP_ACTION_DATA  | OP_AMOUNT_2)
-#define D4      (OP_ACTION_DATA  | OP_AMOUNT_4)
-#define D8      (OP_ACTION_DATA  | OP_AMOUNT_8)
-#define I2      (OP_ACTION_INDEX | OP_AMOUNT_2)
-#define I4      (OP_ACTION_INDEX | OP_AMOUNT_4)
-#define I8      (OP_ACTION_INDEX | OP_AMOUNT_8)
-#define N0      (OP_ACTION_NOOP  | OP_AMOUNT_0)
-
-#define DICT16_BITS     (10)
-#define DICT32_BITS     (11)
-#define DICT64_BITS     (10)
-
-#define OP_DEC_NOOP  (0x00)
-#define OP_DEC_DATA  (0x00)
-#define OP_DEC_INDEX (0x80)
-
-#define OP_DEC_N0   {(N0_BITS | OP_DEC_NOOP),  0}
-#define OP_DEC_D2   {(D2_BITS | OP_DEC_DATA),  2}
-#define OP_DEC_D4   {(D4_BITS | OP_DEC_DATA),  4}
-#define OP_DEC_D8   {(D8_BITS | OP_DEC_DATA),  8}
-#define OP_DEC_I2   {(I2_BITS | OP_DEC_INDEX), 2}
-#define OP_DEC_I4   {(I4_BITS | OP_DEC_INDEX), 4}
-#define OP_DEC_I8   {(I8_BITS | OP_DEC_INDEX), 8}
 
 struct sw842_param_decomp {
     __global uint64_t *out;
@@ -297,4 +245,3 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset, __global u
 
     return;
 }
-//)====="

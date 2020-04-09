@@ -63,11 +63,15 @@ if (OpenCL_FOUND)
 
     add_executable(cl2c src/tools/cl2c.cpp)
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl.c
-        COMMAND cl2c ${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/decompress.cl ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl.c CL842_DECOMPRESS_SOURCE
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_842defs.c
+        COMMAND cl2c ${CMAKE_CURRENT_SOURCE_DIR}/src/common/842.h ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_842defs.c CL842_DECOMPRESS_842DEFS_SOURCE
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/842.h)
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_kernel.c
+        COMMAND cl2c ${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/decompress.cl ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_kernel.c CL842_DECOMPRESS_KERNEL_SOURCE
         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/decompress.cl)
 
-    set(SRCFILES ${SRCFILES} src/ocl/cl842decompress.cpp decompress_cl.c)
+    set(SRCFILES ${SRCFILES} src/ocl/cl842decompress.cpp decompress_cl_842defs.c decompress_cl_kernel.c)
 endif()
 
 # CUDA implementation
