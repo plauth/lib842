@@ -19,14 +19,12 @@
 #define BRANCH_FREE (0)
 //#define DEBUG 1
 
-#define DICT16_BITS     (10)
-#define DICT32_BITS     (11)
-#define DICT64_BITS     (10)
-
-
+#define DICT16_BITS (10)
+#define DICT32_BITS (11)
+#define DICT64_BITS (10)
 
 struct sw842_param {
-	struct bitstream* stream;
+	struct bitstream *stream;
 
 	const uint8_t *in;
 	const uint8_t *instart;
@@ -43,20 +41,20 @@ struct sw842_param {
 	int16_t hashTable16[1 << DICT16_BITS]; // 1024 * 2 bytes =   2 KiB
 	int16_t hashTable32[1 << DICT32_BITS]; // 2048 * 2 bytes =   4 KiB
 	int16_t hashTable64[1 << DICT64_BITS]; // 1024 * 2 bytes =   2 KiB
-	uint16_t rollingFifo16[1 << I2_BITS];   // 256  * 2 bytes = 0.5 KiB
-	uint32_t rollingFifo32[1 << I4_BITS];   // 512  * 4 bytes =   2 KiB
-	uint64_t rollingFifo64[1 << I8_BITS];   // 256  * 8 bytes =   2 KiB
+	uint16_t rollingFifo16[1 << I2_BITS]; // 256  * 2 bytes = 0.5 KiB
+	uint32_t rollingFifo32[1 << I4_BITS]; // 512  * 4 bytes =   2 KiB
+	uint64_t rollingFifo64[1 << I8_BITS]; // 256  * 8 bytes =   2 KiB
 };
 
 struct sw842_param_decomp {
 	uint8_t *out;
 	const uint8_t *ostart;
-	const uint64_t* in;
-	const uint64_t* istart;
-	#ifdef ENABLE_ERROR_HANDLING
+	const uint64_t *in;
+	const uint64_t *istart;
+#ifdef ENABLE_ERROR_HANDLING
 	size_t ilen;
 	size_t olen;
-	#endif
+#endif
 	uint8_t bits;
 	uint64_t buffer;
 };

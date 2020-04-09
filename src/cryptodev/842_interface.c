@@ -14,7 +14,7 @@ struct cryptodev_ctx {
 	uint16_t alignmask;
 };
 
-static int c842_ctx_init(struct cryptodev_ctx* ctx, int cfd)
+static int c842_ctx_init(struct cryptodev_ctx *ctx, int cfd)
 {
 #ifdef CIOCGSESSINFO
 	struct session_info_op siop;
@@ -36,19 +36,19 @@ static int c842_ctx_init(struct cryptodev_ctx* ctx, int cfd)
 		fprintf(stderr, "ioctl(CIOCGSESSINFO) errno=%d\n", errno);
 		return -errno;
 	}
-	#ifdef DEBUG
-	printf("Got %s with driver %s\n",
-			siop.compr_info.cra_name, siop.compr_info.cra_driver_name);
+#ifdef DEBUG
+	printf("Got %s with driver %s\n", siop.compr_info.cra_name,
+	       siop.compr_info.cra_driver_name);
 	if (!(siop.flags & SIOP_FLAG_KERNEL_DRIVER_ONLY)) {
 		printf("Note: This is not an accelerated compressor\n");
 	}
-	#endif
+#endif
 	ctx->alignmask = siop.alignmask;
 #endif
 	return 0;
 }
 
-static int c842_ctx_deinit(struct cryptodev_ctx* ctx)
+static int c842_ctx_deinit(struct cryptodev_ctx *ctx)
 {
 	if (ioctl(ctx->cfd, CIOCFSESSION, &ctx->sess.ses)) {
 		fprintf(stderr, "ioctl(CIOCFSESSION) errno=%d\n", errno);
@@ -58,12 +58,15 @@ static int c842_ctx_deinit(struct cryptodev_ctx* ctx)
 	return 0;
 }
 
-static int is_pointer_aligned(const void *ptr, uint16_t alignmask) {
-	const void *aligned_ptr = (const void*)(((unsigned long)ptr + alignmask) & ~alignmask);
+static int is_pointer_aligned(const void *ptr, uint16_t alignmask)
+{
+	const void *aligned_ptr =
+		(const void *)(((unsigned long)ptr + alignmask) & ~alignmask);
 	return ptr == aligned_ptr;
 }
 
-static int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, void* output, size_t *olen)
+static int c842_compress(struct cryptodev_ctx *ctx, const void *input,
+			 size_t ilen, void *output, size_t *olen)
 {
 	struct crypt_op cryp;
 
@@ -92,8 +95,8 @@ static int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t il
 	cryp.ses = ctx->sess.ses;
 	cryp.len = (__u32)ilen;
 	cryp.dlen = (__u32)*olen;
-	cryp.src = (__u8*)input;
-	cryp.dst = (__u8*)output;
+	cryp.src = (__u8 *)input;
+	cryp.dst = (__u8 *)output;
 	cryp.op = COP_ENCRYPT;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
 		fprintf(stderr, "ioctl(CIOCCRYPT) errno=%d\n", errno);
@@ -105,7 +108,8 @@ static int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t il
 	return 0;
 }
 
-static int c842_decompress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, void* output, size_t *olen)
+static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
+			   size_t ilen, void *output, size_t *olen)
 {
 	struct crypt_op cryp;
 
@@ -134,8 +138,8 @@ static int c842_decompress(struct cryptodev_ctx* ctx, const void* input, size_t 
 	cryp.ses = ctx->sess.ses;
 	cryp.len = (__u32)ilen;
 	cryp.dlen = (__u32)*olen;
-	cryp.src = (__u8*)input;
-	cryp.dst = (__u8*)output;
+	cryp.src = (__u8 *)input;
+	cryp.dst = (__u8 *)output;
 	cryp.op = COP_DECRYPT;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
 		fprintf(stderr, "ioctl(CIOCCRYPT) errno=%i\n", errno);
@@ -147,7 +151,8 @@ static int c842_decompress(struct cryptodev_ctx* ctx, const void* input, size_t 
 	return 0;
 }
 
-int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen) {
+int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
+{
 	int cfd;
 	int err = 0, cleanup_err = 0;
 	struct cryptodev_ctx ctx;
@@ -167,7 +172,7 @@ int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen) {
 	}
 
 	err = c842_ctx_init(&ctx, cfd);
-	if(err)
+	if (err)
 		goto cleanup_file;
 
 	err = c842_compress(&ctx, in, ilen, out, olen);
@@ -187,7 +192,8 @@ cleanup_file:
 	return err;
 }
 
-int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen) {
+int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
+{
 	int cfd;
 	int err = 0, cleanup_err = 0;
 	struct cryptodev_ctx ctx;
@@ -207,7 +213,7 @@ int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 	}
 
 	err = c842_ctx_init(&ctx, cfd);
-	if(err)
+	if (err)
 		goto cleanup_file;
 
 	err = c842_decompress(&ctx, in, ilen, out, olen);

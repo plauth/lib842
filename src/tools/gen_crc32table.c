@@ -5,7 +5,6 @@
 
 #define CRCPOLY_BE 0x04c11db7
 
-
 static uint32_t crc32table_be[8][256];
 
 static void crc32init_be(void)
@@ -29,12 +28,11 @@ static void crc32init_be(void)
 	}
 }
 
-
 static void output_table(int rows, int len, char *trans)
 {
 	int i, j;
 
-	for (j = 0 ; j < rows; j++) {
+	for (j = 0; j < rows; j++) {
 		printf("{");
 		for (i = 0; i < len - 1; i++) {
 			if (i % 4 == 0)
@@ -45,7 +43,7 @@ static void output_table(int rows, int len, char *trans)
 	}
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
 	printf("/* this file is generated - do not edit */\n");
 	printf("#include <stdint.h>\n\n");

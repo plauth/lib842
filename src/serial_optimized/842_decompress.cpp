@@ -32,9 +32,9 @@
 #define ONLY_WELL_DEFINED_BEHAVIOUR
 
 /* rolling fifo sizes */
-#define I2_FIFO_SIZE	(2 * (1 << I2_BITS))
-#define I4_FIFO_SIZE	(4 * (1 << I4_BITS))
-#define I8_FIFO_SIZE	(8 * (1 << I8_BITS))
+#define I2_FIFO_SIZE (2 * (1 << I2_BITS))
+#define I4_FIFO_SIZE (4 * (1 << I4_BITS))
+#define I8_FIFO_SIZE (8 * (1 << I8_BITS))
 
 #define __round_mask(x, y) ((__typeof__(x))((y)-1))
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
@@ -43,100 +43,117 @@
 #define WSIZE 64 //sizeof(uint64_t)
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
-static uint16_t fifo_sizes[9] = {
-	0,
-	0,
-	I2_FIFO_SIZE,
-	0,
-	I4_FIFO_SIZE,
-	0,
-	0,
-	0,
-	I8_FIFO_SIZE
-};
+static uint16_t fifo_sizes[9] = { 0, 0, I2_FIFO_SIZE, 0, I4_FIFO_SIZE, 0,
+				  0, 0, I8_FIFO_SIZE };
 
+static uint8_t dec_templates[26][4][2] = {
+	// params size in bits
+	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0,
+	  OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
+	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2,
+	  OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
+	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_D2,
+	  OP_DEC_N0 }, // 0x02: { D4, I2, D2, N0 }, 56 bits
+	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_I2,
+	  OP_DEC_N0 }, // 0x03: { D4, I2, I2, N0 }, 48 bits
 
-static uint8_t dec_templates[26][4][2] = { // params size in bits
-	{OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x00: { D8, N0, N0, N0 }, 64 bits
-	{OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x01: { D4, D2, I2, N0 }, 56 bits
-	{OP_DEC_D4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0}, // 0x02: { D4, I2, D2, N0 }, 56 bits
-	{OP_DEC_D4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0}, // 0x03: { D4, I2, I2, N0 }, 48 bits
+	{ OP_DEC_D4, OP_DEC_I4, OP_DEC_N0,
+	  OP_DEC_N0 }, // 0x04: { D4, I4, N0, N0 }, 41 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D4,
+	  OP_DEC_N0 }, // 0x05: { D2, I2, D4, N0 }, 56 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D2,
+	  OP_DEC_I2 }, // 0x06: { D2, I2, D2, I2 }, 48 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2,
+	  OP_DEC_D2 }, // 0x07: { D2, I2, I2, D2 }, 48 bits
 
-	{OP_DEC_D4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0}, // 0x04: { D4, I4, N0, N0 }, 41 bits
-	{OP_DEC_D2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0}, // 0x05: { D2, I2, D4, N0 }, 56 bits
-	{OP_DEC_D2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2}, // 0x06: { D2, I2, D2, I2 }, 48 bits
-	{OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2}, // 0x07: { D2, I2, I2, D2 }, 48 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2,
+	  OP_DEC_I2 }, // 0x08: { D2, I2, I2, I2 }, 40 bits
+	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I4,
+	  OP_DEC_N0 }, // 0x09: { D2, I2, I4, N0 }, 33 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_D4,
+	  OP_DEC_N0 }, // 0x0a: { I2, D2, D4, N0 }, 56 bits
+	{ OP_DEC_I2, OP_DEC_D4, OP_DEC_I2,
+	  OP_DEC_N0 }, // 0x0b: { I2, D4, I2, N0 }, 48 bits
 
-	{OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2}, // 0x08: { D2, I2, I2, I2 }, 40 bits
-	{OP_DEC_D2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0}, // 0x09: { D2, I2, I4, N0 }, 33 bits
-	{OP_DEC_I2, OP_DEC_D2, OP_DEC_D4, OP_DEC_N0}, // 0x0a: { I2, D2, D4, N0 }, 56 bits
-	{OP_DEC_I2, OP_DEC_D4, OP_DEC_I2, OP_DEC_N0}, // 0x0b: { I2, D4, I2, N0 }, 48 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2,
+	  OP_DEC_D2 }, // 0x0c: { I2, D2, I2, D2 }, 48 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2,
+	  OP_DEC_I2 }, // 0x0d: { I2, D2, I2, I2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I4,
+	  OP_DEC_N0 }, // 0x0e: { I2, D2, I4, N0 }, 33 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D4,
+	  OP_DEC_N0 }, // 0x0f: { I2, I2, D4, N0 }, 48 bits
 
-	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_D2}, // 0x0c: { I2, D2, I2, D2 }, 48 bits
-	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2}, // 0x0d: { I2, D2, I2, I2 }, 40 bits
-	{OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0}, // 0x0e: { I2, D2, I4, N0 }, 33 bits
-	{OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0}, // 0x0f: { I2, I2, D4, N0 }, 48 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D2,
+	  OP_DEC_I2 }, // 0x10: { I2, I2, D2, I2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2,
+	  OP_DEC_D2 }, // 0x11: { I2, I2, I2, D2 }, 40 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2,
+	  OP_DEC_I2 }, // 0x12: { I2, I2, I2, I2 }, 32 bits
+	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I4,
+	  OP_DEC_N0 }, // 0x13: { I2, I2, I4, N0 }, 25 bits
 
-	{OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2}, // 0x10: { I2, I2, D2, I2 }, 40 bits
-	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2}, // 0x11: { I2, I2, I2, D2 }, 40 bits
-	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2}, // 0x12: { I2, I2, I2, I2 }, 32 bits
-	{OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0}, // 0x13: { I2, I2, I4, N0 }, 25 bits
+	{ OP_DEC_I4, OP_DEC_D4, OP_DEC_N0,
+	  OP_DEC_N0 }, // 0x14: { I4, D4, N0, N0 }, 41 bits
+	{ OP_DEC_I4, OP_DEC_D2, OP_DEC_I2,
+	  OP_DEC_N0 }, // 0x15: { I4, D2, I2, N0 }, 33 bits
+	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_D2,
+	  OP_DEC_N0 }, // 0x16: { I4, I2, D2, N0 }, 33 bits
+	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_I2,
+	  OP_DEC_N0 }, // 0x17: { I4, I2, I2, N0 }, 25 bits
 
-	{OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0}, // 0x14: { I4, D4, N0, N0 }, 41 bits
-	{OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x15: { I4, D2, I2, N0 }, 33 bits
-	{OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0}, // 0x16: { I4, I2, D2, N0 }, 33 bits
-	{OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0}, // 0x17: { I4, I2, I2, N0 }, 25 bits
-
-
-	{OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0}, // 0x18: { I4, I4, N0, N0 }, 18 bits
-	{OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x19: { I8, N0, N0, N0 }, 8 bits
+	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0,
+	  OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
+	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0,
+	  OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
 #endif
 
 /* read a single uint64_t from memory */
 static inline uint64_t read_word(struct sw842_param_decomp *p)
 {
-  #ifdef ENABLE_ERROR_HANDLING
-  if ((p->in - p->istart + 1) * sizeof(uint64_t) > p->ilen) {
-    throw -EINVAL;
-  }
-  #endif
-  uint64_t w = swap_be_to_native64(*p->in++);
-  return w;
+#ifdef ENABLE_ERROR_HANDLING
+	if ((p->in - p->istart + 1) * sizeof(uint64_t) > p->ilen) {
+		throw - EINVAL;
+	}
+#endif
+	uint64_t w = swap_be_to_native64(*p->in++);
+	return w;
 }
 
 /* read 0 <= n <= 64 bits */
 static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 {
-  uint64_t value = p->buffer >> (WSIZE - n);
-  value &= (n > 0) ? 0xFFFFFFFFFFFFFFFF : 0x0000000000000000;
+	uint64_t value = p->buffer >> (WSIZE - n);
+	value &= (n > 0) ? 0xFFFFFFFFFFFFFFFF : 0x0000000000000000;
 
-  if (p->bits < n) {
-    /* fetch WSIZE bits  */
-    p->buffer = read_word(p);
-    value |= p->buffer >> (WSIZE - (n - p->bits));
-    #ifdef ONLY_WELL_DEFINED_BEHAVIOUR
-    // Avoid shift by 64 (only shifts of strictly less bits bits are allowed by the standard)
-    p->buffer = (n - p->bits) < 64 ? (p->buffer << (n - p->bits)) : 0;
-    #else
-    p->buffer <<= n - p->bits;
-    #endif
-    p->bits += WSIZE - n;
-    p->buffer *= (p->bits > 0);
-  }  else {
-    p->bits -= n;
-    p->buffer <<= n;
-  }
-  return value;
+	if (p->bits < n) {
+		/* fetch WSIZE bits  */
+		p->buffer = read_word(p);
+		value |= p->buffer >> (WSIZE - (n - p->bits));
+#ifdef ONLY_WELL_DEFINED_BEHAVIOUR
+		// Avoid shift by 64 (only shifts of strictly less bits bits are allowed by the standard)
+		p->buffer =
+			(n - p->bits) < 64 ? (p->buffer << (n - p->bits)) : 0;
+#else
+		p->buffer <<= n - p->bits;
+#endif
+		p->bits += WSIZE - n;
+		p->buffer *= (p->bits > 0);
+	} else {
+		p->bits -= n;
+		p->buffer <<= n;
+	}
+	return value;
 }
 
 #if (defined(BRANCH_FREE) && BRANCH_FREE == 0) || not defined(BRANCH_FREE)
-template<uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
+template <uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
 {
-	#ifdef ENABLE_ERROR_HANDLING
+#ifdef ENABLE_ERROR_HANDLING
 	if (static_cast<size_t>(p->out - p->ostart + N) > p->olen)
-		throw -ENOSPC;
-	#endif
+		throw - ENOSPC;
+#endif
 
 	switch (N) {
 	case 2:
@@ -153,7 +170,8 @@ template<uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
 	p->out += N;
 }
 
-static inline void do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, uint64_t fsize)
+static inline void do_index(struct sw842_param_decomp *p, uint8_t size,
+			    uint8_t bits, uint64_t fsize)
 {
 	uint64_t index, offset, total = round_down(p->out - p->ostart, 8);
 
@@ -177,13 +195,13 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t 
 		offset += section;
 	}
 
-	#ifdef ENABLE_ERROR_HANDLING
+#ifdef ENABLE_ERROR_HANDLING
 	if (offset + size > total) {
 		fprintf(stderr, "index%x %lx points past end %lx\n", size,
-			 (unsigned long)offset, (unsigned long)total);
-		throw -EINVAL;
+			(unsigned long)offset, (unsigned long)total);
+		throw - EINVAL;
 	}
-	#endif
+#endif
 
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;
@@ -191,7 +209,8 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t 
 #endif
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
-static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uint64_t index, uint64_t fsize)
+static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
+				 uint64_t index, uint64_t fsize)
 {
 	uint64_t offset, total = round_down(p->out - p->ostart, 8);
 
@@ -232,197 +251,197 @@ static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uin
  * will contain the number of output bytes written on success, or
  * 0 on error.
  */
-int optsw842_decompress(const uint8_t *in, size_t ilen,
-		     uint8_t *out, size_t *olen)
+int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
+			size_t *olen)
 {
-	#ifdef ENABLE_ERROR_HANDLING
+#ifdef ENABLE_ERROR_HANDLING
 	try {
-	#endif
+#endif
 
-	struct sw842_param_decomp p;
-	p.out = out;
-	p.ostart = out;
-  	p.in = (const uint64_t*)in;
-	p.istart = (const uint64_t*)in;
-	#ifdef ENABLE_ERROR_HANDLING
-	p.ilen = ilen;
-	p.olen = *olen;
-	#endif
-	p.buffer = 0;
-	p.bits = 0;
+		struct sw842_param_decomp p;
+		p.out = out;
+		p.ostart = out;
+		p.in = (const uint64_t *)in;
+		p.istart = (const uint64_t *)in;
+#ifdef ENABLE_ERROR_HANDLING
+		p.ilen = ilen;
+		p.olen = *olen;
+#endif
+		p.buffer = 0;
+		p.bits = 0;
 
-	*olen = 0;
+		*olen = 0;
 
-	uint64_t op, rep;
+		uint64_t op, rep;
 
-	#if defined(BRANCH_FREE) && BRANCH_FREE == 1
-	uint64_t output_word;
-	uint64_t values[8];
-	uint8_t bits;
-	#endif
+#if defined(BRANCH_FREE) && BRANCH_FREE == 1
+		uint64_t output_word;
+		uint64_t values[8];
+		uint8_t bits;
+#endif
 
-	do {
-		op = read_bits(&p, OP_BITS);
+		do {
+			op = read_bits(&p, OP_BITS);
 
-		#ifdef DEBUG
-		printf("template is %llx\n", op);
-		#endif
+#ifdef DEBUG
+			printf("template is %llx\n", op);
+#endif
 
-		#if defined(BRANCH_FREE) && BRANCH_FREE == 1
-		output_word = 0;
-		bits = 0;
-		memset(values, 0, 64);
-		#endif
+#if defined(BRANCH_FREE) && BRANCH_FREE == 1
+			output_word = 0;
+			bits = 0;
+			memset(values, 0, 64);
+#endif
 
-		switch (op) {
-			#if (defined(BRANCH_FREE) && BRANCH_FREE == 0) || not defined(BRANCH_FREE)
-			case 0x00: 	// { D8, N0, N0, N0 }, 64 bits
-	        	do_data<8>(&p);
-	    	    break;
-	        case 0x01:	// { D4, D2, I2, N0 }, 56 bits
-	        	do_data<4>(&p);
-	        	do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-	        case 0x02:	// { D4, I2, D2, N0 }, 56 bits
-	        	do_data<4>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_data<2>(&p);
-	    	    break;
-			case 0x03: 	// { D4, I2, I2, N0 }, 48 bits
-	        	do_data<4>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x04:	// { D4, I4, N0, N0 }, 41 bits
-	        	do_data<4>(&p);
-	        	do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x05:	// { D2, I2, D4, N0 }, 56 bits
+			switch (op) {
+#if (defined(BRANCH_FREE) && BRANCH_FREE == 0) || not defined(BRANCH_FREE)
+			case 0x00: // { D8, N0, N0, N0 }, 64 bits
+				do_data<8>(&p);
+				break;
+			case 0x01: // { D4, D2, I2, N0 }, 56 bits
+				do_data<4>(&p);
 				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_data<4>(&p);
-	    	    break;
-			case 0x06:	// { D2, I2, D2, I2 }, 48 bits
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				break;
+			case 0x02: // { D4, I2, D2, N0 }, 56 bits
+				do_data<4>(&p);
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				break;
+			case 0x03: // { D4, I2, I2, N0 }, 48 bits
+				do_data<4>(&p);
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				break;
+			case 0x04: // { D4, I4, N0, N0 }, 41 bits
+				do_data<4>(&p);
+				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+				break;
+			case 0x05: // { D2, I2, D4, N0 }, 56 bits
 				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x07:	// { D2, I2, I2, D2 }, 48 bits
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				do_data<4>(&p);
+				break;
+			case 0x06: // { D2, I2, D2, I2 }, 48 bits
 				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
-	    	    break;
-			case 0x08:	// { D2, I2, I2, I2 }, 40 bits
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				break;
+			case 0x07: // { D2, I2, I2, D2 }, 48 bits
 				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x09:	// { D2, I2, I4, N0 }, 33 bits
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x0a:	// { I2, D2, D4, N0 }, 56 bits
-	        	do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	        	do_data<2>(&p);
-	        	do_data<4>(&p);
-	    	    break;
-			case 0x0b:	// { I2, D4, I2, N0 }, 48 bits
+				break;
+			case 0x08: // { D2, I2, I2, I2 }, 40 bits
+				do_data<2>(&p);
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				break;
+			case 0x09: // { D2, I2, I4, N0 }, 33 bits
+				do_data<2>(&p);
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+				break;
+			case 0x0a: // { I2, D2, D4, N0 }, 56 bits
+				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+				do_data<2>(&p);
+				do_data<4>(&p);
+				break;
+			case 0x0b: // { I2, D4, I2, N0 }, 48 bits
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<4>(&p);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x0c:	// { I2, D2, I2, D2 }, 48 bits
+				break;
+			case 0x0c: // { I2, D2, I2, D2 }, 48 bits
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
-	    	    break;
-			case 0x0d:	// { I2, D2, I2, I2 }, 40 bits
+				break;
+			case 0x0d: // { I2, D2, I2, I2 }, 40 bits
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x0e:	// { I2, D2, I4, N0 }, 33 bits
+				break;
+			case 0x0e: // { I2, D2, I4, N0 }, 33 bits
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
 				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x0f:	// { I2, I2, D4, N0 }, 48 bits
+				break;
+			case 0x0f: // { I2, I2, D4, N0 }, 48 bits
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<4>(&p);
-	    	    break;
-			case 0x10:	// { I2, I2, D2, I2 }, 40 bits
+				break;
+			case 0x10: // { I2, I2, D2, I2 }, 40 bits
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x11:	// { I2, I2, I2, D2 }, 40 bits
+				break;
+			case 0x11: // { I2, I2, I2, D2 }, 40 bits
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
-	    	    break;
-			case 0x12:	// { I2, I2, I2, I2 }, 32 bits
+				break;
+			case 0x12: // { I2, I2, I2, I2 }, 32 bits
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x13:	// { I2, I2, I4, N0 }, 25 bits
+				break;
+			case 0x13: // { I2, I2, I4, N0 }, 25 bits
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x14:	// { I4, D4, N0, N0 }, 41 bits
+				break;
+			case 0x14: // { I4, D4, N0, N0 }, 41 bits
 				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
 				do_data<4>(&p);
-	    	    break;
-			case 0x15:	// { I4, D2, I2, N0 }, 33 bits
+				break;
+			case 0x15: // { I4, D2, I2, N0 }, 33 bits
 				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
 				do_data<2>(&p);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x16:	// { I4, I2, D2, N0 }, 33 bits
+				break;
+			case 0x16: // { I4, I2, D2, N0 }, 33 bits
 				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_data<2>(&p);
-	    	    break;
-			case 0x17:	// { I4, I2, I2, N0 }, 25 bits
+				break;
+			case 0x17: // { I4, I2, I2, N0 }, 25 bits
 				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
 				do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-	    	    break;
-			case 0x18:	// { I4, I4, N0, N0 }, 18 bits
+				break;
+			case 0x18: // { I4, I4, N0, N0 }, 18 bits
 				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
 				do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-	    	    break;
-			case 0x19:	// { I8, N0, N0, N0 }, 8 bits
+				break;
+			case 0x19: // { I8, N0, N0, N0 }, 8 bits
 				do_index(&p, 8, I8_BITS, I8_FIFO_SIZE);
-	    	    break;
-	    	#endif
-	    	case OP_REPEAT:
+				break;
+#endif
+			case OP_REPEAT:
 				rep = read_bits(&p, REPEAT_BITS);
 
-				#ifdef ENABLE_ERROR_HANDLING
+#ifdef ENABLE_ERROR_HANDLING
 				if (p.out == out) /* no previous bytes */
 					return -EINVAL;
-				#endif
+#endif
 
 				/* copy rep + 1 */
 				rep++;
 
-				#ifdef ENABLE_ERROR_HANDLING
+#ifdef ENABLE_ERROR_HANDLING
 				if (p.out - p.ostart + rep * 8 > p.olen)
-					throw -ENOSPC;
-				#endif
+					throw - ENOSPC;
+#endif
 
 				while (rep-- > 0) {
 					memcpy(p.out, p.out - 8, 8);
@@ -430,76 +449,90 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 				}
 				break;
 			case OP_ZEROS:
-				#ifdef ENABLE_ERROR_HANDLING
-				if (static_cast<size_t>(p.out - p.ostart + 8) > p.olen)
-					throw -ENOSPC;
-				#endif
+#ifdef ENABLE_ERROR_HANDLING
+				if (static_cast<size_t>(p.out - p.ostart + 8) >
+				    p.olen)
+					throw - ENOSPC;
+#endif
 
 				memset(p.out, 0, 8);
 				p.out += 8;
 				break;
 			case OP_END:
 				break;
-	        default:
-	        #if defined(BRANCH_FREE) && BRANCH_FREE == 1
-				for(int i = 0; i < 4; i++) {
+			default:
+#if defined(BRANCH_FREE) && BRANCH_FREE == 1
+				for (int i = 0; i < 4; i++) {
 					// 0-initialize all values-fields
 					values[i] = 0;
 					values[4 + i] = 0;
 
-					uint8_t dec_template = dec_templates[op][i][0];
+					uint8_t dec_template =
+						dec_templates[op][i][0];
 					uint8_t is_index = (dec_template >> 7);
 					uint8_t num_bits = dec_template & 0x7F;
-					uint8_t dst_size = dec_templates[op][i][1];
+					uint8_t dst_size =
+						dec_templates[op][i][1];
 
-					values[(4 * is_index) + i] = read_bits(&p, num_bits);
+					values[(4 * is_index) + i] =
+						read_bits(&p, num_bits);
 
-					uint64_t offset = get_index(&p, dst_size, values[4 + i], fifo_sizes[dst_size]);
-					memcpy(&values[4 + i], &p.ostart[offset], dst_size);
-					values[4 + i] = swap_be_to_native64(values[4 + i] << (WSIZE - (dst_size << 3)));
+					uint64_t offset =
+						get_index(&p, dst_size,
+							  values[4 + i],
+							  fifo_sizes[dst_size]);
+					memcpy(&values[4 + i],
+					       &p.ostart[offset], dst_size);
+					values[4 + i] = swap_be_to_native64(
+						values[4 + i]
+						<< (WSIZE - (dst_size << 3)));
 
-					values[i] = values[4 + i] * is_index | values[i];
-					output_word |= values[i] << (64 - (dst_size<<3) - bits);
-					bits += dst_size<<3;
+					values[i] = values[4 + i] * is_index |
+						    values[i];
+					output_word |=
+						values[i]
+						<< (64 - (dst_size << 3) -
+						    bits);
+					bits += dst_size << 3;
 				}
-				#ifdef ENABLE_ERROR_HANDLING
+#ifdef ENABLE_ERROR_HANDLING
 				if (p.out - p.ostart + 8 > p.olen)
-					throw -ENOSPC;
-				#endif
-				write64(p.out, swap_native_to_be64(output_word));
+					throw - ENOSPC;
+#endif
+				write64(p.out,
+					swap_native_to_be64(output_word));
 				p.out += 8;
-			#else
-				fprintf(stderr, "Invalid op template: %" PRIx64 "\n", op);
-	        	return -EINVAL;
-			#endif
-	    }
-	} while (op != OP_END);
+#else
+			fprintf(stderr, "Invalid op template: %" PRIx64 "\n",
+				op);
+			return -EINVAL;
+#endif
+			}
+		} while (op != OP_END);
 
-	/*
+/*
 	 * crc(0:31) is saved in compressed data starting with the
 	 * next bit after End of stream template.
 	 */
-	#ifndef DISABLE_CRC
-	uint64_t crc = read_bits(&p, CRC_BITS);
+#ifndef DISABLE_CRC
+		uint64_t crc = read_bits(&p, CRC_BITS);
 
-	/*
+		/*
 	 * Validate CRC saved in compressed data.
 	 */
-	if (crc != (uint64_t) crc32_be(0, out, p.out - p.ostart)) {
-		fprintf(stderr, "CRC mismatch for decompression\n");
-		return -EINVAL;
-	}
-	#endif
+		if (crc != (uint64_t)crc32_be(0, out, p.out - p.ostart)) {
+			fprintf(stderr, "CRC mismatch for decompression\n");
+			return -EINVAL;
+		}
+#endif
 
-	*olen = p.out - p.ostart;
+		*olen = p.out - p.ostart;
 
-	#ifdef ENABLE_ERROR_HANDLING
+#ifdef ENABLE_ERROR_HANDLING
 	} catch (int x) {
 		return x;
 	}
-	#endif
+#endif
 
 	return 0;
 }
-
-
