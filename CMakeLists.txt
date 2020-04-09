@@ -118,19 +118,19 @@ if (AIX_HWCOMPRESSION_FOUND)
 endif()
 
 if (CUDA_FOUND)
-    cuda_add_executable(test_cuda src/cuda/compdecomp.cu)
+    cuda_add_executable(test_cuda sample/compdecomp.cu)
     target_link_libraries (test_cuda 842)
 endif()
 
 if (OpenCL_FOUND)
-    add_executable(test_ocl src/ocl/compdecomp.cpp)
+    add_executable(test_ocl sample/compdecomp_cl.cpp)
     target_link_libraries (test_ocl 842 ${OpenCL_LIBRARY})
 
-    add_executable(test_ocl_inplace src/ocl/compdecomp.cpp)
+    add_executable(test_ocl_inplace sample/compdecomp_cl.cpp)
     set_target_properties(test_ocl_inplace PROPERTIES COMPILE_DEFINITIONS "USE_INPLACE_COMPRESSED_CHUNKS")
     target_link_libraries (test_ocl_inplace 842 ${OpenCL_LIBRARY})
 
-    add_executable(test_ocl_maybe src/ocl/compdecomp.cpp)
+    add_executable(test_ocl_maybe sample/compdecomp_cl.cpp)
     set_target_properties(test_ocl_maybe PROPERTIES COMPILE_DEFINITIONS "USE_MAYBE_COMPRESSED_CHUNKS")
     target_link_libraries (test_ocl_maybe 842 ${OpenCL_LIBRARY})
 endif()

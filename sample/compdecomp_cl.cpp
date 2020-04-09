@@ -2,8 +2,8 @@
 #include <fstream>
 #include <stdint.h>
 
-#include "../../include/sw842.h"
-#include "../../include/cl842.hpp"
+#include "sw842.h"
+#include "cl842.hpp"
 
 using namespace std;
 
