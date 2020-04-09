@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <stdint.h>
 
 #include "../../include/sw842.h"
 #include "../../include/cl842.hpp"
