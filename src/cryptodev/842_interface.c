@@ -58,24 +58,23 @@ static int c842_ctx_deinit(struct cryptodev_ctx* ctx)
 	return 0;
 }
 
+static int is_pointer_aligned(const void *ptr, uint16_t alignmask) {
+	const void *aligned_ptr = (const void*)(((unsigned long)ptr + alignmask) & ~alignmask);
+	return ptr == aligned_ptr;
+}
+
 static int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, void* output, size_t *olen)
 {
 	struct crypt_op cryp;
-	const void* p;
 
 	/* check input and output alignment */
-	if (ctx->alignmask) {
-		p = (const void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);
-		if (input != p) {
-			fprintf(stderr, "input is not aligned\n");
-			return -EINVAL;
-		}
-
-		p = (const void*)(((unsigned long)output + ctx->alignmask) & ~ctx->alignmask);
-		if (output != p) {
-			fprintf(stderr, "output is not aligned\n");
-			return -EINVAL;
-		}
+	if (ctx->alignmask && !is_pointer_aligned(input, ctx->alignmask)) {
+		fprintf(stderr, "input is not aligned\n");
+		return -EINVAL;
+	}
+	if (ctx->alignmask && !is_pointer_aligned(output, ctx->alignmask)) {
+		fprintf(stderr, "output is not aligned\n");
+		return -EINVAL;
 	}
 
 	if (ilen > UINT32_MAX) {
@@ -109,21 +108,15 @@ static int c842_compress(struct cryptodev_ctx* ctx, const void* input, size_t il
 static int c842_decompress(struct cryptodev_ctx* ctx, const void* input, size_t ilen, void* output, size_t *olen)
 {
 	struct crypt_op cryp;
-	const void* p;
 
 	/* check input and output alignment */
-	if (ctx->alignmask) {
-		p = (const void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);
-		if (input != p) {
-			fprintf(stderr, "input is not aligned\n");
-			return -EINVAL;
-		}
-
-		p = (const void*)(((unsigned long)output + ctx->alignmask) & ~ctx->alignmask);
-		if (output != p) {
-			fprintf(stderr, "output is not aligned\n");
-			return -EINVAL;
-		}
+	if (ctx->alignmask && !is_pointer_aligned(input, ctx->alignmask)) {
+		fprintf(stderr, "input is not aligned\n");
+		return -EINVAL;
+	}
+	if (ctx->alignmask && !is_pointer_aligned(output, ctx->alignmask)) {
+		fprintf(stderr, "output is not aligned\n");
+		return -EINVAL;
 	}
 
 	if (ilen > UINT32_MAX) {
