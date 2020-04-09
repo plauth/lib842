@@ -5,7 +5,6 @@ static inline uint16_t swap_endianness16(uint16_t input) {
 	#ifdef __x86_64__
 		asm("xchgb %b0,%h0" : "=Q" (input) :  "0" (input));
 		return input;
-	//#elif defined __CUDA_ARCH__
 	#else
 		return
 		((input & (uint16_t)0x00ffU) << 8) |
@@ -34,7 +33,6 @@ static inline uint32_t swap_endianness32(uint32_t input) {
 	#ifdef __x86_64__
 		asm("bswap %0" : "=r" (input) : "0" (input));
 		return input;
-	//#elif defined __CUDA_ARCH__
 	#else
 		return
 		((input & (uint32_t)0x000000ffUL) << 24) |
@@ -64,7 +62,6 @@ static inline uint64_t swap_endianness64(uint64_t input) {
 	#ifdef __x86_64__
 		asm("bswap %0" : "=r" (input) : "0" (input));
 		return input;
-	//#elif defined __CUDA_ARCH__
 	#else
 		return
 		(uint64_t)((input & (uint64_t)0x00000000000000ffULL) << 56) |
