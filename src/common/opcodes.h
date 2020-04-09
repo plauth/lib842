@@ -1,6 +1,8 @@
 #ifndef __OPCODES_H__
 #define __OPCODES_H__
 
+#include "842.h"
+
 static const uint8_t ops_dict[224] = {
 /*	0	*/	0x00,
 /*	1	*/	0	,
@@ -229,6 +231,25 @@ static const uint8_t ops_dict[224] = {
 };
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
+
+//1st value: position of payload in dataAndIndices
+//2nd value: number of bits
+#define D20_OP	{0,  D2_BITS}
+#define D21_OP	{1,  D2_BITS}
+#define D22_OP	{2,  D2_BITS}
+#define D23_OP	{3,  D2_BITS}
+#define D40_OP	{4,  D4_BITS}
+#define D41_OP  {5,  D4_BITS}
+#define D80_OP	{6,  D8_BITS}
+#define I20_OP	{7,  I2_BITS}
+#define I21_OP	{8,  I2_BITS}
+#define I22_OP	{9,  I2_BITS}
+#define I23_OP	{10, I2_BITS}
+#define I40_OP	{11, I4_BITS}
+#define I41_OP	{12, I4_BITS}
+#define I80_OP	{13, I8_BITS}
+#define D4S_OP  {14, D4_BITS}
+#define N0_OP	{15, 0}
 
 static uint8_t templates[26][4][2] = { // params size in bits
 	{ D80_OP, N0_OP,  N0_OP,  N0_OP }, // 0x00	64

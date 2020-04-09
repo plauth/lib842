@@ -48,29 +48,6 @@ typedef ulong   uint64_t;
 #define DICT32_BITS     (11)
 #define DICT64_BITS     (10)
 
-#define I2N (13)
-#define I4N (53)
-#define I8N (149)
-
-//1st value: position of payload in dataAndIndices
-//2nd value: number of bits
-#define D20_OP  {0,  D2_BITS}
-#define D21_OP  {1,  D2_BITS}
-#define D22_OP  {2,  D2_BITS}
-#define D23_OP  {3,  D2_BITS}
-#define D40_OP  {4,  D4_BITS}
-#define D41_OP  {5,  D4_BITS}
-#define D80_OP  {6,  D8_BITS}
-#define I20_OP  {7,  I2_BITS}
-#define I21_OP  {8,  I2_BITS}
-#define I22_OP  {9,  I2_BITS}
-#define I23_OP  {10, I2_BITS}
-#define I40_OP  {11, I4_BITS}
-#define I41_OP  {12, I4_BITS}
-#define I80_OP  {13, I8_BITS}
-#define D4S_OP  {14, D4_BITS}
-#define N0_OP   {15, 0}
-
 #define OP_DEC_NOOP  (0x00)
 #define OP_DEC_DATA  (0x00)
 #define OP_DEC_INDEX (0x80)

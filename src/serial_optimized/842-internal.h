@@ -19,49 +19,9 @@
 #define BRANCH_FREE (0)
 //#define DEBUG 1
 
-#define D2_BITS 	(16)
-#define D4_BITS 	(32)
-#define D8_BITS 	(64)
-#define N0_BITS		(0)
-
 #define DICT16_BITS     (10)
 #define DICT32_BITS     (11)
 #define DICT64_BITS     (10)
-
-#define I2N (13)
-#define I4N (53)
-#define I8N (149)
-
-//1st value: position of payload in dataAndIndices
-//2nd value: number of bits
-#define D20_OP	{0,  D2_BITS}
-#define D21_OP	{1,  D2_BITS}
-#define D22_OP	{2,  D2_BITS}
-#define D23_OP	{3,  D2_BITS}
-#define D40_OP	{4,  D4_BITS}
-#define D41_OP  {5,  D4_BITS}
-#define D80_OP	{6,  D8_BITS}
-#define I20_OP	{7,  I2_BITS}
-#define I21_OP	{8,  I2_BITS}
-#define I22_OP	{9,  I2_BITS}
-#define I23_OP	{10, I2_BITS}
-#define I40_OP	{11, I4_BITS}
-#define I41_OP	{12, I4_BITS}
-#define I80_OP	{13, I8_BITS}
-#define D4S_OP  {14, D4_BITS}
-#define N0_OP	{15, 0}
-
-#define OP_DEC_NOOP  (0x00)
-#define OP_DEC_DATA	 (0x00)
-#define OP_DEC_INDEX (0x80)
-
-#define OP_DEC_N0	{(N0_BITS | OP_DEC_NOOP),  0}
-#define OP_DEC_D2	{(D2_BITS | OP_DEC_DATA),  2}
-#define OP_DEC_D4	{(D4_BITS | OP_DEC_DATA),  4}
-#define OP_DEC_D8	{(D8_BITS | OP_DEC_DATA),  8}
-#define OP_DEC_I2	{(I2_BITS | OP_DEC_INDEX), 2}
-#define OP_DEC_I4	{(I4_BITS | OP_DEC_INDEX), 4}
-#define OP_DEC_I8	{(I8_BITS | OP_DEC_INDEX), 8}
 
 
 
