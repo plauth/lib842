@@ -1,6 +1,8 @@
 #ifndef _KERNELDEPS_H
 #define _KERNELDEPS_H
 
+#include <stdint.h>
+
 typedef uint16_t __be16;
 typedef uint32_t __be32;
 typedef uint64_t __be64;

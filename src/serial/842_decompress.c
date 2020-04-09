@@ -17,6 +17,13 @@
  */
 
 #include "842-internal.h"
+#include "kerneldeps.h"
+#include "../common/crc32.h"
+#include "../common/endianness.h"
+
+#include <stdio.h>
+#include <limits.h>
+#include <errno.h>
 
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE	(2 * (1 << I2_BITS))

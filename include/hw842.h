@@ -5,6 +5,7 @@
 
 #ifdef LIB842_HAVE_CRYPTODEV_LINUX_COMP
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus

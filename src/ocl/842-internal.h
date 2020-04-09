@@ -2,28 +2,8 @@
 #ifndef __842_INTERNAL_H__
 #define __842_INTERNAL_H__
 
-#include "../common/842-internal.h"
-
-#ifndef OCL
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <limits.h>
-#include <errno.h>
-#include <string.h>
-
-#include "../../include/sw842.h"
-
-#include "../common/memaccess.h"
-#include "../common/endianness.h"
-#include "../common/crc32.h"
-#else
-typedef uchar	uint8_t;
-typedef ushort	uint16_t;
-typedef short	int16_t;
-typedef uint 	uint32_t;
-typedef ulong	uint64_t;
-#endif
+#include "../common/842.h"
+#include <stdint.h>
 
 //#define DEBUG 1
 
@@ -94,24 +74,5 @@ struct sw842_param {
 	uint32_t rollingFifo32[1 << I4_BITS];   // 512  * 4 bytes =   2 KiB
 	uint64_t rollingFifo64[1 << I8_BITS];   // 256  * 8 bytes =   2 KiB
 };
-
-#ifdef OCL
-struct sw842_param_decomp {
-	__global uint64_t *out;
- 	__global const uint64_t* ostart;
- 	__global uint64_t *in;
- 	uint32_t bits;
- 	uint64_t buffer;
-};
-#else
-struct sw842_param_decomp {
-	uint64_t *out;
- 	const uint64_t* ostart;
- 	uint64_t *in;
- 	uint32_t bits;
- 	uint64_t buffer;
-};
-
-#endif
 
 #endif

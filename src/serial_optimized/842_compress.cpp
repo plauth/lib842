@@ -16,7 +16,15 @@
  * See 842.h for details of the 842 compressed format.
  */
 #include "842-internal.h"
+#include "../../include/sw842.h"
 #include "../common/opcodes.h"
+#include "../common/endianness.h"
+#include "../common/memaccess.h"
+#include "../common/crc32.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
 
 /* If defined, avoid (ab)using undefined behaviour (as defined by the standard),
  * which nevertheless works on our target platforms and provides better performance.

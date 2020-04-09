@@ -17,6 +17,14 @@
  */
 
 #include "842-internal.h"
+#include "kerneldeps.h"
+#include "../common/crc32.h"
+#include "../common/endianness.h"
+
+#include <stdio.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <errno.h>
 
 /* By default, we allow compressing input buffers of any length, but we must
  * use the non-standard "short data" template so the decompressor can correctly

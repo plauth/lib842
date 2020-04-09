@@ -2,7 +2,8 @@
 #ifndef __842_INTERNAL_H__
 #define __842_INTERNAL_H__
 
-#include "../common/842-internal.h"
+#include "../common/842.h"
+#include <stdint.h>
 
 #define CUDA842_STRICT
 
@@ -11,19 +12,9 @@
 // avoided in a controlled environment. This has a performance penalty.
 #define ENABLE_ERROR_HANDLING
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <limits.h>
-#include <errno.h>
-#include <string.h>
-
-
-#include "../../include/sw842.h"
-
-#include "../common/memaccess.h"
-#include "../common/endianness.h"
-#include "../common/crc32.h"
+#ifdef ENABLE_ERROR_HANDLING
+#include <stddef.h>
+#endif
 
 #define BRANCH_FREE (0)
 //#define DEBUG 1

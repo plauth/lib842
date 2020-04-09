@@ -1,5 +1,5 @@
-#ifndef __842_INTERNAL_H__XXX
-#define __842_INTERNAL_H__XXX
+#ifndef __842_H__
+#define __842_H__
 
 /* The 842 compressed format is made up of multiple blocks, each of
  * which have the format:

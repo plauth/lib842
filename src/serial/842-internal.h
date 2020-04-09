@@ -2,23 +2,11 @@
 #ifndef __842_INTERNAL_H__
 #define __842_INTERNAL_H__
 
-#include "../common/842-internal.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <limits.h>
-#include <errno.h>
-#include <string.h>
-
-
-#include "../../include/sw842.h"
-
+#include "../common/842.h"
 #include "uthash/src/uthash.h"
 #include "uthash/src/utlist.h"
-#include "../common/endianness.h"
-#include "../common/crc32.h"
-#include "kerneldeps.h"
+
+#include <stdint.h>
 
 //#define DEBUG 1
 

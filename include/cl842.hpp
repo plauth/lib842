@@ -14,6 +14,7 @@
 #include <CL/cl.hpp>
 #endif
 
+#include <stddef.h>
 #include <stdint.h>
 
 #define CL842_CHUNK_SIZE 65536

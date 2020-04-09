@@ -2,20 +2,8 @@
 #ifndef __842_INTERNAL_H__
 #define __842_INTERNAL_H__
 
-#include "../common/842-internal.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <limits.h>
-#include <errno.h>
-#include <string.h>
-
+#include "../common/842.h"
 #include "../../include/cuda842.h"
-
-#include "../common/memaccess.h"
-#include "../common/endianness.h"
-#include "../common/crc32.h"
 
 #define BRANCH_FREE (1)
 //#define DEBUG 1

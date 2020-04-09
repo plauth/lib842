@@ -1,6 +1,7 @@
 #ifndef __SW842_H__
 #define __SW842_H__
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "crc32table.h"
+#include "endianness.h"
 
 /* implements slicing-by-4 or slicing-by-8 algorithm */
 static inline uint32_t crc32_be(uint32_t crc, unsigned char const *buf, size_t len)
