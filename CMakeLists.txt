@@ -94,33 +94,27 @@ if (OpenCL_FOUND)
     target_link_libraries (842 ${OpenCL_LIBRARY})
 endif()
 
-####################
-# TESTS / EXAMPLES #
-####################
-add_executable(test_serial test/compdecomp.c)
+###########
+# SAMPLES #
+###########
+add_executable(test_serial sample/compdecomp.c)
 target_link_libraries (test_serial 842)
 
-add_executable(test_serial_optimized test/compdecomp.c)
+add_executable(test_serial_optimized sample/compdecomp.c)
 set_target_properties(test_serial_optimized PROPERTIES COMPILE_DEFINITIONS "USEOPTSW")
 target_link_libraries (test_serial_optimized 842)
 
-add_executable(test_diffuse_pattern test/diffuse_pattern.c)
+add_executable(test_diffuse_pattern contrib/diffuse_pattern.c)
 target_link_libraries (test_diffuse_pattern 842)
 
 if (CRYPTODEV_LINUX_COMP_FOUND)
-    add_executable(test_cryptodev test/compdecomp.c)
+    add_executable(test_cryptodev sample/compdecomp.c)
     set_target_properties(test_cryptodev PROPERTIES COMPILE_DEFINITIONS "USEHW")
     target_link_libraries (test_cryptodev 842)
-
-    add_executable(test_goldenunit1 test/goldenunit1.c)
-    target_link_libraries (test_goldenunit1 842)
-
-    add_executable(test_goldenunit2 test/goldenunit2.c)
-    target_link_libraries (test_goldenunit2 842)
 endif()
 
 if (AIX_HWCOMPRESSION_FOUND)
-    add_executable(test_aix_standalone test/compdecomp_aix.c)
+    add_executable(test_aix_standalone contrib/compdecomp_aix.c)
 endif()
 
 if (CUDA_FOUND)
