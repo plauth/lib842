@@ -16,6 +16,7 @@
  * See 842.h for details of the 842 compressed format.
  */
 #include "842-internal.h"
+#include "bitstream.h"
 #include "../../include/sw842.h"
 #include "../common/opcodes.h"
 #include "../common/endianness.h"
@@ -34,14 +35,6 @@
 #define PRIME64 (11400714785074694791ULL)
 
 #define NO_ENTRY (-1)
-
-struct bitstream *stream_open(void *buffer, size_t bytes);
-void stream_close(struct bitstream *s);
-size_t stream_size(const struct bitstream *s);
-//uint64_t stream_read_bits(struct bitstream* s, uint8_t n);
-void stream_write_bits(struct bitstream *s, uint64_t value, uint8_t n);
-//uint64_t stream_read_bits(struct bitstream* s, uint8_t n);
-size_t stream_flush(struct bitstream *s);
 
 static inline void hash(uint64_t *values, uint64_t *results)
 {

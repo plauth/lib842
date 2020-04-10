@@ -1,3 +1,9 @@
+// NOTE: To my best knowledge, this file is based on a bitstream implementation
+// from the zpf library (e.g. src/inline/bitstream.c on zpf-0.5.5)
+// See: https://computing.llnl.gov/projects/floating-point-compression
+// zpf is Copyright (c) 2014-2019, Lawrence Livermore National Security, LLC.
+// and licensed under a BSD license
+
 #include <stdlib.h>
 #include <stdint.h>
 
