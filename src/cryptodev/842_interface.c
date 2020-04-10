@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <crypto/cryptodev.h>
+#include "../../include/hw842.h"
 
 struct cryptodev_ctx {
 	int cfd;

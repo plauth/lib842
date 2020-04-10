@@ -20,6 +20,7 @@
 #include "kerneldeps.h"
 #include "../common/crc32.h"
 #include "../common/endianness.h"
+#include "../../include/sw842.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -483,7 +484,7 @@ static int process_next(struct sw842_param *p)
  * 0 on error.
  */
 int sw842_compress(const uint8_t *in, size_t ilen,
-		   uint8_t *out, size_t *olen, void *wmem)
+		   uint8_t *out, size_t *olen)
 {
 	struct sw842_param *p =
 		(struct sw842_param *)malloc(sizeof(struct sw842_param));

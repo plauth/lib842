@@ -20,6 +20,7 @@
 #include "kerneldeps.h"
 #include "../common/crc32.h"
 #include "../common/endianness.h"
+#include "../../include/sw842.h"
 
 #include <stdio.h>
 #include <limits.h>
@@ -281,8 +282,8 @@ static int do_op(struct sw842_param_decomp *p, uint8_t o)
  * will contain the number of output bytes written on success, or
  * 0 on error.
  */
-int sw842_decompress(const uint8_t *in, unsigned int ilen,
-		     uint8_t *out, unsigned int *olen)
+int sw842_decompress(const uint8_t *in, size_t ilen,
+		     uint8_t *out, size_t *olen)
 {
 	struct sw842_param_decomp p;
 	int ret;
