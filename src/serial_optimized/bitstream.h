@@ -9,6 +9,7 @@
 
 struct bitstream *stream_open(void *buffer, size_t bytes);
 void stream_close(struct bitstream *s);
+bool stream_is_overfull(const struct bitstream *s);
 size_t stream_size(const struct bitstream *s);
 void stream_write_bits(struct bitstream *s, uint64_t value, uint8_t n);
 size_t stream_flush(struct bitstream *s);

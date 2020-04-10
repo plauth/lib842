@@ -54,6 +54,7 @@ struct sw842_param_decomp {
 #ifdef ENABLE_ERROR_HANDLING
 	size_t ilen;
 	size_t olen;
+	int errorcode;
 #endif
 	uint8_t bits;
 	uint64_t buffer;

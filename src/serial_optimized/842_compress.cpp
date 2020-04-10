@@ -562,9 +562,6 @@ int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 			ilen, ilen % 8);
 		return -EINVAL;
 	}
-#ifdef ENABLE_ERROR_HANDLING
-	try {
-#endif
 
 	struct sw842_param *p = (struct sw842_param *)malloc(
 		sizeof(struct sw842_param));
@@ -641,6 +638,11 @@ int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 		update_hashtables(p);
 		p->in += 8;
 		p->ilen -= 8;
+
+#ifdef ENABLE_ERROR_HANDLING
+		if (stream_is_overfull(p->stream))
+			break;
+#endif
 	}
 
 	if (repeat_count)
@@ -663,15 +665,19 @@ int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 
 	stream_flush(p->stream);
 
+#ifdef ENABLE_ERROR_HANDLING
+	bool overfull = stream_is_overfull(p->stream);
+#endif
+
 	*olen = stream_size(p->stream);
 
 	stream_close(p->stream);
 	free(p);
 
+
 #ifdef ENABLE_ERROR_HANDLING
-	} catch (int x) {
-		return x;
-	}
+	if (overfull)
+		return -ENOSPC;
 #endif
 
 	return 0;

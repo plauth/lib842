@@ -30,6 +30,7 @@ struct bitstream {
 	uint64_t *begin; /* beginning of stream */
 #ifdef ENABLE_ERROR_HANDLING
 	uint64_t *end; /* end of stream */
+	bool overfull; /* true after attempting to write past the end of the stream */
 #endif
 };
 
@@ -39,14 +40,21 @@ struct bitstream {
 static void stream_write_word(struct bitstream *s, uint64_t value)
 {
 #ifdef ENABLE_ERROR_HANDLING
-	if (s->ptr == s->end)
-		throw - ENOSPC;
+	if (s->ptr == s->end) {
+		s->overfull = true;
+		return;
+	}
 #endif
 
 	*s->ptr++ = swap_native_to_be64(value);
 }
 
 /* public functions -------------------------------------------------------- */
+
+bool stream_is_overfull(const struct bitstream *s)
+{
+	return s->overfull;
+}
 
 /* current byte size of stream (if flushed) */
 size_t stream_size(const struct bitstream *s)
@@ -117,6 +125,7 @@ struct bitstream *stream_open(void *buffer, size_t bytes)
 		s->begin = (uint64_t *)buffer;
 #ifdef ENABLE_ERROR_HANDLING
 		s->end = s->begin + bytes / sizeof(uint64_t);
+		s->overfull = false;
 #endif
 		stream_rewind(s);
 		s->buffer = 0;

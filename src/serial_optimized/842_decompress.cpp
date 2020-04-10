@@ -88,7 +88,9 @@ static inline uint64_t read_word(struct sw842_param_decomp *p)
 {
 #ifdef ENABLE_ERROR_HANDLING
 	if ((p->in - p->istart + 1) * sizeof(uint64_t) > p->ilen) {
-		throw - EINVAL;
+		if (p->errorcode == 0)
+			p->errorcode = -EINVAL;
+		return 0;
 	}
 #endif
 	uint64_t w = swap_be_to_native64(*p->in++);
@@ -125,8 +127,11 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 template <uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
 {
 #ifdef ENABLE_ERROR_HANDLING
-	if (static_cast<size_t>(p->out - p->ostart + N) > p->olen)
-		throw - ENOSPC;
+	if (static_cast<size_t>(p->out - p->ostart + N) > p->olen) {
+		if (p->errorcode == 0)
+			p->errorcode = -ENOSPC;
+		return;
+	}
 #endif
 
 	switch (N) {
@@ -171,9 +176,12 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size,
 
 #ifdef ENABLE_ERROR_HANDLING
 	if (offset + size > total) {
-		fprintf(stderr, "index%x %lx points past end %lx\n", size,
-			(unsigned long)offset, (unsigned long)total);
-		throw - EINVAL;
+		if (p->errorcode == 0) {
+			fprintf(stderr, "index%x %lx points past end %lx\n", size,
+				(unsigned long)offset, (unsigned long)total);
+			p->errorcode = -EINVAL;
+		}
+		return;
 	}
 #endif
 
@@ -228,10 +236,6 @@ static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 			size_t *olen)
 {
-#ifdef ENABLE_ERROR_HANDLING
-	try {
-#endif
-
 	struct sw842_param_decomp p;
 	p.out = out;
 	p.ostart = out;
@@ -240,6 +244,7 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 #ifdef ENABLE_ERROR_HANDLING
 	p.ilen = ilen;
 	p.olen = *olen;
+	p.errorcode = 0;
 #endif
 	p.buffer = 0;
 	p.bits = 0;
@@ -256,6 +261,10 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 
 	do {
 		op = read_bits(&p, OP_BITS);
+#ifdef ENABLE_ERROR_HANDLING
+		if (p.errorcode != 0)
+			return p.errorcode;
+#endif
 
 #ifdef DEBUG
 		printf("template is %llx\n", op);
@@ -403,6 +412,10 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 #endif
 		case OP_REPEAT:
 			rep = read_bits(&p, REPEAT_BITS);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+#endif
 
 #ifdef ENABLE_ERROR_HANDLING
 			if (p.out == out) /* no previous bytes */
@@ -414,7 +427,7 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 
 #ifdef ENABLE_ERROR_HANDLING
 			if (p.out - p.ostart + rep * 8 > p.olen)
-				throw - ENOSPC;
+				return -ENOSPC;
 #endif
 
 			while (rep-- > 0) {
@@ -424,9 +437,8 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 			break;
 		case OP_ZEROS:
 #ifdef ENABLE_ERROR_HANDLING
-			if (static_cast<size_t>(p.out - p.ostart + 8) >
-			    p.olen)
-				throw - ENOSPC;
+			if (static_cast<size_t>(p.out - p.ostart + 8) > p.olen)
+				return -ENOSPC;
 #endif
 
 			memset(p.out, 0, 8);
@@ -450,6 +462,10 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 
 				values[(4 * is_index) + i] =
 					read_bits(&p, num_bits);
+#ifdef ENABLE_ERROR_HANDLING
+				if (p.errorcode != 0)
+					return p.errorcode;
+#endif
 
 				uint64_t offset =
 					get_index(&p, dst_size,
@@ -471,7 +487,7 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 			}
 #ifdef ENABLE_ERROR_HANDLING
 			if (p.out - p.ostart + 8 > p.olen)
-				throw - ENOSPC;
+				return -ENOSPC;
 #endif
 			write64(p.out,
 				swap_native_to_be64(output_word));
@@ -482,6 +498,12 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 		return -EINVAL;
 #endif
 		}
+
+
+#ifdef ENABLE_ERROR_HANDLING
+		if (p.errorcode != 0)
+			return p.errorcode;
+#endif
 	} while (op != OP_END);
 
 	/*
@@ -490,6 +512,10 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 	 */
 #ifndef DISABLE_CRC
 	uint64_t crc = read_bits(&p, CRC_BITS);
+#ifdef ENABLE_ERROR_HANDLING
+	if (p.errorcode != 0)
+		return p.errorcode;
+#endif
 
 	/*
 	 * Validate CRC saved in compressed data.
@@ -501,12 +527,6 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 #endif
 
 	*olen = p.out - p.ostart;
-
-#ifdef ENABLE_ERROR_HANDLING
-	} catch (int x) {
-		return x;
-	}
-#endif
 
 	return 0;
 }
