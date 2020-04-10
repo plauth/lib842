@@ -25,8 +25,7 @@ static const struct test842_impl IMPL_SW = { .compress = sw842_compress,
 					     .decompress = sw842_decompress };
 
 static const struct test842_impl IMPL_OPTSW = { .compress = optsw842_compress,
-						.decompress =
-							optsw842_decompress };
+						.decompress = optsw842_decompress };
 
 #ifdef LIB842_HAVE_CRYPTODEV_LINUX_COMP
 static const struct test842_impl IMPL_HW = { .compress = hw842_compress,

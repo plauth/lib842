@@ -9,13 +9,13 @@
 #define lib842_decompress hw842_decompress
 #define lib842_compress hw842_compress
 #elif defined(USEOPTSW)
+#include "sw842.h"
 #define lib842_decompress optsw842_decompress
 #define lib842_compress optsw842_compress
-#include "sw842.h"
 #else
+#include "sw842.h"
 #define lib842_decompress sw842_decompress
 #define lib842_compress sw842_compress
-#include "sw842.h"
 #endif
 
 //#define CHUNK_SIZE ((size_t)32768)

@@ -1,5 +1,5 @@
 // Tests compressing and decompressing generated data that starts as a
-// random pattern, but progresses to a more stable pattern 
+// random pattern, but progresses to a more stable pattern
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 		}
 		memcpy(data_buffer, tmpbuf, BUFFER_SIZE);
 
-		// Try to copress the data, then uncompress it, and check the result is correct		
+		// Try to compress the data, then uncompress it, and check the result is correct
 		size_t comp_size = 2 * BUFFER_SIZE;
 		int ret_compress = impl->compress(data_buffer, BUFFER_SIZE,
 						  comp_data, &comp_size);

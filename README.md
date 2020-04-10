@@ -14,7 +14,7 @@ You can find more information about the algorithm, including a description of it
 
 * A *simple serial* implementation for the CPU intended to serve as a reference. This implementation is a port of the reference implementation available in the [mainline Linux kernel](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/lib/842?id=ae46d2aa6a7fbe8ca0946f24b061b6ccdc6c3f25).
 
-* An *optimized serial* implementation for the CPU designed to achieve high compression/decompression.
+* An *optimized serial* implementation for the CPU designed to achieve high compression/decompression speeds.
 
 * A *OpenCL* implementation for OpenCL-capable GPUs designed to achieve high decompression speeds.
 

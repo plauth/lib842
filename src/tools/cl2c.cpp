@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 	std::ofstream outputFile(argv[2], std::ifstream::out);
 	outputFile.exceptions(std::ofstream::badbit);
 
-	outputFile << "const char *" << argv[3] << " = \n\"";
+	outputFile << "const char *" << argv[3] << " =\n\"";
 
 	int c;
 	while ((c = inputFile.get()) != EOF) {
