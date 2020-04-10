@@ -18,7 +18,7 @@ struct cryptodev_ctx {
 static int c842_ctx_init(struct cryptodev_ctx *ctx, int cfd)
 {
 #ifdef CIOCGSESSINFO
-	struct session_info_op siop;
+	struct session_info_op siop = { 0 };
 #endif
 
 	memset(ctx, 0, sizeof(*ctx));
