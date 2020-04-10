@@ -7,7 +7,7 @@
 #include <errno.h>
 #include "test_util.h"
 
-#define BUFFER_SIZE 65536
+#define BUFFER_SIZE 2048
 
 static unsigned xorshift_seed = 1234;
 unsigned xorshift_next()
