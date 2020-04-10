@@ -555,6 +555,13 @@ static inline void process_next(struct sw842_param *p)
 int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 		      size_t *olen)
 {
+	/* if using strict mode, we can only compress a multiple of 8 */
+	if (ilen % 8) {
+		fprintf(stderr,
+			"Can only compress multiples of 8 bytes, but len is len %zu (%% 8 = %zu)\n",
+			ilen, ilen % 8);
+		return -EINVAL;
+	}
 #ifdef ENABLE_ERROR_HANDLING
 	try {
 #endif
@@ -592,13 +599,6 @@ int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 	p->olen = *olen;
 
 	*olen = 0;
-	/* if using strict mode, we can only compress a multiple of 8 */
-	if (ilen % 8) {
-		fprintf(stderr,
-			"Can only compress multiples of 8 bytes, but len is len %zu (%% 8 = %zu)\n",
-			ilen, ilen % 8);
-		return -EINVAL;
-	}
 
 	/* make initial 'last' different so we don't match the first time */
 	last = ~read64(p->in);
