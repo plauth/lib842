@@ -15,27 +15,41 @@ struct cryptodev_ctx {
 	uint16_t alignmask;
 };
 
-static int c842_ctx_init(struct cryptodev_ctx *ctx, int cfd)
+static int c842_ctx_init(struct cryptodev_ctx *ctx)
 {
-#ifdef CIOCGSESSINFO
-	struct session_info_op siop = { 0 };
-#endif
+	int err = 0;
 
-	memset(ctx, 0, sizeof(*ctx));
-	ctx->cfd = cfd;
+	/* Open the crypto device */
+	ctx->cfd = open("/dev/crypto", O_RDWR, 0);
+	if (ctx->cfd < 0) {
+		err = -errno;
+		fprintf(stderr, "open(/dev/crypto) errno=%d\n", errno);
+		goto return_error;
+	}
 
+	/* Set close-on-exec (not really needed here) */
+	if (fcntl(ctx->cfd, F_SETFD, 1) == -1) {
+		err = -errno;
+		fprintf(stderr, "fcntl(F_SETFD) errno=%d\n", errno);
+		goto cleanup_file;
+	}
+
+	memset(&ctx->sess, 0, sizeof(ctx->sess));
 	ctx->sess.compr = CRYPTO_842;
 
 	if (ioctl(ctx->cfd, CIOCGSESSION, &ctx->sess)) {
+		err = -errno;
 		fprintf(stderr, "ioctl(CIOCGSESSION) errno=%d\n", errno);
-		return -errno;
+		goto cleanup_file;
 	}
 
 #ifdef CIOCGSESSINFO
+	struct session_info_op siop = { 0 };
 	siop.ses = ctx->sess.ses;
 	if (ioctl(ctx->cfd, CIOCGSESSINFO, &siop)) {
+		err = -errno;
 		fprintf(stderr, "ioctl(CIOCGSESSINFO) errno=%d\n", errno);
-		return -errno;
+		goto cleanup_file_and_session;
 	}
 #ifdef DEBUG
 	printf("Got %s with driver %s\n", siop.compr_info.cra_name,
@@ -46,17 +60,34 @@ static int c842_ctx_init(struct cryptodev_ctx *ctx, int cfd)
 #endif
 	ctx->alignmask = siop.alignmask;
 #endif
+
 	return 0;
+
+cleanup_file_and_session:
+	ioctl(ctx->cfd, CIOCFSESSION, &ctx->sess.ses);
+cleanup_file:
+	close(ctx->cfd);
+return_error:
+	return err;
 }
 
 static int c842_ctx_deinit(struct cryptodev_ctx *ctx)
 {
+	int err = 0;
+
 	if (ioctl(ctx->cfd, CIOCFSESSION, &ctx->sess.ses)) {
+		err = -errno;
 		fprintf(stderr, "ioctl(CIOCFSESSION) errno=%d\n", errno);
-		return -errno;
 	}
 
-	return 0;
+	/* Close the original descriptor */
+	if (close(ctx->cfd)) {
+		if (err == 0)
+			err = -errno;
+		fprintf(stderr, "close(cfd) errno=%d\n", errno);
+	}
+
+	return err;
 }
 
 static int is_pointer_aligned(const void *ptr, uint16_t alignmask)
@@ -69,7 +100,7 @@ static int is_pointer_aligned(const void *ptr, uint16_t alignmask)
 static int c842_compress(struct cryptodev_ctx *ctx, const void *input,
 			 size_t ilen, void *output, size_t *olen)
 {
-	struct crypt_op cryp;
+	struct crypt_op cryp = { 0 };
 
 	/* check input and output alignment */
 	if (ctx->alignmask && !is_pointer_aligned(input, ctx->alignmask)) {
@@ -89,8 +120,6 @@ static int c842_compress(struct cryptodev_ctx *ctx, const void *input,
 		fprintf(stderr, "olen too big\n");
 		return -EINVAL;
 	}
-
-	memset(&cryp, 0, sizeof(cryp));
 
 	/* Encrypt data.in to data.encrypted */
 	cryp.ses = ctx->sess.ses;
@@ -112,7 +141,7 @@ static int c842_compress(struct cryptodev_ctx *ctx, const void *input,
 static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
 			   size_t ilen, void *output, size_t *olen)
 {
-	struct crypt_op cryp;
+	struct crypt_op cryp = { 0 };
 
 	/* check input and output alignment */
 	if (ctx->alignmask && !is_pointer_aligned(input, ctx->alignmask)) {
@@ -133,8 +162,6 @@ static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
 		return -EINVAL;
 	}
 
-	memset(&cryp, 0, sizeof(cryp));
-
 	/* Encrypt data.in to data.encrypted */
 	cryp.ses = ctx->sess.ses;
 	cryp.len = (__u32)ilen;
@@ -154,27 +181,12 @@ static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
 
 int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 {
-	int cfd;
 	int err = 0, cleanup_err = 0;
 	struct cryptodev_ctx ctx;
 
-	/* Open the crypto device */
-	cfd = open("/dev/crypto", O_RDWR, 0);
-	if (cfd < 0) {
-		fprintf(stderr, "open(/dev/crypto)\n");
-		return -errno;
-	}
-
-	/* Set close-on-exec (not really needed here) */
-	if (fcntl(cfd, F_SETFD, 1) == -1) {
-		fprintf(stderr, "fcntl(F_SETFD)\n");
-		err = -errno;
-		goto cleanup_file;
-	}
-
-	err = c842_ctx_init(&ctx, cfd);
+	err = c842_ctx_init(&ctx);
 	if (err)
-		goto cleanup_file;
+		return err;
 
 	err = c842_compress(&ctx, in, ilen, out, olen);
 
@@ -182,54 +194,23 @@ int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 	if (err == 0)
 		err = cleanup_err;
 
-cleanup_file:
-	/* Close the original descriptor */
-	if (close(cfd)) {
-		fprintf(stderr, "close(cfd)\n");
-		if (err == 0)
-			err = -errno;
-	}
-
 	return err;
 }
 
 int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 {
-	int cfd;
 	int err = 0, cleanup_err = 0;
 	struct cryptodev_ctx ctx;
 
-	/* Open the crypto device */
-	cfd = open("/dev/crypto", O_RDWR, 0);
-	if (cfd < 0) {
-		fprintf(stderr, "open(/dev/crypto)\n");
-		return -errno;
-	}
-
-	/* Set close-on-exec (not really needed here) */
-	if (fcntl(cfd, F_SETFD, 1) == -1) {
-		fprintf(stderr, "fcntl(F_SETFD)\n");
-		err = -errno;
-		goto cleanup_file;
-	}
-
-	err = c842_ctx_init(&ctx, cfd);
+	err = c842_ctx_init(&ctx);
 	if (err)
-		goto cleanup_file;
+		return err;
 
 	err = c842_decompress(&ctx, in, ilen, out, olen);
 
 	cleanup_err = c842_ctx_deinit(&ctx);
 	if (err == 0)
 		err = cleanup_err;
-
-cleanup_file:
-	/* Close the original descriptor */
-	if (close(cfd)) {
-		fprintf(stderr, "close(cfd)\n");
-		if (err == 0)
-			err = -errno;
-	}
 
 	return err;
 }
