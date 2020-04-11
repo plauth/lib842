@@ -224,6 +224,8 @@ static int register_cryptodev_context(struct cryptodev_ctx *ctx) {
 
 	release_contexts_list[release_contexts_count++] = ctx;
 	mtx_unlock(&release_contexts_mutex);
+
+	return 0;
 }
 
 static thread_local bool have_thread_ctx = false;
