@@ -5,7 +5,15 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#ifndef __STDC_NO_THREADS__
 #include <threads.h>
+#else
+#include <pthread.h>
+#define mtx_t pthread_mutex_t
+#define mtx_lock pthread_mutex_lock
+#define mtx_unlock pthread_mutex_unlock
+#define thread_local __thread
+#endif
 #include <stdbool.h>
 #include <sys/ioctl.h>
 #include <crypto/cryptodev.h>
