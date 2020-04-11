@@ -194,6 +194,7 @@ static void atexit_release_cryptodev_contexts()
 {
 	for (size_t i = 0; i < release_contexts_count; i++)
 		c842_ctx_deinit(release_contexts_list[i]);
+	free(release_contexts_list);
 }
 
 static int register_cryptodev_context(struct cryptodev_ctx *ctx) {
