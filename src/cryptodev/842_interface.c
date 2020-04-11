@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <threads.h>
+#include <stdbool.h>
 #include <sys/ioctl.h>
 #include <crypto/cryptodev.h>
 #include "../../include/hw842.h"
@@ -179,38 +181,86 @@ static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
 	return 0;
 }
 
-int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
-{
-	int err = 0, cleanup_err = 0;
-	struct cryptodev_ctx ctx;
+// Unfortunately, there doesn't seem to be any really nice way to
+// release the thread local cryptodev context at thread exit without
+// the help of the caller. As an alternative, store all the contexts
+// in a global list which will get released at program exit (atexit)
+static mtx_t release_contexts_mutex;
+static struct cryptodev_ctx **release_contexts_list = NULL;
+static size_t release_contexts_count = 0;
+static size_t release_contexts_capacity = 0;
 
-	err = c842_ctx_init(&ctx);
+static void atexit_release_cryptodev_contexts()
+{
+	for (size_t i = 0; i < release_contexts_count; i++)
+		c842_ctx_deinit(release_contexts_list[i]);
+}
+
+static int register_cryptodev_context(struct cryptodev_ctx *ctx) {
+	mtx_lock(&release_contexts_mutex);
+
+	if (release_contexts_capacity == release_contexts_count) {
+		size_t new_capacity = release_contexts_capacity != 0
+			? release_contexts_capacity * 2
+			: 4;
+		struct cryptodev_ctx **new_list = realloc(release_contexts_list,
+			new_capacity * sizeof(struct cryptodev_ctx *));
+		if (new_list == NULL) {
+			mtx_unlock(&release_contexts_mutex);
+			return -ENOMEM;
+		}
+
+		release_contexts_list = new_list;
+		release_contexts_capacity = new_capacity;
+	}
+
+	if (release_contexts_count == 0) {
+		if (atexit(atexit_release_cryptodev_contexts) != 0) {
+			mtx_unlock(&release_contexts_mutex);
+			return -ENOMEM;
+		}
+	}
+
+	release_contexts_list[release_contexts_count++] = ctx;
+	mtx_unlock(&release_contexts_mutex);
+}
+
+static thread_local bool have_thread_ctx = false;
+static thread_local struct cryptodev_ctx thread_ctx;
+
+static int ensure_thread_ctx_exists()
+{
+	if (have_thread_ctx)
+		return 0;
+
+	int err = c842_ctx_init(&thread_ctx);
 	if (err)
 		return err;
 
-	err = c842_compress(&ctx, in, ilen, out, olen);
+	err = register_cryptodev_context(&thread_ctx);
+	if (err) {
+		c842_ctx_deinit(&thread_ctx);
+		return err;
+	}
 
-	cleanup_err = c842_ctx_deinit(&ctx);
-	if (err == 0)
-		err = cleanup_err;
+	have_thread_ctx = true;
+	return 0;
+}
 
-	return err;
+int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
+{
+	int err = ensure_thread_ctx_exists();
+	if (err)
+		return err;
+
+	return c842_compress(&thread_ctx, in, ilen, out, olen);
 }
 
 int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 {
-	int err = 0, cleanup_err = 0;
-	struct cryptodev_ctx ctx;
-
-	err = c842_ctx_init(&ctx);
+	int err = ensure_thread_ctx_exists();
 	if (err)
 		return err;
 
-	err = c842_decompress(&ctx, in, ilen, out, olen);
-
-	cleanup_err = c842_ctx_deinit(&ctx);
-	if (err == 0)
-		err = cleanup_err;
-
-	return err;
+	return c842_decompress(&thread_ctx, in, ilen, out, olen);
 }
