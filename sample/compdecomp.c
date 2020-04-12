@@ -2,22 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#ifdef USEAIX
-#include <errno.h>
-#endif
 #include <sys/time.h>
-#ifdef USEAIX
+
+#if defined(USEAIX)
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/vminfo.h>
-#endif
-
-#ifdef USEAIX
-#define CHUNK_SIZE ((size_t)262144) //32768
-//#define CHUNK_SIZE ((size_t)524288) //65536
-//#define CHUNK_SIZE ((size_t)4096)
 #define ALIGNMENT 4096
-#else
-#if defined(USEHW)
+#elif defined(USEHW)
 #include "hw842.h"
 #define lib842_decompress hw842_decompress
 #define lib842_compress hw842_compress
@@ -32,9 +24,10 @@
 #endif
 
 //#define CHUNK_SIZE ((size_t)32768)
-#define CHUNK_SIZE ((size_t)1024)
+//#define CHUNK_SIZE ((size_t)1024)
+#define CHUNK_SIZE ((size_t)4096)
+
 #define STRLEN 32
-#endif
 
 long long timestamp()
 {
@@ -63,11 +56,7 @@ int main(int argc, const char *argv[])
 #endif
 
 	if (argc <= 1) {
-#ifdef USEAIX
-		ilen = 32;
-#else
 		ilen = STRLEN;
-#endif
 		olen = ilen * 2;
 #ifdef USEHW
 		dlen = ilen * 2;
@@ -90,32 +79,23 @@ int main(int argc, const char *argv[])
 			printf("decompressed = aligned_alloc(...) failed!\n");
 			exit(-1);
 		}
-		uint8_t tmp[] = "00112233001122330011223300112233";
 #else
 		in = (uint8_t *)malloc(ilen);
 		out = (uint8_t *)malloc(olen);
 		decompressed = (uint8_t *)malloc(dlen);
-
+#endif
 		uint8_t tmp[] = {
 			0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33,
 			0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37,
 			0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41,
 			0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45
 		}; //"0011223344556677889900AABBCCDDEE";
-		//tmp[0] = 0xff;
-		//tmp[1] = 0x00;
-#endif
 
 		memset(in, 0, ilen);
 		memset(out, 0, olen);
 		memset(decompressed, 0, dlen);
 
-#ifdef USEAIX
-		memcpy(in, tmp, 32);
-#else
 		memcpy(in, tmp, STRLEN);
-#endif
-
 	} else if (argc == 2) {
 		FILE *fp;
 		fp = fopen(argv[1], "r");
@@ -167,7 +147,6 @@ int main(int argc, const char *argv[])
 	if (ilen > CHUNK_SIZE) {
 		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
 #ifdef USEAIX
-		size_t acc_olen = 0;
 		ret = 0;
 #endif
 
