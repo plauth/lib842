@@ -31,6 +31,7 @@
 #define CHUNK_SIZE ((size_t)4096)
 
 #define STRLEN 32
+//#define CONDENSE
 
 static void *alloc_chunk(size_t size)
 {
@@ -147,8 +148,10 @@ int main(int argc, const char *argv[])
 		bool fail = false;
 
 		size_t num_chunks = ilen / CHUNK_SIZE;
+#ifdef CONDENSE
 		size_t *compressedChunkPositions =
 			(size_t *)malloc(sizeof(size_t) * num_chunks);
+#endif
 		size_t *compressedChunkSizes =
 			(size_t *)malloc(sizeof(size_t) * num_chunks);
 
@@ -175,7 +178,7 @@ int main(int argc, const char *argv[])
 		if (fail)
 			exit(-1);
 
-#ifndef USEAIX
+#ifdef CONDENSE
 		timestart_condense = timeend_comp;
 #endif
 
@@ -183,15 +186,13 @@ int main(int argc, const char *argv[])
 
 		for (size_t chunk_num = 0; chunk_num < num_chunks;
 		     chunk_num++) {
-#ifndef USEAIX
+#ifdef CONDENSE
 			compressedChunkPositions[chunk_num] = currentChunkPos;
 #endif
 			currentChunkPos += compressedChunkSizes[chunk_num];
 		}
 
-#ifdef USEAIX
-		size_t chunk_olen = CHUNK_SIZE * 2;
-#else
+#ifdef CONDENSE
 		uint8_t *out_condensed = (uint8_t *)malloc(currentChunkPos);
 
 #pragma omp parallel for
@@ -213,25 +214,16 @@ int main(int argc, const char *argv[])
 			size_t chunk_dlen = CHUNK_SIZE;
 
 			uint8_t *chunk_in = in + (CHUNK_SIZE * chunk_num);
-#ifdef USEAIX
-			uint8_t *chunk_out =
-				out + ((CHUNK_SIZE * 2) * chunk_num);
-			uint8_t *chunk_decomp = in + (CHUNK_SIZE * chunk_num);
-
-			int ret = lib842_decompress(chunk_out,
-					       compressedChunkSizes[chunk_num],
-					       chunk_decomp, &chunk_dlen);
+#ifdef CONDENSE
+			uint8_t *chunk_out = out_condensed + compressedChunkPositions[chunk_num];
 #else
-			uint8_t *chunk_condensed =
-				out_condensed +
-				compressedChunkPositions[chunk_num];
+			uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
+#endif
 			uint8_t *chunk_decomp =
 				decompressed + (CHUNK_SIZE * chunk_num);
-
-			int ret = lib842_decompress(chunk_condensed,
+			int ret = lib842_decompress(chunk_out,
 					  compressedChunkSizes[chunk_num],
 					  chunk_decomp, &chunk_dlen);
-#endif
 			if (ret < 0) {
 				printf("Error during decompression (%d): %s\n",
 				       errno, strerror(errno));
@@ -249,10 +241,10 @@ int main(int argc, const char *argv[])
 		if (fail)
 			exit(-1);
 
-#ifndef USEAIX
+#ifdef CONDENSE
 		free(compressedChunkPositions);
-		free(compressedChunkSizes);
 #endif
+		free(compressedChunkSizes);
 
 		printf("Input: %zu bytes\n", ilen);
 		printf("Output: %zu bytes\n", currentChunkPos);
@@ -261,7 +253,7 @@ int main(int argc, const char *argv[])
 		printf("Compression performance: %lld ms / %f MiB/s\n",
 		       timeend_comp - timestart_comp,
 		       (ilen / 1024 / 1024) / ((float)(timeend_comp - timestart_comp) / 1000));
-#ifndef USEAIX
+#ifdef CONDENSE
 		printf("Condensation performance: %lld ms / %f MiB/s\n",
 		       timeend_condense - timestart_condense,
 		       (currentChunkPos / 1024 / 1024) / ((float)(timeend_condense - timestart_condense) / 1000));
