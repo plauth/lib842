@@ -111,7 +111,8 @@ if (CRYPTODEV_LINUX_COMP_FOUND)
 endif()
 
 if (AIX_HWCOMPRESSION_FOUND)
-    add_executable(test_aix_standalone contrib/compdecomp_aix.c)
+    add_executable(test_aix_standalone sample/compdecomp.c)
+    set_target_properties(test_aix_standalone PROPERTIES COMPILE_DEFINITIONS "USEAIX")
 endif()
 
 if (CUDA_FOUND)
