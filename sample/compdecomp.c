@@ -30,7 +30,6 @@
 //#define CHUNK_SIZE ((size_t)1024)
 #define CHUNK_SIZE ((size_t)4096)
 
-#define STRLEN 32
 //#define CONDENSE
 
 static void *alloc_chunk(size_t size)
@@ -67,40 +66,21 @@ int main(int argc, const char *argv[])
 	long long timestart_condense, timeend_condense;
 
 	if (argc <= 1) {
-		ilen = STRLEN;
-		olen = ilen * 2;
-#ifdef USEHW
-		dlen = ilen * 2;
-#else
-		dlen = ilen;
-#endif
-		in = alloc_chunk(ilen);
-		if (in == NULL) {
-			printf("in = alloc_chunk(...) failed!\n");
-			exit(-1);
-		}
-		out = alloc_chunk(olen);
-		if (out == NULL) {
-			printf("out = alloc_chunk(...) failed!\n");
-			exit(-1);
-		}
-		decompressed = alloc_chunk(dlen);
-		if (decompressed == NULL) {
-			printf("decompressed = alloc_chunk(...) failed!\n");
-			exit(-1);
-		}
-		uint8_t tmp[] = {
+		static const uint8_t TEST_STRING[] = {
 			0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33,
 			0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37,
 			0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41,
 			0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45
 		}; //"0011223344556677889900AABBCCDDEE";
 
-		memset(in, 0, ilen);
-		memset(out, 0, olen);
-		memset(decompressed, 0, dlen);
+		ilen = sizeof(TEST_STRING);
+		in = alloc_chunk(ilen);
+		if (in == NULL) {
+			printf("in = alloc_chunk(...) failed!\n");
+			exit(-1);
+		}
 
-		memcpy(in, tmp, STRLEN);
+		memcpy(in, TEST_STRING, sizeof(TEST_STRING));
 	} else if (argc == 2) {
 		FILE *fp;
 		fp = fopen(argv[1], "r");
@@ -109,12 +89,7 @@ int main(int argc, const char *argv[])
 		printf("original file length: %zu\n", flen);
 		ilen = nextMultipleOfChunkSize(flen);
 		printf("original file length (padded): %zu\n", ilen);
-		olen = ilen * 2;
-#ifdef USEHW
-		dlen = ilen * 2;
-#else
-		dlen = ilen;
-#endif
+
 		fseek(fp, 0, SEEK_SET);
 
 		in = alloc_chunk(ilen);
@@ -122,19 +97,8 @@ int main(int argc, const char *argv[])
 			printf("in = alloc_chunk(...) failed!\n");
 			exit(-1);
 		}
-		out = alloc_chunk(olen);
-		if (out == NULL) {
-			printf("out = alloc_chunk(...) failed!\n");
-			exit(-1);
-		}
-		decompressed = alloc_chunk(dlen);
-		if (decompressed == NULL) {
-			printf("decompressed = alloc_chunk(...) failed!\n");
-			exit(-1);
-		}
+
 		memset(in, 0, ilen);
-		memset(out, 0, olen);
-		memset(decompressed, 0, dlen);
 
 		if (!fread(in, flen, 1, fp)) {
 			fprintf(stderr,
@@ -142,6 +106,26 @@ int main(int argc, const char *argv[])
 		}
 		fclose(fp);
 	}
+
+	olen = ilen * 2;
+#ifdef USEHW
+	dlen = ilen * 2;
+#else
+	dlen = ilen;
+#endif
+
+	out = alloc_chunk(olen);
+	if (out == NULL) {
+		printf("out = alloc_chunk(...) failed!\n");
+		exit(-1);
+	}
+	decompressed = alloc_chunk(dlen);
+	if (decompressed == NULL) {
+		printf("decompressed = alloc_chunk(...) failed!\n");
+		exit(-1);
+	}
+	memset(out, 0, olen);
+	memset(decompressed, 0, dlen);
 
 	if (ilen > CHUNK_SIZE) {
 		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
