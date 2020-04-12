@@ -149,11 +149,9 @@ int main(int argc, const char *argv[])
 
 		size_t num_chunks = ilen / CHUNK_SIZE;
 #ifdef CONDENSE
-		size_t *compressedChunkPositions =
-			(size_t *)malloc(sizeof(size_t) * num_chunks);
+		size_t *compressedChunkPositions = malloc(sizeof(size_t) * num_chunks);
 #endif
-		size_t *compressedChunkSizes =
-			(size_t *)malloc(sizeof(size_t) * num_chunks);
+		size_t *compressedChunkSizes = malloc(sizeof(size_t) * num_chunks);
 
 		timestart_comp = timestamp();
 #pragma omp parallel for
@@ -193,7 +191,7 @@ int main(int argc, const char *argv[])
 		}
 
 #ifdef CONDENSE
-		uint8_t *out_condensed = (uint8_t *)malloc(currentChunkPos);
+		uint8_t *out_condensed = malloc(currentChunkPos);
 
 #pragma omp parallel for
 		for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
@@ -303,4 +301,9 @@ int main(int argc, const char *argv[])
 			return -1;
 		}
 	}
+
+	free(in);
+	free(out);
+	free(decompressed);
+	return EXIT_SUCCESS;
 }
