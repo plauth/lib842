@@ -2,10 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <errno.h>
 #include <sys/time.h>
 
 #if defined(USEAIX)
-#include <errno.h>
 #include <sys/types.h>
 #include <sys/vminfo.h>
 #define ALIGNMENT 4096
@@ -61,9 +62,6 @@ int main(int argc, const char *argv[])
 	long long timestart_comp, timeend_comp;
 	long long timestart_decomp, timeend_decomp;
 	long long timestart_condense, timeend_condense;
-#ifdef USEAIX
-	int ret = 0;
-#endif
 
 	if (argc <= 1) {
 		ilen = STRLEN;
@@ -144,9 +142,7 @@ int main(int argc, const char *argv[])
 
 	if (ilen > CHUNK_SIZE) {
 		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
-#ifdef USEAIX
-		ret = 0;
-#endif
+		bool fail = false;
 
 		size_t num_chunks = ilen / CHUNK_SIZE;
 		size_t *compressedChunkPositions =
@@ -156,29 +152,31 @@ int main(int argc, const char *argv[])
 
 		timestart_comp = timestamp();
 #pragma omp parallel for
-		for (size_t chunk_num = 0; chunk_num < num_chunks;
-		     chunk_num++) {
+		for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t *chunk_in = in + (CHUNK_SIZE * chunk_num);
 			uint8_t *chunk_out =
 				out + ((CHUNK_SIZE * 2) * chunk_num);
 
 #ifdef USEAIX
-			ret = accel_compress(chunk_in, CHUNK_SIZE, chunk_out,
+			int ret = accel_compress(chunk_in, CHUNK_SIZE, chunk_out,
 					     &chunk_olen, 0);
-
-			if (ret != ERANGE && ret < 0 && ret != ERANGE) {
-				printf("Error calling 'accel_compress' (%d): %s\n",
-				       errno, strerror(errno));
-			}
-			//printf("Compression factor: %f\n", (float) chunk_olen / (float) CHUNK_SIZE);
 #else
-			lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
+			int ret = lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
 					&chunk_olen);
 #endif
+			if (ret < 0) {
+				printf("Error during compression (%d): %s\n",
+				       errno, strerror(errno));
+				#pragma omp atomic write
+				fail = true;
+			}
 			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
 		timeend_comp = timestamp();
+
+		if (fail)
+			exit(-1);
 
 #ifndef USEAIX
 		timestart_condense = timeend_comp;
@@ -200,8 +198,7 @@ int main(int argc, const char *argv[])
 		uint8_t *out_condensed = (uint8_t *)malloc(currentChunkPos);
 
 #pragma omp parallel for
-		for (size_t chunk_num = 0; chunk_num < num_chunks;
-		     chunk_num++) {
+		for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			uint8_t *chunk_out =
 				out + ((CHUNK_SIZE * 2) * chunk_num);
 			uint8_t *chunk_condensed =
@@ -215,8 +212,7 @@ int main(int argc, const char *argv[])
 
 		timestart_decomp = timestamp();
 #pragma omp parallel for
-		for (size_t chunk_num = 0; chunk_num < num_chunks;
-		     chunk_num++) {
+		for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 			size_t chunk_dlen = CHUNK_SIZE;
 
 			uint8_t *chunk_in = in + (CHUNK_SIZE * chunk_num);
@@ -225,13 +221,9 @@ int main(int argc, const char *argv[])
 				out + ((CHUNK_SIZE * 2) * chunk_num);
 			uint8_t *chunk_decomp = in + (CHUNK_SIZE * chunk_num);
 
-			ret = accel_decompress(chunk_out,
+			int ret = accel_decompress(chunk_out,
 					       compressedChunkSizes[chunk_num],
 					       chunk_decomp, &chunk_dlen, 0);
-			if (ret < 0) {
-				printf("Error calling 'accel_decompress' (%d): %s\n",
-				       errno, strerror(errno));
-			}
 #else
 			uint8_t *chunk_condensed =
 				out_condensed +
@@ -239,19 +231,26 @@ int main(int argc, const char *argv[])
 			uint8_t *chunk_decomp =
 				decompressed + (CHUNK_SIZE * chunk_num);
 
-			lib842_decompress(chunk_condensed,
+			int ret = lib842_decompress(chunk_condensed,
 					  compressedChunkSizes[chunk_num],
 					  chunk_decomp, &chunk_dlen);
 #endif
-
-			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) ==
-			      0)) {
+			if (ret < 0) {
+				printf("Error during decompression (%d): %s\n",
+				       errno, strerror(errno));
+				#pragma omp atomic write
+				fail = true;
+			} else if (memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) != 0) {
 				fprintf(stderr,
 					"FAIL: Decompressed data differs from the original input data.\n");
-				//return -1;
+				#pragma omp atomic write
+				fail = true;
 			}
 		}
 		timeend_decomp = timestamp();
+
+		if (fail)
+			exit(-1);
 
 #ifndef USEAIX
 		free(compressedChunkPositions);
@@ -276,43 +275,32 @@ int main(int argc, const char *argv[])
 
 		printf("Compression- and decompression was successful!\n");
 	} else {
+		int ret = 0;
 #ifdef USEAIX
 		ret = accel_compress(in, ilen, out, &olen, 0);
+#else
+		ret = lib842_compress(in, ilen, out, &olen);
+#endif
 		if (ret < 0) {
-			printf("Error calling 'accel_compress' (%d): %s\n",
+			printf("Error during compression (%d): %s\n",
 			       errno, strerror(errno));
 		}
 
+#ifdef USEAIX
 		ret = accel_decompress(out, olen, decompressed, &dlen, 0);
+#else
+		ret = lib842_decompress(out, olen, decompressed, &dlen);
+#endif
 		if (ret < 0) {
-			printf("Error calling 'accel_decompress' (%d): %s\n",
+			printf("Error during decompression (%d): %s\n",
 			       errno, strerror(errno));
 		}
-#else
-		lib842_compress(in, ilen, out, &olen);
-		lib842_decompress(out, olen, decompressed, &dlen);
-#endif
 
 		printf("Input: %zu bytes\n", ilen);
 		printf("Output: %zu bytes\n", olen);
 		printf("Compression factor: %f\n", (float)olen / (float)ilen);
 
-#ifdef USEAIX
-		/*
-		for (size_t i = 0; i < ilen; i++) {
-			printf("%02x:", in[i]);
-		}
 
-		printf("\n\n");
-
-		for (size_t i = 0; i < olen; i++) {
-			printf("%02x:", out[i]);
-		}
-
-		printf("\n\n");
-		*/
-#else
-		//if(argc <= 1) {
 		for (int i = 0; i < 64; i++) {
 			printf("%02x:", out[i]);
 		}
@@ -322,8 +310,6 @@ int main(int argc, const char *argv[])
 		for (int i = 0; i < 32; i++) {
 			printf("%02x:", decompressed[i]);
 		}
-		//}
-#endif
 
 		printf("\n\n");
 
