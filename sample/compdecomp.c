@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <sys/vminfo.h>
 #define ALIGNMENT 4096
+#define lib842_decompress(in, ilen, out, olen) accel_decompress(in, ilen, out, olen, 0)
+#define lib842_compress(in, ilen, out, olen) accel_compress(in, ilen, out, olen, 0)
 #elif defined(USEHW)
 #include "hw842.h"
 #define lib842_decompress hw842_decompress
@@ -158,13 +160,8 @@ int main(int argc, const char *argv[])
 			uint8_t *chunk_out =
 				out + ((CHUNK_SIZE * 2) * chunk_num);
 
-#ifdef USEAIX
-			int ret = accel_compress(chunk_in, CHUNK_SIZE, chunk_out,
-					     &chunk_olen, 0);
-#else
 			int ret = lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
 					&chunk_olen);
-#endif
 			if (ret < 0) {
 				printf("Error during compression (%d): %s\n",
 				       errno, strerror(errno));
@@ -221,9 +218,9 @@ int main(int argc, const char *argv[])
 				out + ((CHUNK_SIZE * 2) * chunk_num);
 			uint8_t *chunk_decomp = in + (CHUNK_SIZE * chunk_num);
 
-			int ret = accel_decompress(chunk_out,
+			int ret = lib842_decompress(chunk_out,
 					       compressedChunkSizes[chunk_num],
-					       chunk_decomp, &chunk_dlen, 0);
+					       chunk_decomp, &chunk_dlen);
 #else
 			uint8_t *chunk_condensed =
 				out_condensed +
@@ -276,21 +273,14 @@ int main(int argc, const char *argv[])
 		printf("Compression- and decompression was successful!\n");
 	} else {
 		int ret = 0;
-#ifdef USEAIX
-		ret = accel_compress(in, ilen, out, &olen, 0);
-#else
+
 		ret = lib842_compress(in, ilen, out, &olen);
-#endif
 		if (ret < 0) {
 			printf("Error during compression (%d): %s\n",
 			       errno, strerror(errno));
 		}
 
-#ifdef USEAIX
-		ret = accel_decompress(out, olen, decompressed, &dlen, 0);
-#else
 		ret = lib842_decompress(out, olen, decompressed, &dlen);
-#endif
 		if (ret < 0) {
 			printf("Error during decompression (%d): %s\n",
 			       errno, strerror(errno));
