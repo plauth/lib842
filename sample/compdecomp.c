@@ -29,6 +29,16 @@
 
 #define STRLEN 32
 
+static void *alloc_chunk(size_t size)
+{
+#ifdef ALIGNMENT
+	size_t padded_size = (size + (ALIGNMENT - 1)) & ~(ALIGNMENT - 1);
+	return aligned_alloc(ALIGNMENT, padded_size);
+#else
+	return malloc(size);
+#endif
+}
+
 long long timestamp()
 {
 	struct timeval te;
@@ -63,27 +73,21 @@ int main(int argc, const char *argv[])
 #else
 		dlen = ilen;
 #endif
-#ifdef USEAIX
-		in = (uint8_t *)aligned_alloc(ALIGNMENT, CHUNK_SIZE);
+		in = alloc_chunk(ilen);
 		if (in == NULL) {
-			printf("in = aligned_alloc(...) failed!\n");
+			printf("in = alloc_chunk(...) failed!\n");
 			exit(-1);
 		}
-		out = (uint8_t *)aligned_alloc(ALIGNMENT, CHUNK_SIZE);
+		out = alloc_chunk(olen);
 		if (out == NULL) {
-			printf("out = aligned_alloc(...) failed!\n");
+			printf("out = alloc_chunk(...) failed!\n");
 			exit(-1);
 		}
-		decompressed = (uint8_t *)aligned_alloc(ALIGNMENT, CHUNK_SIZE);
+		decompressed = alloc_chunk(dlen);
 		if (decompressed == NULL) {
-			printf("decompressed = aligned_alloc(...) failed!\n");
+			printf("decompressed = alloc_chunk(...) failed!\n");
 			exit(-1);
 		}
-#else
-		in = (uint8_t *)malloc(ilen);
-		out = (uint8_t *)malloc(olen);
-		decompressed = (uint8_t *)malloc(dlen);
-#endif
 		uint8_t tmp[] = {
 			0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33,
 			0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37,
@@ -112,27 +116,21 @@ int main(int argc, const char *argv[])
 #endif
 		fseek(fp, 0, SEEK_SET);
 
-#ifdef USEAIX
-		in = (uint8_t *)aligned_alloc(ALIGNMENT, ilen);
+		in = alloc_chunk(ilen);
 		if (in == NULL) {
-			printf("in = aligned_alloc(...) failed!\n");
+			printf("in = alloc_chunk(...) failed!\n");
 			exit(-1);
 		}
-		out = (uint8_t *)aligned_alloc(ALIGNMENT, olen);
+		out = alloc_chunk(olen);
 		if (out == NULL) {
-			printf("out = aligned_alloc(...) failed!\n");
+			printf("out = alloc_chunk(...) failed!\n");
 			exit(-1);
 		}
-		decompressed = (uint8_t *)aligned_alloc(ALIGNMENT, dlen);
+		decompressed = alloc_chunk(dlen);
 		if (decompressed == NULL) {
-			printf("decompressed = aligned_alloc(...) failed!\n");
+			printf("decompressed = alloc_chunk(...) failed!\n");
 			exit(-1);
 		}
-#else
-		in = (uint8_t *)malloc(ilen);
-		out = (uint8_t *)malloc(olen);
-		decompressed = (uint8_t *)malloc(dlen);
-#endif
 		memset(in, 0, ilen);
 		memset(out, 0, olen);
 		memset(decompressed, 0, dlen);
