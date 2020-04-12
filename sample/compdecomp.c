@@ -121,20 +121,9 @@ int main(int argc, const char *argv[])
 		fp = fopen(argv[1], "r");
 		fseek(fp, 0, SEEK_END);
 		size_t flen = (size_t)ftell(fp);
-#ifdef USEAIX
-		ilen = flen;
-#ifndef BENCHMARK
-		printf("original file length: %d\n", ilen);
-#endif
-		ilen = nextMultipleOfChunkSize(ilen);
-#ifndef BENCHMARK
-		printf("original file length (padded): %d\n", ilen);
-#endif
-#else
 		printf("original file length: %zu\n", flen);
 		ilen = nextMultipleOfChunkSize(flen);
 		printf("original file length (padded): %zu\n", ilen);
-#endif
 		olen = ilen * 2;
 #ifdef USEHW
 		dlen = ilen * 2;
@@ -176,14 +165,10 @@ int main(int argc, const char *argv[])
 	}
 
 	if (ilen > CHUNK_SIZE) {
-#ifdef USEAIX
-#ifndef BENCHMARK
 		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
-#endif
+#ifdef USEAIX
 		size_t acc_olen = 0;
 		ret = 0;
-#else
-		printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
 #endif
 
 		size_t num_chunks = ilen / CHUNK_SIZE;
@@ -291,34 +276,10 @@ int main(int argc, const char *argv[])
 		}
 		timeend_decomp = timestamp();
 
-#ifdef USEAIX
-#ifdef BENCHMARK
-		printf("%.4f,%.4f\n",
-		       (ilen / 1024 / 1024) /
-			       ((float)(timeend_comp - timestart_comp) / 1000),
-		       (ilen / 1024 / 1024) /
-			       ((float)(timeend_decomp - timestart_decomp) /
-				1000));
-#else
-		printf("Input: %zu bytes\n", ilen);
-		printf("Output: %zu bytes\n", currentChunkPos);
-		printf("Compression factor: %f\n",
-		       (float)currentChunkPos / (float)ilen);
-		printf("Compression performance: %lld ms / %f MiB/s\n",
-		       timeend_comp - timestart_comp,
-		       (ilen / 1024 / 1024) /
-			       ((float)(timeend_comp - timestart_comp) / 1000));
-		printf("Decompression performance: %lld ms / %f MiB/s\n",
-		       timeend_decomp - timestart_decomp,
-		       (ilen / 1024 / 1024) /
-			       ((float)(timeend_decomp - timestart_decomp) /
-				1000));
-
-		printf("Compression- and decompression was successful!\n");
-#endif
-#else
+#ifndef USEAIX
 		free(compressedChunkPositions);
 		free(compressedChunkSizes);
+#endif
 
 		printf("Input: %zu bytes\n", ilen);
 		printf("Output: %zu bytes\n", currentChunkPos);
@@ -326,21 +287,17 @@ int main(int argc, const char *argv[])
 		       (float)currentChunkPos / (float)ilen);
 		printf("Compression performance: %lld ms / %f MiB/s\n",
 		       timeend_comp - timestart_comp,
-		       (ilen / 1024 / 1024) /
-			       ((float)(timeend_comp - timestart_comp) / 1000));
+		       (ilen / 1024 / 1024) / ((float)(timeend_comp - timestart_comp) / 1000));
+#ifndef USEAIX
 		printf("Condensation performance: %lld ms / %f MiB/s\n",
 		       timeend_condense - timestart_condense,
-		       (currentChunkPos / 1024 / 1024) /
-			       ((float)(timeend_condense - timestart_condense) /
-				1000));
+		       (currentChunkPos / 1024 / 1024) / ((float)(timeend_condense - timestart_condense) / 1000));
+#endif
 		printf("Decompression performance: %lld ms / %f MiB/s\n",
 		       timeend_decomp - timestart_decomp,
-		       (ilen / 1024 / 1024) /
-			       ((float)(timeend_decomp - timestart_decomp) /
-				1000));
+		       (ilen / 1024 / 1024) / ((float)(timeend_decomp - timestart_decomp) / 1000));
 
 		printf("Compression- and decompression was successful!\n");
-#endif
 	} else {
 #ifdef USEAIX
 		ret = accel_compress(in, ilen, out, &olen, 0);
