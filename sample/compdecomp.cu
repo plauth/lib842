@@ -102,7 +102,7 @@ int main(int argc, const char *argv[])
 
 	} else if (argc == 2) {
 		FILE *fp;
-		fp = fopen(argv[1], "r");
+		fp = fopen(argv[1], "rb");
 		fseek(fp, 0, SEEK_END);
 		size_t flen = (size_t)ftell(fp);
 		ilen = flen;

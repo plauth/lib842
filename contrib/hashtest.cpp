@@ -26,7 +26,7 @@ int main(int argc, char **argv)
 
 		for (int i_args = 1; i_args < argc; i_args++) {
 			FILE *fp;
-			fp = fopen(argv[i_args], "r");
+			fp = fopen(argv[i_args], "rb");
 			fseek(fp, 0, SEEK_END);
 			size_t flen = (size_t)ftell(fp);
 			fseek(fp, 0, SEEK_SET);
