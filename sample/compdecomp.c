@@ -125,15 +125,21 @@ static uint8_t *get_test_string(size_t *ilen) {
 	return test_string;
 }
 
-static bool compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompressed, size_t ilen) {
-	printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
+static bool compress_benchmark_core(const uint8_t *in, size_t ilen,
+				    uint8_t *out, size_t *olen,
+				    uint8_t *decompressed, size_t *dlen,
+				    long long *time_comp,
+#ifdef CONDENSE
+				    long long *time_condense,
+#endif
+				    long long *time_decomp) {
 	bool ret = false;
 	bool omp_success = true;
 
 	size_t num_chunks = ilen / CHUNK_SIZE;
 #ifdef CONDENSE
 	size_t *compressedChunkPositions = malloc(sizeof(size_t) * num_chunks);
-	if (compressedChunkPosition == NULL) {
+	if (compressedChunkPositions == NULL) {
 		fprintf(stderr, "FAIL: Could not allocate memory for the compressed chunk positions.\n");
 		return ret;
 	}
@@ -142,6 +148,11 @@ static bool compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompr
 	if (compressedChunkSizes == NULL) {
 		fprintf(stderr, "FAIL: Could not allocate memory for the compressed chunk sizes.\n");
 		goto free_3;
+	}
+	size_t *decompressedChunkSizes = malloc(sizeof(size_t) * num_chunks);
+	if (decompressedChunkSizes == NULL) {
+		fprintf(stderr, "FAIL: Could not allocate memory for the decompressed chunk sizes.\n");
+		goto free_2;
 	}
 
 	long long timestart_comp = timestamp();
@@ -165,27 +176,26 @@ static bool compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompr
 		}
 		compressedChunkSizes[chunk_num] = chunk_olen;
 	}
-	long long timeend_comp = timestamp();
+	*time_comp = timestamp() - timestart_comp;
 
 	if (!omp_success)
-		goto free_2;
+		goto free_x;
 
 #ifdef CONDENSE
-	long long timestart_condense = timeend_comp;
+	long long timestart_condense = timestamp();
 #endif
 
-	size_t currentChunkPos = 0;
+	*olen = 0;
 
-	for (size_t chunk_num = 0; chunk_num < num_chunks;
-	     chunk_num++) {
+	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 #ifdef CONDENSE
-		compressedChunkPositions[chunk_num] = currentChunkPos;
+		compressedChunkPositions[chunk_num] = *olen;
 #endif
-		currentChunkPos += compressedChunkSizes[chunk_num];
+		*olen += compressedChunkSizes[chunk_num];
 	}
 
 #ifdef CONDENSE
-	uint8_t *out_condensed = malloc(currentChunkPos);
+	uint8_t *out_condensed = malloc(*olen);
 
 #pragma omp parallel for
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
@@ -197,7 +207,7 @@ static bool compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompr
 		memcpy(chunk_condensed, chunk_out,
 		       compressedChunkSizes[chunk_num]);
 	}
-	long long timeend_condense = timestamp();
+	*time_condense = timestamp() - timestart_condense;
 #endif
 
 	long long timestart_decomp = timestamp();
@@ -223,35 +233,22 @@ static bool compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompr
 				        -err, strerror(-err));
 			}
 		}
+		decompressedChunkSizes[chunk_num] = chunk_dlen;
 	}
-	long long timeend_decomp = timestamp();
+	*time_decomp = timestamp() - timestart_decomp;
 
 	if (!omp_success)
 		goto free_1;
 
-	if (memcmp(in, decompressed, ilen) != 0) {
+	*dlen = 0;
+	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++)
+		*dlen += decompressedChunkSizes[chunk_num];
+
+	if (ilen != *dlen || memcmp(in, decompressed, ilen) != 0) {
 		fprintf(stderr,
 			"FAIL: Decompressed data differs from the original input data.\n");
 		goto free_1;
 	}
-
-	printf("Input: %zu bytes\n", ilen);
-	printf("Output: %zu bytes\n", currentChunkPos);
-	printf("Compression factor: %f\n",
-	       (float)currentChunkPos / (float)ilen);
-	printf("Compression performance: %lld ms / %f MiB/s\n",
-	       timeend_comp - timestart_comp,
-	       (ilen / 1024 / 1024) / ((float)(timeend_comp - timestart_comp) / 1000));
-#ifdef CONDENSE
-	printf("Condensation performance: %lld ms / %f MiB/s\n",
-	       timeend_condense - timestart_condense,
-	       (currentChunkPos / 1024 / 1024) / ((float)(timeend_condense - timestart_condense) / 1000));
-#endif
-	printf("Decompression performance: %lld ms / %f MiB/s\n",
-	       timeend_decomp - timestart_decomp,
-	       (ilen / 1024 / 1024) / ((float)(timeend_decomp - timestart_decomp) / 1000));
-
-	printf("Compression- and decompression was successful!\n");
 
 	ret = true;
 
@@ -259,6 +256,8 @@ free_1:
 #ifdef CONDENSE
 	free(out_condensed);
 #endif
+free_x:
+	free(decompressedChunkSizes);
 free_2:
 	free(compressedChunkSizes);
 free_3:
@@ -269,42 +268,87 @@ free_3:
 	return ret;
 }
 
+static bool compress_benchmark(const uint8_t *in, size_t ilen,
+			       uint8_t *out, size_t olen,
+			       uint8_t *decompressed, size_t dlen) {
+	printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
 
-static bool simple_test(const uint8_t *in, uint8_t *out, uint8_t *decompressed, size_t ilen, size_t olen, size_t dlen)
+	long long time_comp, time_decomp;
+#ifdef CONDENSE
+	long long time_condense;
+#endif
+	if (!compress_benchmark_core(in, ilen, out, &olen, decompressed, &dlen,
+				     &time_comp,
+#ifdef CONDENSE
+				     &time_condense,
+#endif
+				     &time_decomp))
+		return false;
+
+	printf("Input: %zu bytes\n", ilen);
+	printf("Output: %zu bytes\n", olen);
+	printf("Compression factor: %f\n",
+	       (float)olen / (float)ilen);
+	printf("Compression performance: %lld ms / %f MiB/s\n",
+	       time_comp, (ilen / 1024 / 1024) / ((float)time_comp / 1000));
+#ifdef CONDENSE
+	printf("Condensation performance: %lld ms / %f MiB/s\n",
+	       time_condense, (olen / 1024 / 1024) / ((float)time_condense / 1000));
+#endif
+	printf("Decompression performance: %lld ms / %f MiB/s\n",
+	       time_decomp, (dlen / 1024 / 1024) / ((float)time_decomp / 1000));
+
+	printf("Compression- and decompression was successful!\n");
+	return true;
+}
+
+static bool simple_test_core(const uint8_t *in, size_t ilen,
+			     uint8_t *out, size_t *olen,
+			     uint8_t *decompressed, size_t *dlen)
 {
 	int err;
 
-	err = lib842_compress(in, ilen, out, &olen);
+	err = lib842_compress(in, ilen, out, olen);
 	if (err < 0) {
 		fprintf(stderr, "Error during compression (%d): %s\n",
 		        -err, strerror(-err));
 		return false;
 	}
 
-	err = lib842_decompress(out, olen, decompressed, &dlen);
+	err = lib842_decompress(out, *olen, decompressed, dlen);
 	if (err < 0) {
 		fprintf(stderr, "Error during decompression (%d): %s\n",
 		        -err, strerror(-err));
 		return false;
 	}
 
+	return true;
+}
+
+static bool simple_test(const uint8_t *in, size_t ilen,
+			uint8_t *out, size_t olen,
+			uint8_t *decompressed, size_t dlen)
+{
+	if (!simple_test_core(in, ilen, out, &olen, decompressed, &dlen))
+		return false;
+
 	printf("Input: %zu bytes\n", ilen);
 	printf("Output: %zu bytes\n", olen);
 	printf("Compression factor: %f\n", (float)olen / (float)ilen);
 
-	for (int i = 0; i < 64; i++) {
+	for (size_t i = 0; i < olen; i++) {
 		printf("%02x:", out[i]);
 	}
 
 	printf("\n\n");
 
-	for (int i = 0; i < 32; i++) {
+	for (size_t i = 0; i < dlen; i++) {
 		printf("%02x:", decompressed[i]);
 	}
 
 	printf("\n\n");
 
-	if (memcmp(in, decompressed, ilen) != 0) {
+	if (ilen != dlen || memcmp(in, decompressed, ilen) != 0) {
 		fprintf(stderr,
 			"FAIL: Decompressed data differs from the original input data.\n");
 		return false;
@@ -345,10 +389,10 @@ int main(int argc, const char *argv[])
 	memset(decompressed, 0, dlen);
 
 	if (ilen > CHUNK_SIZE) {
-		if (!compress_benchmark(in, out, decompressed, ilen))
+		if (!compress_benchmark(in, ilen, out, olen, decompressed, dlen))
 			goto return_free_decompressed;
 	} else {
-		if (!simple_test(in, out, decompressed, ilen, olen, dlen))
+		if (!simple_test(in, ilen, out, olen, decompressed, dlen))
 			goto return_free_decompressed;
 	}
 
