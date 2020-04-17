@@ -12,6 +12,11 @@
 // avoided in a controlled environment. This has a performance penalty.
 #define ENABLE_ERROR_HANDLING
 
+/* If defined, avoid (ab)using undefined behaviour (as defined by the standard),
+ * which nevertheless works on our target platforms and provides better performance.
+ * This option is also useful to avoid warnings for debugging (e.g. valgrind). */
+#define ONLY_WELL_DEFINED_BEHAVIOUR
+
 #ifdef ENABLE_ERROR_HANDLING
 #include <stddef.h>
 #endif

@@ -60,8 +60,6 @@ static inline uint32_t crc32_be(uint32_t crc, unsigned char const *buf, size_t l
 		for (i = 0; i < len; i++)
 			DO_CRC(*++p); /* use pre increment for speed */
 	}
-	// TODOXXX: This changes the CRC wrt. the original version of lib842, but
-	// is necessary to match the stock Linux kernel output!
 	crc = swap_be_to_native32(crc);
 	return crc;
 #undef DO_CRC

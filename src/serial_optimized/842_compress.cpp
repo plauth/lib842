@@ -27,11 +27,6 @@
 #include <string.h>
 #include <errno.h>
 
-/* If defined, avoid (ab)using undefined behaviour (as defined by the standard),
- * which nevertheless works on our target platforms and provides better performance.
- * This option is also useful to avoid warnings for debugging (e.g. valgrind). */
-#define ONLY_WELL_DEFINED_BEHAVIOUR
-
 #define PRIME64 (11400714785074694791ULL)
 
 #define NO_ENTRY (-1)
@@ -566,11 +561,7 @@ int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 	struct sw842_param *p = (struct sw842_param *)malloc(
 		sizeof(struct sw842_param));
 
-#ifdef ONLY_WELL_DEFINED_BEHAVIOUR
-	// TODOXXX: It appears that actually this memset should ALWAYS be done,
-	//          because if one executes memset(..., 55, ...), the program crashes!
 	memset(&p->hashes, 0, sizeof(p->hashes));
-#endif
 
 	uint64_t last, next;
 	uint8_t repeat_count = 0;

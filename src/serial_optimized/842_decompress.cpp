@@ -26,11 +26,6 @@
 #include <inttypes.h>
 #include <errno.h>
 
-/* If defined, avoid (ab)using undefined behaviour (as defined by the standard),
- * which nevertheless works on our target platforms and provides better performance.
- * This option is also useful to avoid warnings for debugging (e.g. valgrind). */
-#define ONLY_WELL_DEFINED_BEHAVIOUR
-
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE (2 * (1 << I2_BITS))
 #define I4_FIFO_SIZE (4 * (1 << I4_BITS))

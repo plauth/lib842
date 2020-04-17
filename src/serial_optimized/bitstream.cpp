@@ -14,11 +14,6 @@
 #include <errno.h>
 #endif
 
-/* If defined, (ab)use undefined behaviour (as defined by the standard), which
- * nevertheless works on our target platforms and provides better performance.
- * This option is also useful to avoid warnings for debugging (e.g. valgrind). */
-#define ONLY_WELL_DEFINED_BEHAVIOUR
-
 /* number of bits in a buffered word */
 #define wsize 64
 
