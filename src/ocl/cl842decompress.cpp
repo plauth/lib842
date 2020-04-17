@@ -16,10 +16,15 @@ extern const char *CL842_DECOMPRESS_KERNEL_SOURCE;
 #define LOCAL_SIZE 256
 #endif
 
-CL842DeviceDecompressor::CL842DeviceDecompressor(
-	const cl::Context &context, const VECTOR_CLASS<cl::Device> &devices,
-	size_t inputChunkStride, CL842InputFormat inputFormat, bool verbose)
-	: m_inputChunkStride(inputChunkStride), m_inputFormat(inputFormat),
+CL842DeviceDecompressor::CL842DeviceDecompressor(const cl::Context &context,
+						 const VECTOR_CLASS<cl::Device> &devices,
+						 size_t inputChunkSize,
+						 size_t inputChunkStride,
+						 CL842InputFormat inputFormat,
+						 bool verbose)
+	: m_inputChunkSize(inputChunkSize),
+	  m_inputChunkStride(inputChunkStride),
+	  m_inputFormat(inputFormat),
 	  m_verbose(verbose)
 {
 	buildProgram(context, devices);
@@ -62,7 +67,7 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 
 	if (numChunks > 1 && m_verbose) {
 		std::cerr << "Using " << numChunks << " chunks of "
-			  << CL842_CHUNK_SIZE << " bytes, " << LOCAL_SIZE
+			  << m_inputChunkSize << " bytes, " << LOCAL_SIZE
 			  << " threads per workgroup" << std::endl;
 	}
 
@@ -97,7 +102,7 @@ void CL842DeviceDecompressor::buildProgram(
 	const cl::Context &context, const VECTOR_CLASS<cl::Device> &devices)
 {
 	std::ostringstream options;
-	options << "-D CL842_CHUNK_SIZE=" << CL842_CHUNK_SIZE;
+	options << "-D CL842_CHUNK_SIZE=" << m_inputChunkSize;
 	options << " -D CL842_CHUNK_STRIDE=" << m_inputChunkStride;
 	options << " -D EINVAL=" << EINVAL;
 	options << " -D ENOSPC=" << ENOSPC;
@@ -127,12 +132,8 @@ void CL842DeviceDecompressor::buildProgram(
 	}
 }
 
-size_t CL842HostDecompressor::paddedSize(size_t size)
-{
-	return (size + (CL842_CHUNK_SIZE - 1)) & ~(CL842_CHUNK_SIZE - 1);
-}
-
-CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkStride,
+CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkSize,
+					     size_t inputChunkStride,
 					     CL842InputFormat inputFormat,
 					     bool verbose)
 	: m_inputChunkStride(inputChunkStride),
@@ -140,8 +141,8 @@ CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkStride,
 	  m_verbose(verbose),
 	  m_devices(findDevices()), m_context(m_devices),
 	  m_queue(m_context, m_devices[0]),
-	  m_deviceCompressor(m_context, m_devices, inputChunkStride,
-			     inputFormat, verbose)
+	  m_deviceCompressor(m_context, m_devices, inputChunkSize,
+			     inputChunkStride, inputFormat, verbose)
 {
 }
 
@@ -302,7 +303,7 @@ void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 int cl842_decompress(const uint8_t *in, size_t ilen,
 		     uint8_t *out, size_t *olen)
 {
-	static CL842HostDecompressor decompressor(99999,
+	static CL842HostDecompressor decompressor(65536, 99999 /* Doesn't matter */,
 						 CL842InputFormat::ALWAYS_COMPRESSED_CHUNKS,
 						 true);
 	int ret;

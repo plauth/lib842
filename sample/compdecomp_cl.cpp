@@ -9,6 +9,13 @@ using namespace std;
 
 #define STRLEN 32
 
+#define CHUNK_SIZE ((size_t)65536)
+
+size_t nextMultipleOfChunkSize(size_t input)
+{
+	return (input + (CHUNK_SIZE - 1)) & ~(CHUNK_SIZE - 1);
+}
+
 int main(int argc, char *argv[])
 {
 	uint8_t *compressIn, *compressOut, *decompressIn, *decompressOut;
@@ -19,7 +26,7 @@ int main(int argc, char *argv[])
 	size_t num_chunks = 0;
 
 	if (argc <= 1) {
-		ilen = CL842HostDecompressor::paddedSize(STRLEN);
+		ilen = nextMultipleOfChunkSize(STRLEN);
 	} else if (argc == 2) {
 		std::ifstream is(argv[1], std::ifstream::binary);
 		if (!is)
@@ -29,7 +36,7 @@ int main(int argc, char *argv[])
 		is.seekg(0, is.beg);
 		is.close();
 
-		ilen = CL842HostDecompressor::paddedSize(flen);
+		ilen = nextMultipleOfChunkSize(flen);
 
 		printf("original file length: %zu\n", flen);
 		printf("original file length (padded): %zu\n", ilen);
@@ -57,7 +64,7 @@ int main(int argc, char *argv[])
 		}; //"0011223344556677889900AABBCCDDEE";
 		memcpy(compressIn, tmp, STRLEN);
 	} else if (argc == 2) {
-		num_chunks = ilen / CL842_CHUNK_SIZE;
+		num_chunks = ilen / CHUNK_SIZE;
 
 		std::ifstream is(argv[1], std::ifstream::binary);
 		if (!is)
@@ -74,7 +81,7 @@ int main(int argc, char *argv[])
 		is.close();
 	}
 
-	printf("Using %zu chunks of %d bytes\n", num_chunks, CL842_CHUNK_SIZE);
+	printf("Using %zu chunks of %zu bytes\n", num_chunks, CHUNK_SIZE);
 
 #if defined(USE_INPLACE_COMPRESSED_CHUNKS) || defined(USE_MAYBE_COMPRESSED_CHUNKS)
 	/** The objective of (MAYBE|INPLACE)_COMPRESSED_CHUNKS is to define a format that allows
@@ -83,9 +90,9 @@ int main(int argc, char *argv[])
         As part of this, as the name mentions, chunks are decompressed in-place.
 
         A file is compressed as follows: It is first chunked into chunks of size
-        CL842_CHUNK_SIZE, and each chunk is compressed with 842. Chunks are
+        CHUNK_SIZE, and each chunk is compressed with 842. Chunks are
         classified as compressible if the compressed size is
-        <= CL842_CHUNK_SIZE - sizeof(CL842_COMPRESSED_CHUNK_MAGIC) - sizeof(uint64_t),
+        <= CHUNK_SIZE - sizeof(CL842_COMPRESSED_CHUNK_MAGIC) - sizeof(uint64_t),
         otherwise they are considered incompressible.
 
         The chunks are placed into the decompression buffer as follows:
@@ -108,21 +115,21 @@ int main(int argc, char *argv[])
 
 #pragma omp parallel
 	{
-		std::vector<uint8_t> temp_buffer(CL842_CHUNK_SIZE * 2);
+		std::vector<uint8_t> temp_buffer(CHUNK_SIZE * 2);
 
 #pragma omp for
 		for (size_t chunk_num = 0; chunk_num < num_chunks;
 		     chunk_num++) {
-			size_t chunk_olen = CL842_CHUNK_SIZE * 2;
+			size_t chunk_olen = CHUNK_SIZE * 2;
 			uint8_t *chunk_in =
-				compressIn + (CL842_CHUNK_SIZE * chunk_num);
+				compressIn + (CHUNK_SIZE * chunk_num);
 			uint8_t *chunk_out =
-				compressOut + (CL842_CHUNK_SIZE * chunk_num);
+				compressOut + (CHUNK_SIZE * chunk_num);
 
-			sw842_compress(chunk_in, CL842_CHUNK_SIZE,
+			sw842_compress(chunk_in, CHUNK_SIZE,
 				       &temp_buffer[0], &chunk_olen);
 			if (chunk_olen <=
-			    CL842_CHUNK_SIZE -
+			    CHUNK_SIZE -
 				    sizeof(CL842_COMPRESSED_CHUNK_MAGIC) -
 				    sizeof(uint64_t)) {
 				memcpy(chunk_out, CL842_COMPRESSED_CHUNK_MAGIC,
@@ -131,23 +138,23 @@ int main(int argc, char *argv[])
 					chunk_out +
 					sizeof(CL842_COMPRESSED_CHUNK_MAGIC)) =
 					chunk_olen;
-				memcpy(&chunk_out[CL842_CHUNK_SIZE - chunk_olen],
+				memcpy(&chunk_out[CHUNK_SIZE - chunk_olen],
 				       &temp_buffer[0], chunk_olen);
 			} else {
 				memcpy(&chunk_out[0], &chunk_in[0],
-				       CL842_CHUNK_SIZE);
+				       CHUNK_SIZE);
 			}
 		}
 	}
 #else
 #pragma omp parallel for
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-		size_t chunk_olen = CL842_CHUNK_SIZE * 2;
-		uint8_t *chunk_in = compressIn + (CL842_CHUNK_SIZE * chunk_num);
+		size_t chunk_olen = CHUNK_SIZE * 2;
+		uint8_t *chunk_in = compressIn + (CHUNK_SIZE * chunk_num);
 		uint8_t *chunk_out =
-			compressOut + ((CL842_CHUNK_SIZE * 2) * chunk_num);
+			compressOut + ((CHUNK_SIZE * 2) * chunk_num);
 
-		sw842_compress(chunk_in, CL842_CHUNK_SIZE, chunk_out,
+		sw842_compress(chunk_in, CHUNK_SIZE, chunk_out,
 			       &chunk_olen);
 	}
 #endif
@@ -157,19 +164,19 @@ int main(int argc, char *argv[])
 	try {
 #if defined(USE_INPLACE_COMPRESSED_CHUNKS)
 		CL842HostDecompressor clDecompress(
-			CL842_CHUNK_SIZE,
+			CHUNK_SIZE, CHUNK_SIZE,
 			CL842InputFormat::INPLACE_COMPRESSED_CHUNKS, true);
 		clDecompress.decompress(decompressIn, olen, nullptr, decompressIn, dlen, nullptr, nullptr);
 		memcpy(decompressOut, decompressIn, olen);
 #elif defined(USE_MAYBE_COMPRESSED_CHUNKS)
 		CL842HostDecompressor clDecompress(
-			CL842_CHUNK_SIZE,
+			CHUNK_SIZE, CHUNK_SIZE,
 			CL842InputFormat::MAYBE_COMPRESSED_CHUNKS, true);
 		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
 					dlen, nullptr, nullptr);
 #else
 		CL842HostDecompressor clDecompress(
-			CL842_CHUNK_SIZE * 2,
+			CHUNK_SIZE, CHUNK_SIZE * 2,
 			CL842InputFormat::ALWAYS_COMPRESSED_CHUNKS, true);
 		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
 					dlen, nullptr, nullptr);

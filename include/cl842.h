@@ -19,19 +19,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define CL842_CHUNK_SIZE 65536
-
 static const uint8_t CL842_COMPRESSED_CHUNK_MAGIC[16] = {
 	0xbe, 0x5a, 0x46, 0xbf, 0x97, 0xe5, 0x2d, 0xd7, 0xb2, 0x7c, 0x94, 0x1a, 0xee, 0xd6, 0x70, 0x76
 };
 
 enum class CL842InputFormat {
 	// This is the simplest format, in which the input buffer contains blocks
-	// of size (CL842_CHUNK_SIZE*2), which are always compressed
+	// of size (inputChunkSize*2), which are always compressed
 	// This format is typically not useful for realistic scenarios, due to
 	// being suboptimal when dealing with uncompressible (e.g. random) data
 	ALWAYS_COMPRESSED_CHUNKS,
-	// In this format, the input buffer contains blocks of size CL842_CHUNK_SIZE
+	// In this format, the input buffer contains blocks of size inputChunkSize
 	// Inside this buffer, uncompressible data is stored as-is and compressible
 	// data is stored with a "marker" header (see CL842_COMPRESSED_CHUNK_MAGIC et al.)
 	// This format allows mixing compressed and uncompressed chunks, which minimizes
@@ -54,6 +52,7 @@ class CL842DeviceDecompressor
 	public:
 		CL842DeviceDecompressor(const cl::Context& context,
 					const VECTOR_CLASS<cl::Device>& devices,
+					size_t inputChunkSize,
 					size_t inputChunkStride,
 					CL842InputFormat inputFormat,
 					bool verbose = false);
@@ -66,6 +65,7 @@ class CL842DeviceDecompressor
 				const VECTOR_CLASS<cl::Event>* events = nullptr, cl::Event* event = nullptr);
 
 	private:
+		size_t m_inputChunkSize;
 		size_t m_inputChunkStride;
 		CL842InputFormat m_inputFormat;
 		bool m_verbose;
@@ -81,9 +81,8 @@ class CL842DeviceDecompressor
 class CL842HostDecompressor
 {
 	public:
-		static size_t paddedSize(size_t size);
-
-		CL842HostDecompressor(size_t inputChunkStride,
+		CL842HostDecompressor(size_t inputChunkSize,
+				      size_t inputChunkStride,
 				      CL842InputFormat inputFormat,
 				      bool verbose = false);
 		void decompress(const uint8_t* input, size_t inputSize,
@@ -92,6 +91,7 @@ class CL842HostDecompressor
 				size_t *outputSizes, int *returnValues);
 
 	private:
+		size_t m_inputChunkSize;
 		size_t m_inputChunkStride;
 		CL842InputFormat m_inputFormat;
 		bool m_verbose;
