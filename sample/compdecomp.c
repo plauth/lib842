@@ -55,6 +55,77 @@ size_t nextMultipleOfChunkSize(size_t input)
 	return (input + (CHUNK_SIZE - 1)) & ~(CHUNK_SIZE - 1);
 }
 
+static uint8_t *read_file(const char *file_name, size_t *ilen)
+{
+	FILE *fp = fopen(file_name, "rb");
+	if (fp == NULL) {
+		fprintf(stderr, "FAIL: Could not open the file at path '%s'.\n",
+			file_name);
+		return NULL;
+	}
+
+	if (fseek(fp, 0, SEEK_END) != 0) {
+		fprintf(stderr, "FAIL: Could not seek the file to the end.\n");
+		goto fail_file;
+	}
+
+	long flen = ftell(fp);
+	if (flen == -1) {
+		fprintf(stderr, "FAIL: Could not get the file length.\n");
+		goto fail_file;
+	}
+
+	if (fseek(fp, 0, SEEK_SET) != 0) {
+		fprintf(stderr, "FAIL: Could not seek the file to the start.\n");
+		goto fail_file;
+	}
+
+	*ilen = nextMultipleOfChunkSize((size_t)flen);
+
+	uint8_t *file_data = alloc_chunk(*ilen);
+	if (file_data == NULL) {
+		fprintf(stderr, "FAIL: Could not allocate memory to read the file.\n");
+		goto fail_file;
+	}
+
+	memset(file_data, 0, *ilen);
+	if (fread(file_data, 1, (size_t)flen, fp) != (size_t)flen) {
+		fprintf(stderr,
+			"FAIL: Reading file content to memory failed.\n");
+		goto fail_file_data_and_file;
+	}
+	fclose(fp);
+
+	printf("original file length: %li\n", flen);
+	printf("original file length (padded): %zu\n", *ilen);
+	return file_data;
+
+fail_file_data_and_file:
+	free(file_data);
+fail_file:
+	fclose(fp);
+	return NULL;
+}
+
+static uint8_t *get_test_string(size_t *ilen) {
+	static const uint8_t TEST_STRING[] = {
+		0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33,
+		0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37,
+		0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41,
+		0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45
+	}; //"0011223344556677889900AABBCCDDEE";
+
+	*ilen = sizeof(TEST_STRING);
+	uint8_t *test_string = alloc_chunk(*ilen);
+	if (test_string == NULL) {
+		fprintf(stderr, "FAIL: Could not allocate memory for the test string.\n");
+		return NULL;
+	}
+
+	memcpy(test_string, TEST_STRING, sizeof(TEST_STRING));
+	return test_string;
+}
+
 int main(int argc, const char *argv[])
 {
 	uint8_t *in, *out, *decompressed;
@@ -65,47 +136,9 @@ int main(int argc, const char *argv[])
 	long long timestart_decomp, timeend_decomp;
 	long long timestart_condense, timeend_condense;
 
-	if (argc <= 1) {
-		static const uint8_t TEST_STRING[] = {
-			0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33,
-			0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37,
-			0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41,
-			0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45
-		}; //"0011223344556677889900AABBCCDDEE";
-
-		ilen = sizeof(TEST_STRING);
-		in = alloc_chunk(ilen);
-		if (in == NULL) {
-			printf("in = alloc_chunk(...) failed!\n");
-			exit(-1);
-		}
-
-		memcpy(in, TEST_STRING, sizeof(TEST_STRING));
-	} else if (argc == 2) {
-		FILE *fp;
-		fp = fopen(argv[1], "rb");
-		fseek(fp, 0, SEEK_END);
-		size_t flen = (size_t)ftell(fp);
-		printf("original file length: %zu\n", flen);
-		ilen = nextMultipleOfChunkSize(flen);
-		printf("original file length (padded): %zu\n", ilen);
-
-		fseek(fp, 0, SEEK_SET);
-
-		in = alloc_chunk(ilen);
-		if (in == NULL) {
-			printf("in = alloc_chunk(...) failed!\n");
-			exit(-1);
-		}
-
-		memset(in, 0, ilen);
-
-		if (!fread(in, flen, 1, fp)) {
-			fprintf(stderr,
-				"FAIL: Reading file content to memory failed.\n");
-		}
-		fclose(fp);
-	}
+	in = (argc <= 1) ? get_test_string(&ilen) : read_file(argv[1], &ilen);
+	if (in == NULL)
+		return EXIT_FAILURE;
 
 	olen = ilen * 2;
 #ifdef USEHW
