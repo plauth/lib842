@@ -3,7 +3,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <errno.h>
 #include <sys/time.h>
 
 #if defined(USEAIX)
@@ -126,15 +125,24 @@ static uint8_t *get_test_string(size_t *ilen) {
 	return test_string;
 }
 
-static void compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompressed, size_t ilen) {
+static bool compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompressed, size_t ilen) {
 	printf("Using chunks of %zu bytes\n", CHUNK_SIZE);
-	bool fail = false;
+	bool ret = false;
+	bool omp_success = true;
 
 	size_t num_chunks = ilen / CHUNK_SIZE;
 #ifdef CONDENSE
 	size_t *compressedChunkPositions = malloc(sizeof(size_t) * num_chunks);
+	if (compressedChunkPosition == NULL) {
+		fprintf(stderr, "FAIL: Could not allocate memory for the compressed chunk positions.\n");
+		return ret;
+	}
 #endif
 	size_t *compressedChunkSizes = malloc(sizeof(size_t) * num_chunks);
+	if (compressedChunkSizes == NULL) {
+		fprintf(stderr, "FAIL: Could not allocate memory for the compressed chunk sizes.\n");
+		goto free_3;
+	}
 
 	long long timestart_comp = timestamp();
 #pragma omp parallel for
@@ -144,20 +152,23 @@ static void compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompr
 		uint8_t *chunk_out =
 			out + ((CHUNK_SIZE * 2) * chunk_num);
 
-		int ret = lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
+		int err = lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
 				&chunk_olen);
-		if (ret < 0) {
-			printf("Error during compression (%d): %s\n",
-			       errno, strerror(errno));
-			#pragma omp atomic write
-			fail = true;
+		if (err < 0) {
+			bool is_first_failure;
+			#pragma omp atomic capture
+			{ is_first_failure = omp_success; omp_success = false; }
+			if (is_first_failure) {
+				fprintf(stderr, "FAIL: Error during compression (%d): %s\n",
+				        -err, strerror(-err));
+			}
 		}
 		compressedChunkSizes[chunk_num] = chunk_olen;
 	}
 	long long timeend_comp = timestamp();
 
-	if (fail)
-		exit(-1);
+	if (!omp_success)
+		goto free_2;
 
 #ifdef CONDENSE
 	long long timestart_condense = timeend_comp;
@@ -193,8 +204,6 @@ static void compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompr
 #pragma omp parallel for
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 		size_t chunk_dlen = CHUNK_SIZE;
-
-		const uint8_t *chunk_in = in + (CHUNK_SIZE * chunk_num);
 #ifdef CONDENSE
 		uint8_t *chunk_out = out_condensed + compressedChunkPositions[chunk_num];
 #else
@@ -202,30 +211,29 @@ static void compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompr
 #endif
 		uint8_t *chunk_decomp =
 			decompressed + (CHUNK_SIZE * chunk_num);
-		int ret = lib842_decompress(chunk_out,
+		int err = lib842_decompress(chunk_out,
 				  compressedChunkSizes[chunk_num],
 				  chunk_decomp, &chunk_dlen);
-		if (ret < 0) {
-			printf("Error during decompression (%d): %s\n",
-			       errno, strerror(errno));
-			#pragma omp atomic write
-			fail = true;
-		} else if (memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) != 0) {
-			fprintf(stderr,
-				"FAIL: Decompressed data differs from the original input data.\n");
-			#pragma omp atomic write
-			fail = true;
+		if (err < 0) {
+			bool is_first_failure;
+			#pragma omp atomic capture
+			{ is_first_failure = omp_success; omp_success = false; }
+			if (is_first_failure) {
+				fprintf(stderr, "FAIL: Error during decompression (%d): %s\n",
+				        -err, strerror(-err));
+			}
 		}
 	}
 	long long timeend_decomp = timestamp();
 
-	if (fail)
-		exit(-1);
+	if (!omp_success)
+		goto free_1;
 
-#ifdef CONDENSE
-	free(compressedChunkPositions);
-#endif
-	free(compressedChunkSizes);
+	if (memcmp(in, decompressed, ilen) != 0) {
+		fprintf(stderr,
+			"FAIL: Decompressed data differs from the original input data.\n");
+		goto free_1;
+	}
 
 	printf("Input: %zu bytes\n", ilen);
 	printf("Output: %zu bytes\n", currentChunkPos);
@@ -244,29 +252,45 @@ static void compress_benchmark(const uint8_t *in, uint8_t *out, uint8_t *decompr
 	       (ilen / 1024 / 1024) / ((float)(timeend_decomp - timestart_decomp) / 1000));
 
 	printf("Compression- and decompression was successful!\n");
+
+	ret = true;
+
+free_1:
+#ifdef CONDENSE
+	free(out_condensed);
+#endif
+free_2:
+	free(compressedChunkSizes);
+free_3:
+#ifdef CONDENSE
+	free(compressedChunkPositions);
+#endif
+
+	return ret;
 }
 
 
-static void simple_test(const uint8_t *in, uint8_t *out, uint8_t *decompressed, size_t ilen, size_t olen, size_t dlen)
+static bool simple_test(const uint8_t *in, uint8_t *out, uint8_t *decompressed, size_t ilen, size_t olen, size_t dlen)
 {
-	int ret = 0;
+	int err;
 
-	ret = lib842_compress(in, ilen, out, &olen);
-	if (ret < 0) {
-		printf("Error during compression (%d): %s\n",
-		       errno, strerror(errno));
+	err = lib842_compress(in, ilen, out, &olen);
+	if (err < 0) {
+		fprintf(stderr, "Error during compression (%d): %s\n",
+		        -err, strerror(-err));
+		return false;
 	}
 
-	ret = lib842_decompress(out, olen, decompressed, &dlen);
-	if (ret < 0) {
-		printf("Error during decompression (%d): %s\n",
-		       errno, strerror(errno));
+	err = lib842_decompress(out, olen, decompressed, &dlen);
+	if (err < 0) {
+		fprintf(stderr, "Error during decompression (%d): %s\n",
+		        -err, strerror(-err));
+		return false;
 	}
 
 	printf("Input: %zu bytes\n", ilen);
 	printf("Output: %zu bytes\n", olen);
 	printf("Compression factor: %f\n", (float)olen / (float)ilen);
-
 
 	for (int i = 0; i < 64; i++) {
 		printf("%02x:", out[i]);
@@ -280,51 +304,61 @@ static void simple_test(const uint8_t *in, uint8_t *out, uint8_t *decompressed, 
 
 	printf("\n\n");
 
-	if (memcmp(in, decompressed, ilen) == 0) {
-		printf("Compression- and decompression was successful!\n");
-	} else {
+	if (memcmp(in, decompressed, ilen) != 0) {
 		fprintf(stderr,
 			"FAIL: Decompressed data differs from the original input data.\n");
-		exit(-1);
+		return false;
 	}
+
+	printf("Compression- and decompression was successful!\n");
+	return true;
 }
 
 int main(int argc, const char *argv[])
 {
+	int ret = EXIT_FAILURE;
+
 	size_t ilen;
-	uint8_t *in = (argc <= 1) ? get_test_string(&ilen) : read_file(argv[1], &ilen);
+	uint8_t *in = (argc <= 1) ? get_test_string(&ilen)
+				  : read_file(argv[1], &ilen);
 	if (in == NULL)
-		return EXIT_FAILURE;
+		return ret;
 
-	size_t olen, dlen;
-	olen = ilen * 2;
-#ifdef USEHW
-	dlen = ilen * 2;
-#else
-	dlen = ilen;
-#endif
-
+	size_t olen = ilen * 2;
 	uint8_t *out = alloc_chunk(olen);
 	if (out == NULL) {
-		printf("out = alloc_chunk(...) failed!\n");
-		exit(-1);
-	}
-	uint8_t *decompressed = alloc_chunk(dlen);
-	if (decompressed == NULL) {
-		printf("decompressed = alloc_chunk(...) failed!\n");
-		exit(-1);
+		fprintf(stderr, "FAIL: out = alloc_chunk(...) failed!\n");
+		goto return_free_in;
 	}
 	memset(out, 0, olen);
+
+#ifdef USEHW
+	size_t dlen = ilen * 2;
+#else
+	size_t dlen = ilen;
+#endif
+	uint8_t *decompressed = alloc_chunk(dlen);
+	if (decompressed == NULL) {
+		fprintf(stderr, "FAIL: decompressed = alloc_chunk(...) failed!\n");
+		goto return_free_out;
+	}
 	memset(decompressed, 0, dlen);
 
 	if (ilen > CHUNK_SIZE) {
-		compress_benchmark(in, out, decompressed, ilen);
+		if (!compress_benchmark(in, out, decompressed, ilen))
+			goto return_free_decompressed;
 	} else {
-		simple_test(in, out, decompressed, ilen, olen, dlen);
+		if (!simple_test(in, out, decompressed, ilen, olen, dlen))
+			goto return_free_decompressed;
 	}
 
-	free(in);
-	free(out);
+	ret = EXIT_SUCCESS;
+
+return_free_decompressed:
 	free(decompressed);
-	return EXIT_SUCCESS;
+return_free_out:
+	free(out);
+return_free_in:
+	free(in);
+	return ret;
 }
