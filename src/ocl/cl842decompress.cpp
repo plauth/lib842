@@ -1,10 +1,11 @@
-#include "../../include/cl842.hpp"
+#include "../../include/cl842.h"
 
 #include <errno.h>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <chrono>
+#include <algorithm>
 
 // Those two symbols are generated during the build process and define
 // the source of the decompression OpenCL kernel and the common 842 definitions
@@ -27,8 +28,11 @@ CL842DeviceDecompressor::CL842DeviceDecompressor(
 void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 					 const cl::Buffer &inputBuffer,
 					 size_t inputOffset, size_t inputSize,
+					 const cl::Buffer &inputSizes,
 					 const cl::Buffer &outputBuffer,
 					 size_t outputOffset, size_t outputSize,
+					 const cl::Buffer &outputSizes,
+					 const cl::Buffer &returnValues,
 					 const VECTOR_CLASS<cl::Event> *events,
 					 cl::Event *event)
 {
@@ -45,12 +49,12 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 
 	decompressKernel.setArg(0, inputBuffer);
 	decompressKernel.setArg(1, static_cast<cl_ulong>(inputOffset));
-	decompressKernel.setArg(2, nullptr);
+	decompressKernel.setArg(2, inputSizes);
 	decompressKernel.setArg(3, outputBuffer);
 	decompressKernel.setArg(4, static_cast<cl_ulong>(outputOffset));
-	decompressKernel.setArg(5, nullptr);
+	decompressKernel.setArg(5, outputSizes);
 	decompressKernel.setArg(6, static_cast<cl_ulong>(numChunks));
-	decompressKernel.setArg(7, nullptr);
+	decompressKernel.setArg(7, returnValues);
 
 	cl::NDRange globalSize((numChunks + (LOCAL_SIZE - 1)) &
 			       ~(LOCAL_SIZE - 1));
@@ -131,7 +135,9 @@ size_t CL842HostDecompressor::paddedSize(size_t size)
 CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkStride,
 					     CL842InputFormat inputFormat,
 					     bool verbose)
-	: m_inputFormat(inputFormat), m_verbose(verbose),
+	: m_inputChunkStride(inputChunkStride),
+	  m_inputFormat(inputFormat),
+	  m_verbose(verbose),
 	  m_devices(findDevices()), m_context(m_devices),
 	  m_queue(m_context, m_devices[0]),
 	  m_deviceCompressor(m_context, m_devices, inputChunkStride,
@@ -195,8 +201,40 @@ VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices()
 }
 
 void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
-				       uint8_t *output, size_t outputSize)
+				       const size_t *inputSizes,
+				       uint8_t *output, size_t outputSize,
+				       size_t *outputSizes,
+				       int *returnValues)
 {
+	size_t numChunks =
+		(inputSize + m_inputChunkStride - 1) / (m_inputChunkStride);
+
+	cl::Buffer inputSizesBuffer;
+	if (inputSizes != nullptr) {
+		std::vector<cl_ulong> inputSizesCl(inputSizes, inputSizes + numChunks);
+		inputSizesBuffer = cl::Buffer(m_context, CL_MEM_READ_ONLY,
+					      numChunks * sizeof(cl_ulong));
+		m_queue.enqueueWriteBuffer(inputSizesBuffer, CL_TRUE, 0,
+					   numChunks * sizeof(cl_ulong),
+					   inputSizesCl.data());
+	}
+
+	cl::Buffer outputSizesBuffer;
+	if (outputSizes != nullptr) {
+		std::vector<cl_ulong> outputSizesCl(outputSizes, outputSizes + numChunks);
+		outputSizesBuffer = cl::Buffer(m_context, CL_MEM_READ_WRITE,
+			numChunks * sizeof(cl_ulong));
+		m_queue.enqueueWriteBuffer(outputSizesBuffer, CL_TRUE, 0,
+					   numChunks * sizeof(cl_ulong),
+					   outputSizesCl.data());
+	}
+
+	cl::Buffer returnValuesBuffer;
+	if (returnValues != nullptr) {
+		returnValuesBuffer = cl::Buffer(m_context, CL_MEM_WRITE_ONLY,
+			numChunks * sizeof(cl_int));
+	}
+
 	if (m_inputFormat == CL842InputFormat::INPLACE_COMPRESSED_CHUNKS) {
 		if (input != output || inputSize != outputSize) {
 			throw cl::Error(CL_INVALID_VALUE);
@@ -207,12 +245,18 @@ void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 
 		m_queue.enqueueWriteBuffer(buffer, CL_TRUE, 0, inputSize,
 					   input);
-		m_deviceCompressor.decompress(m_queue, buffer, 0, inputSize,
-					      buffer, 0, outputSize);
+		m_deviceCompressor.decompress(m_queue, buffer, 0,
+					      inputSize, inputSizesBuffer,
+					      buffer, 0,
+					      outputSize, outputSizesBuffer,
+					      returnValuesBuffer);
 		m_queue.enqueueReadBuffer(buffer, CL_TRUE, 0, outputSize,
 					  output);
 	} else {
-		if (input == output) {
+		// Input and output pointers shouldn't overlap (but can't check
+		// for that in standard C/C++). Check that they're not the same,
+		// but take care about the valid edge case when outputSize == 0
+		if (input == output && outputSize != 0) {
 			throw cl::Error(CL_INVALID_VALUE);
 		}
 		if (m_inputFormat ==
@@ -222,15 +266,46 @@ void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 		}
 
 		cl::Buffer inputBuffer(m_context, CL_MEM_READ_ONLY, inputSize);
+
+		// Avoid a CL_INVALID_BUFFER_SIZE if outputSize == 0
 		cl::Buffer outputBuffer(m_context, CL_MEM_READ_WRITE,
-					outputSize);
+					outputSize != 0 ? outputSize : 1);
 
 		m_queue.enqueueWriteBuffer(inputBuffer, CL_TRUE, 0, inputSize,
 					   input);
 		m_deviceCompressor.decompress(m_queue, inputBuffer, 0,
-					      inputSize, outputBuffer, 0,
-					      outputSize);
+					      inputSize, inputSizesBuffer,
+					      outputBuffer, 0,
+					      outputSize, outputSizesBuffer,
+					      returnValuesBuffer);
 		m_queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, outputSize,
 					  output);
 	}
+
+	if (outputSizes != nullptr) {
+		std::vector<cl_ulong> outputSizesCl(outputSizes, outputSizes + numChunks);
+		m_queue.enqueueReadBuffer(outputSizesBuffer, CL_TRUE, 0,
+					  numChunks * sizeof(cl_ulong),
+					  outputSizesCl.data());
+		std::copy(outputSizesCl.begin(), outputSizesCl.end(), outputSizes);
+	}
+
+	if (returnValues != nullptr) {
+		static_assert(sizeof(int) == sizeof(cl_int),
+			      "sizeof(int) == sizeof(cl_int)");
+		m_queue.enqueueReadBuffer(returnValuesBuffer, CL_TRUE, 0,
+					  numChunks * sizeof(int),
+					  returnValues);
+	}
+}
+
+int cl842_decompress(const uint8_t *in, size_t ilen,
+		     uint8_t *out, size_t *olen)
+{
+	static CL842HostDecompressor decompressor(99999,
+						 CL842InputFormat::ALWAYS_COMPRESSED_CHUNKS,
+						 true);
+	int ret;
+	decompressor.decompress(in, ilen, &ilen, out, *olen, olen, &ret);
+	return ret;
 }

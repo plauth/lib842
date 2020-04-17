@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <sw842.h>
 #include <hw842.h>
+#include <cl842.h>
 
 #define HEXDUMP_BYTES_PER_LINE 8
 
@@ -32,6 +33,11 @@ static const struct test842_impl IMPL_HW = { .compress = hw842_compress,
 					     .decompress = hw842_decompress };
 #endif
 
+#ifdef LIB842_HAVE_OPENCL
+static const struct test842_impl IMPL_CL = { .compress = NULL,
+					     .decompress = cl842_decompress };
+#endif
+
 const struct test842_impl *test842_get_impl_by_name(const char *name)
 {
 	if (strcmp(name, "sw") == 0) {
@@ -41,6 +47,10 @@ const struct test842_impl *test842_get_impl_by_name(const char *name)
 #ifdef LIB842_HAVE_CRYPTODEV_LINUX_COMP
 	} else if (strcmp(name, "hw") == 0) {
 		return &IMPL_HW;
+#endif
+#ifdef LIB842_HAVE_OPENCL
+	} else if (strcmp(name, "cl") == 0) {
+		return &IMPL_CL;
 #endif
 	}
 	return NULL;

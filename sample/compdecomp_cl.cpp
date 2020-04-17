@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 #include "sw842.h"
-#include "cl842.hpp"
+#include "cl842.h"
 
 using namespace std;
 
@@ -159,20 +159,20 @@ int main(int argc, char *argv[])
 		CL842HostDecompressor clDecompress(
 			CL842_CHUNK_SIZE,
 			CL842InputFormat::INPLACE_COMPRESSED_CHUNKS, true);
-		clDecompress.decompress(decompressIn, olen, decompressIn, dlen);
+		clDecompress.decompress(decompressIn, olen, nullptr, decompressIn, dlen, nullptr, nullptr);
 		memcpy(decompressOut, decompressIn, olen);
 #elif defined(USE_MAYBE_COMPRESSED_CHUNKS)
 		CL842HostDecompressor clDecompress(
 			CL842_CHUNK_SIZE,
 			CL842InputFormat::MAYBE_COMPRESSED_CHUNKS, true);
-		clDecompress.decompress(decompressIn, olen, decompressOut,
-					dlen);
+		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
+					dlen, nullptr, nullptr);
 #else
 		CL842HostDecompressor clDecompress(
 			CL842_CHUNK_SIZE * 2,
 			CL842InputFormat::ALWAYS_COMPRESSED_CHUNKS, true);
-		clDecompress.decompress(decompressIn, olen, decompressOut,
-					dlen);
+		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
+					dlen, nullptr, nullptr);
 #endif
 	} catch (const cl::Error &ex) {
 		std::cerr << "ERROR: " << ex.what() << " (" << ex.err() << ")"
