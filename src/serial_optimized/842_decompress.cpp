@@ -240,8 +240,8 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 	p.out = out;
 	p.ostart = out;
 	p.in = (const uint64_t *)in;
-	p.istart = (const uint64_t *)in;
 #ifdef ENABLE_ERROR_HANDLING
+	p.istart = p.in;
 	p.ilen = ilen;
 	p.olen = *olen;
 	p.errorcode = 0;
@@ -415,9 +415,7 @@ int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
 #ifdef ENABLE_ERROR_HANDLING
 			if (p.errorcode != 0)
 				return p.errorcode;
-#endif
 
-#ifdef ENABLE_ERROR_HANDLING
 			if (p.out == out) /* no previous bytes */
 				return -EINVAL;
 #endif

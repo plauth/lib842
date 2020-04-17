@@ -50,8 +50,8 @@ struct sw842_param_decomp {
 	uint8_t *out;
 	const uint8_t *ostart;
 	const uint64_t *in;
-	const uint64_t *istart;
 #ifdef ENABLE_ERROR_HANDLING
+	const uint64_t *istart;
 	size_t ilen;
 	size_t olen;
 	int errorcode;
