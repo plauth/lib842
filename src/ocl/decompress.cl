@@ -8,10 +8,18 @@ typedef short int16_t;
 typedef uint uint32_t;
 typedef ulong uint64_t;
 
+#define ENABLE_ERROR_HANDLING
+
 struct sw842_param_decomp {
 	__global uint64_t *out;
 	__global const uint64_t *ostart;
 	__global const uint64_t *in;
+#ifdef ENABLE_ERROR_HANDLING
+	__global const uint64_t *istart;
+	size_t ilen;
+	size_t olen;
+	int errorcode;
+#endif
 	uint32_t bits;
 	uint64_t buffer;
 #ifdef USE_INPLACE_COMPRESSED_CHUNKS
@@ -88,6 +96,13 @@ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 		value = 0;
 
 	if (p->bits < n) {
+#ifdef ENABLE_ERROR_HANDLING
+	if ((p->in - p->istart + 1) * sizeof(uint64_t) > p->ilen) {
+		if (p->errorcode == 0)
+			p->errorcode = -EINVAL;
+		return 0;
+	}
+#endif
 #ifdef USE_INPLACE_COMPRESSED_CHUNKS
 		p->buffer = p->lookAheadBuffer[0];
 		p->lookAheadBuffer[0] = p->lookAheadBuffer[1];
@@ -148,6 +163,12 @@ inline int decompress_core(__global const uint64_t *in, size_t ilen,
 	struct sw842_param_decomp p;
 	p.ostart = p.out = out;
 	p.in = in;
+#ifdef ENABLE_ERROR_HANDLING
+	p.istart = p.in;
+	p.ilen = ilen;
+	p.olen = *olen;
+	p.errorcode = 0;
+#endif
 
 	p.buffer = 0;
 #ifdef USE_INPLACE_COMPRESSED_CHUNKS
@@ -169,14 +190,30 @@ inline int decompress_core(__global const uint64_t *in, size_t ilen,
 
 	do {
 		op = read_bits(&p, OP_BITS);
+#ifdef ENABLE_ERROR_HANDLING
+		if (p.errorcode != 0)
+			return p.errorcode;
+#endif
 		output_word = 0;
 		bits = 0;
 
 		switch (op) {
 		case OP_REPEAT:
 			op = read_bits(&p, REPEAT_BITS);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+
+			if (p.out == out) /* no previous bytes */
+				return -EINVAL;
+#endif
 			// copy op + 1
 			op++;
+
+#ifdef ENABLE_ERROR_HANDLING
+			if ((p.out - p.ostart) * sizeof(uint64_t) + op * 8 > p.olen)
+				return -ENOSPC;
+#endif
 
 			while (op-- > 0) {
 				*p.out = *(p.out - 1);
@@ -184,6 +221,10 @@ inline int decompress_core(__global const uint64_t *in, size_t ilen,
 			}
 			break;
 		case OP_ZEROS:
+#ifdef ENABLE_ERROR_HANDLING
+			if ((p.out - p.ostart) * sizeof(uint64_t) + 8 > p.olen)
+				return -ENOSPC;
+#endif
 			*p.out = 0;
 			p.out++;
 			break;
@@ -199,6 +240,10 @@ inline int decompress_core(__global const uint64_t *in, size_t ilen,
 				uint32_t dst_size = dec_templates[op][i][1];
 
 				value = read_bits(&p, dec_template & 0x7F);
+#ifdef ENABLE_ERROR_HANDLING
+				if (p.errorcode != 0)
+					return p.errorcode;
+#endif
 
 				if (is_index) {
 					uint64_t offset = get_index(
@@ -222,6 +267,10 @@ inline int decompress_core(__global const uint64_t *in, size_t ilen,
 					       << (64 - (dst_size << 3) - bits);
 				bits += dst_size << 3;
 			}
+#ifdef ENABLE_ERROR_HANDLING
+			if ((p.out - p.ostart) * sizeof(uint64_t) + 8 > p.olen)
+				return -ENOSPC;
+#endif
 			*p.out++ = bswap(output_word);
 		}
 	} while (op != OP_END);
@@ -232,6 +281,10 @@ inline int decompress_core(__global const uint64_t *in, size_t ilen,
 	 */
 #ifndef DISABLE_CRC
 	op = read_bits(&p, CRC_BITS);
+#ifdef ENABLE_ERROR_HANDLING
+	if (p.errorcode != 0)
+		return p.errorcode;
+#endif
 
 	/*
 	 * Validate CRC saved in compressed data.
@@ -239,7 +292,7 @@ inline int decompress_core(__global const uint64_t *in, size_t ilen,
 	// FIXME: Implement CRC32 for OpenCL
 	//if (crc != (uint64_t)crc32_be(0, p.ostart, (p.out - p.ostart) * sizeof(uint64_t))) {
 	if (false) {
-		return 0;
+		return -EINVAL;
 	}
 #endif
 

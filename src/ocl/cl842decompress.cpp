@@ -1,5 +1,6 @@
 #include "../../include/cl842.hpp"
 
+#include <errno.h>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -94,6 +95,8 @@ void CL842DeviceDecompressor::buildProgram(
 	std::ostringstream options;
 	options << "-D CL842_CHUNK_SIZE=" << CL842_CHUNK_SIZE;
 	options << " -D CL842_CHUNK_STRIDE=" << m_inputChunkStride;
+	options << " -D EINVAL=" << EINVAL;
+	options << " -D ENOSPC=" << ENOSPC;
 	if (m_inputFormat == CL842InputFormat::MAYBE_COMPRESSED_CHUNKS)
 		options << " -D USE_MAYBE_COMPRESSED_CHUNKS=1";
 	else if (m_inputFormat == CL842InputFormat::INPLACE_COMPRESSED_CHUNKS)
