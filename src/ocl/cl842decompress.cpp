@@ -44,9 +44,12 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 
 	decompressKernel.setArg(0, inputBuffer);
 	decompressKernel.setArg(1, static_cast<cl_ulong>(inputOffset));
-	decompressKernel.setArg(2, outputBuffer);
-	decompressKernel.setArg(3, static_cast<cl_ulong>(outputOffset));
-	decompressKernel.setArg(4, static_cast<cl_ulong>(numChunks));
+	decompressKernel.setArg(2, nullptr);
+	decompressKernel.setArg(3, outputBuffer);
+	decompressKernel.setArg(4, static_cast<cl_ulong>(outputOffset));
+	decompressKernel.setArg(5, nullptr);
+	decompressKernel.setArg(6, static_cast<cl_ulong>(numChunks));
+	decompressKernel.setArg(7, nullptr);
 
 	cl::NDRange globalSize((numChunks + (LOCAL_SIZE - 1)) &
 			       ~(LOCAL_SIZE - 1));

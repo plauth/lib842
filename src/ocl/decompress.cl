@@ -142,32 +142,12 @@ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 	return offset;
 }
 
-__kernel void decompress(__global const uint64_t *in, ulong inOffset,
-			 __global uint64_t *out, ulong outOffset,
-			 ulong numChunks)
+inline int decompress_core(__global const uint64_t *in, size_t ilen,
+			   __global uint64_t *out, size_t *olen)
 {
-	unsigned int chunk_num = get_global_id(0);
-	if (chunk_num >= numChunks) {
-		return;
-	}
-
 	struct sw842_param_decomp p;
-	p.ostart = p.out =
-		out + (outOffset / 8) + ((CL842_CHUNK_SIZE / 8) * chunk_num);
-	p.in = (in + (inOffset / 8) + ((CL842_CHUNK_STRIDE / 8) * chunk_num));
-
-#if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
-	if (p.in[0] != 0xd72de597bf465abe ||
-	    p.in[1] != 0x7670d6ee1a947cb2) { // = CL842_COMPRESSED_CHUNK_MAGIC
-#ifdef USE_MAYBE_COMPRESSED_CHUNKS
-		for (size_t i = 0; i < CL842_CHUNK_SIZE; i++) {
-			p.out[i] = p.in[i];
-		}
-#endif
-		return;
-	}
-	p.in += (CL842_CHUNK_SIZE - p.in[2]) / 8;
-#endif
+	p.ostart = p.out = out;
+	p.in = in;
 
 	p.buffer = 0;
 #ifdef USE_INPLACE_COMPRESSED_CHUNKS
@@ -179,6 +159,8 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset,
 	p.lookAheadBuffer[5] = bswap(*p.in++);
 #endif
 	p.bits = 0;
+
+	*olen = 0;
 
 	uint64_t op;
 
@@ -244,5 +226,62 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset,
 		}
 	} while (op != OP_END);
 
-	return;
+	/*
+	 * crc(0:31) is saved in compressed data starting with the
+	 * next bit after End of stream template.
+	 */
+#ifndef DISABLE_CRC
+	op = read_bits(&p, CRC_BITS);
+
+	/*
+	 * Validate CRC saved in compressed data.
+	 */
+	// FIXME: Implement CRC32 for OpenCL
+	//if (crc != (uint64_t)crc32_be(0, p.ostart, (p.out - p.ostart) * sizeof(uint64_t))) {
+	if (false) {
+		return 0;
+	}
+#endif
+
+	*olen = (p.out - p.ostart) * sizeof(uint64_t);
+
+	return 0;
+}
+
+__kernel void decompress(__global const uint64_t *in, ulong inOffset, __global const ulong *ilen,
+			 __global uint64_t *out, ulong outOffset, __global ulong *olen,
+			 ulong numChunks, __global int *returnValues)
+{
+	size_t chunk_num = get_global_id(0);
+	if (chunk_num >= numChunks)
+		return;
+
+	__global uint64_t *my_out = out + (outOffset / 8) + ((CL842_CHUNK_SIZE / 8) * chunk_num);
+	__global const uint64_t *my_in = in + (inOffset / 8) + ((CL842_CHUNK_STRIDE / 8) * chunk_num);
+
+#if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
+	if (my_in[0] != 0xd72de597bf465abe ||
+	    my_in[1] != 0x7670d6ee1a947cb2) { // = CL842_COMPRESSED_CHUNK_MAGIC
+#ifdef USE_MAYBE_COMPRESSED_CHUNKS
+		for (size_t i = 0; i < CL842_CHUNK_SIZE; i++) {
+			my_out[i] = my_in[i];
+		}
+#endif
+		if (olen)
+			olen[chunk_num] = CL842_CHUNK_SIZE;
+		if (returnValues)
+			returnValues[chunk_num] = 0;
+		return;
+	}
+	my_in += (CL842_CHUNK_SIZE - my_in[2]) / 8;
+#endif
+
+	size_t my_ilen = ilen != NULL ? ilen[chunk_num] : (size_t)-1;
+	size_t my_olen = olen != NULL ? olen[chunk_num] : (size_t)-1;
+
+	int ret = decompress_core(my_in, my_ilen, my_out, &my_olen);
+	if (olen)
+		olen[chunk_num] = my_olen;
+	if (returnValues)
+		returnValues[chunk_num] = ret;
 }
