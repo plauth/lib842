@@ -97,21 +97,21 @@ endif()
 ###########
 # SAMPLES #
 ###########
-add_executable(test_serial sample/compdecomp.c)
+add_executable(test_serial sample/compdecomp.c sample/compdecomp_driver.c)
 target_link_libraries (test_serial 842)
 
-add_executable(test_serial_optimized sample/compdecomp.c)
+add_executable(test_serial_optimized sample/compdecomp.c sample/compdecomp_driver.c)
 set_target_properties(test_serial_optimized PROPERTIES COMPILE_DEFINITIONS "USEOPTSW")
 target_link_libraries (test_serial_optimized 842)
 
 if (CRYPTODEV_LINUX_COMP_FOUND)
-    add_executable(test_cryptodev sample/compdecomp.c)
+    add_executable(test_cryptodev sample/compdecomp.c sample/compdecomp_driver.c)
     set_target_properties(test_cryptodev PROPERTIES COMPILE_DEFINITIONS "USEHW")
     target_link_libraries (test_cryptodev 842)
 endif()
 
 if (AIX_HWCOMPRESSION_FOUND)
-    add_executable(test_aix_standalone sample/compdecomp.c)
+    add_executable(test_aix_standalone sample/compdecomp.c sample/compdecomp_driver.c)
     set_target_properties(test_aix_standalone PROPERTIES COMPILE_DEFINITIONS "USEAIX")
 endif()
 
