@@ -194,14 +194,14 @@ static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
 // the help of the caller. As an alternative, store all the contexts
 // in a global list which will get released at program exit (atexit)
 static mtx_t release_contexts_mutex;
-static struct cryptodev_ctx **release_contexts_list = NULL;
+static struct cryptodev_ctx *release_contexts_list = NULL;
 static size_t release_contexts_count = 0;
 static size_t release_contexts_capacity = 0;
 
 static void atexit_release_cryptodev_contexts()
 {
 	for (size_t i = 0; i < release_contexts_count; i++)
-		c842_ctx_deinit(release_contexts_list[i]);
+		c842_ctx_deinit(&release_contexts_list[i]);
 	free(release_contexts_list);
 }
 
@@ -212,8 +212,8 @@ static int register_cryptodev_context(struct cryptodev_ctx *ctx) {
 		size_t new_capacity = release_contexts_capacity != 0
 			? release_contexts_capacity * 2
 			: 4;
-		struct cryptodev_ctx **new_list = realloc(release_contexts_list,
-			new_capacity * sizeof(struct cryptodev_ctx *));
+		struct cryptodev_ctx *new_list = realloc(release_contexts_list,
+			new_capacity * sizeof(struct cryptodev_ctx));
 		if (new_list == NULL) {
 			mtx_unlock(&release_contexts_mutex);
 			return -ENOMEM;
@@ -230,7 +230,7 @@ static int register_cryptodev_context(struct cryptodev_ctx *ctx) {
 		}
 	}
 
-	release_contexts_list[release_contexts_count++] = ctx;
+	release_contexts_list[release_contexts_count++] = *ctx;
 	mtx_unlock(&release_contexts_mutex);
 
 	return 0;
