@@ -39,7 +39,24 @@
 //#define CHUNK_SIZE ((size_t)1024)
 #define CHUNK_SIZE ((size_t)4096)
 
-#define NUM_THREADS 4
+static unsigned int determine_num_threads()
+{
+	// Configuration for the number of threads to use for compression or decompression
+	const char *env_value = std::getenv("COMPDECOMP_NUM_THREADS");
+	if (env_value != nullptr && std::atoi(env_value) > 0) {
+		return (unsigned int)std::atoi(env_value);
+	}
+
+	// If the value is not specified (or invalid),
+	// the hardware concurrency level (~= number of logical cores) is used
+	static unsigned int hardware_concurrency = std::thread::hardware_concurrency();
+	if (hardware_concurrency == 0) {
+		fprintf(stderr, "std::thread::hardware_concurrency() returned 0, using 1 thread\n");
+		return 1;
+	}
+
+	return hardware_concurrency;
+}
 
 bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			     uint8_t *out, size_t *olen,
@@ -51,7 +68,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// SETUP
 	// -----
 	bool ret = false;
-	bool omp_success = true;
+	size_t num_threads = determine_num_threads();
 
 	size_t num_chunks = ilen / CHUNK_SIZE;
 	std::vector<size_t> compressed_chunk_sizes(num_chunks);
@@ -60,14 +77,14 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// -----------
 	// COMPRESSION
 	// -----------
-	int compthreads_ready = 0;
+	unsigned int compthreads_ready = 0;
 	bool compthread_exit = false;
 	std::mutex compthread_mutex;
 	std::condition_variable compthread_trigger;
 	std::queue<size_t> compthread_queue;
 	std::atomic<bool> compthread_error(false);
 
-	std::vector<std::thread> compthreads(NUM_THREADS);
+	std::vector<std::thread> compthreads(num_threads);
 	for (size_t i = 0; i < compthreads.size(); i++) {
 		compthreads[i] = std::thread([&compthreads_ready,
 					      &compthread_exit,
@@ -103,7 +120,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 				int err = lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
 							  &chunk_olen);
-				if (err < 0 && compthread_error.exchange(true)) {
+				if (err < 0 && !compthread_error.exchange(true)) {
 					fprintf(stderr, "FAIL: Error during compression (%d): %s\n",
 					        -err, strerror(-err));
 				}
@@ -116,8 +133,8 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// not to include thread spawning overhead in the timing
 	{
 		std::unique_lock<std::mutex> lock(compthread_mutex);
-		compthread_trigger.wait(lock, [&compthreads_ready] {
-			return compthreads_ready == NUM_THREADS;
+		compthread_trigger.wait(lock, [&compthreads_ready, num_threads] {
+			return compthreads_ready == num_threads;
 		});
 	}
 
@@ -150,14 +167,14 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// -------------
 	// DECOMPRESSION
 	// -------------
-	int decompthreads_ready = 0;
+	unsigned int decompthreads_ready = 0;
 	bool decompthread_exit = false;
 	std::mutex decompthread_mutex;
 	std::condition_variable decompthread_trigger;
 	std::queue<size_t> decompthread_queue;
 	std::atomic<bool> decompthread_error(false);
 
-	std::vector<std::thread> decompthreads(NUM_THREADS);
+	std::vector<std::thread> decompthreads(num_threads);
 	for (size_t i = 0; i < decompthreads.size(); i++) {
 		decompthreads[i] = std::thread([&decompthreads_ready,
 						&decompthread_exit,
@@ -194,7 +211,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 				int err = lib842_decompress(chunk_out,
 							    compressed_chunk_sizes[chunk_num],
 							    chunk_decomp, &chunk_dlen);
-				if (err < 0 && decompthread_error.exchange(true)) {
+				if (err < 0 && !decompthread_error.exchange(true)) {
 					fprintf(stderr, "FAIL: Error during decompression (%d): %s\n",
 					        -err, strerror(-err));
 				}
@@ -207,8 +224,8 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// not to include thread spawning overhead in the timing
 	{
 		std::unique_lock<std::mutex> lock(decompthread_mutex);
-		decompthread_trigger.wait(lock, [&decompthreads_ready] {
-			return decompthreads_ready == NUM_THREADS;
+		decompthread_trigger.wait(lock, [&decompthreads_ready, num_threads] {
+			return decompthreads_ready == num_threads;
 		});
 	}
 
