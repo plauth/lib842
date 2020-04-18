@@ -1,3 +1,5 @@
+// Compression - decompression benchmark for non-GPU implementations,
+// based on multithreading using OpenMP
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -141,6 +143,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 #endif
 		uint8_t *chunk_decomp = decompressed + (CHUNK_SIZE * chunk_num);
+
 		int err = lib842_decompress(chunk_out,
 					    compressed_chunk_sizes[chunk_num],
 					    chunk_decomp, &chunk_dlen);

@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 long long timestamp();
 int compdecomp(const char *file_name, size_t chunk_size, size_t alignment);
 
@@ -18,5 +22,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			     long long *time_comp,
 			     long long *time_condense,
 			     long long *time_decomp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
