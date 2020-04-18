@@ -106,7 +106,7 @@ target_link_libraries (test_serial_optimized 842)
 
 add_executable(test_serial_optimized_cppthreads sample/compdecomp_cppthreads.cpp sample/compdecomp_driver.c)
 set_target_properties(test_serial_optimized_cppthreads PROPERTIES COMPILE_DEFINITIONS "USEOPTSW")
-target_link_libraries (test_serial_optimized_cppthreads 842)
+target_link_libraries (test_serial_optimized_cppthreads 842 numa)
 
 if (CRYPTODEV_LINUX_COMP_FOUND)
     add_executable(test_cryptodev sample/compdecomp.c sample/compdecomp_driver.c)
@@ -115,7 +115,7 @@ if (CRYPTODEV_LINUX_COMP_FOUND)
 
     add_executable(test_cryptodev_cppthreads sample/compdecomp_cppthreads.cpp sample/compdecomp_driver.c)
     set_target_properties(test_cryptodev_cppthreads PROPERTIES COMPILE_DEFINITIONS "USEHW")
-    target_link_libraries (test_cryptodev_cppthreads 842)
+    target_link_libraries (test_cryptodev_cppthreads 842 numa)
 endif()
 
 if (AIX_HWCOMPRESSION_FOUND)
