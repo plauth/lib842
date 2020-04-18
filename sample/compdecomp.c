@@ -79,9 +79,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 		int err = lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
 					  &chunk_olen);
-		if (err < 0) {
+		if (err != 0) {
 			bool is_first_failure;
-			#pragma omp atomic capture
+#pragma omp atomic capture
 			{ is_first_failure = omp_success; omp_success = false; }
 			if (is_first_failure) {
 				fprintf(stderr, "FAIL: Error during compression (%d): %s\n",
@@ -147,9 +147,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		int err = lib842_decompress(chunk_out,
 					    compressed_chunk_sizes[chunk_num],
 					    chunk_decomp, &chunk_dlen);
-		if (err < 0) {
+		if (err != 0) {
 			bool is_first_failure;
-			#pragma omp atomic capture
+#pragma omp atomic capture
 			{ is_first_failure = omp_success; omp_success = false; }
 			if (is_first_failure) {
 				fprintf(stderr, "FAIL: Error during decompression (%d): %s\n",
@@ -202,14 +202,14 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 	int err;
 
 	err = lib842_compress(in, ilen, out, olen);
-	if (err < 0) {
+	if (err != 0) {
 		fprintf(stderr, "Error during compression (%d): %s\n",
 		        -err, strerror(-err));
 		return false;
 	}
 
 	err = lib842_decompress(out, *olen, decompressed, dlen);
-	if (err < 0) {
+	if (err != 0) {
 		fprintf(stderr, "Error during decompression (%d): %s\n",
 		        -err, strerror(-err));
 		return false;
