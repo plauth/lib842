@@ -40,6 +40,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			     long long *time_comp,
 			     long long *time_condense,
 			     long long *time_decomp) {
+	// -----
+	// SETUP
+	// -----
 	bool ret = false;
 	bool omp_success = true;
 
@@ -62,16 +65,18 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		goto exit_free_compressed_chunk_sizes;
 	}
 
+	// -----------
+	// COMPRESSION
+	// -----------
 	long long timestart_comp = timestamp();
 #pragma omp parallel for
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
 		size_t chunk_olen = CHUNK_SIZE * 2;
 		const uint8_t *chunk_in = in + (CHUNK_SIZE * chunk_num);
-		uint8_t *chunk_out =
-			out + ((CHUNK_SIZE * 2) * chunk_num);
+		uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 
 		int err = lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
-				&chunk_olen);
+					  &chunk_olen);
 		if (err < 0) {
 			bool is_first_failure;
 			#pragma omp atomic capture
@@ -83,34 +88,38 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		}
 		compressed_chunk_sizes[chunk_num] = chunk_olen;
 	}
-	*time_comp = timestamp() - timestart_comp;
 
 	if (!omp_success)
 		goto exit_free_decompressed_chunk_sizes;
 
-#ifdef CONDENSE
-	long long timestart_condense = timestamp();
-#endif
+	*time_comp = timestamp() - timestart_comp;
 
 	*olen = 0;
-
-	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-#ifdef CONDENSE
-		compressed_chunk_positions[chunk_num] = *olen;
-#endif
+	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++)
 		*olen += compressed_chunk_sizes[chunk_num];
+
+	// ------------
+	// CONDENSATION
+	// ------------
+#ifdef CONDENSE
+	long long timestart_condense = timestamp();
+
+	for (size_t chunk_num = 0, pos = 0; chunk_num < num_chunks; chunk_num++) {
+		compressed_chunk_positions[chunk_num] = pos;
+		pos += compressed_chunk_sizes[chunk_num];
 	}
 
-#ifdef CONDENSE
 	uint8_t *out_condensed = malloc(*olen);
+	if (out_condensed == NULL) {
+		fprintf(stderr, "FAIL: Could not allocate memory for the condensed data.\n");
+		goto exit_free_decompressed_chunk_sizes;
+	}
 
 #pragma omp parallel for
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-		uint8_t *chunk_out =
-			out + ((CHUNK_SIZE * 2) * chunk_num);
+		uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 		uint8_t *chunk_condensed =
-			out_condensed +
-			compressed_chunk_positions[chunk_num];
+			out_condensed + compressed_chunk_positions[chunk_num];
 		memcpy(chunk_condensed, chunk_out,
 		       compressed_chunk_sizes[chunk_num]);
 	}
@@ -119,6 +128,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	*time_condense = -1;
 #endif
 
+	// -------------
+	// DECOMPRESSION
+	// -------------
 	long long timestart_decomp = timestamp();
 #pragma omp parallel for
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
@@ -128,11 +140,10 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 #else
 		uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 #endif
-		uint8_t *chunk_decomp =
-			decompressed + (CHUNK_SIZE * chunk_num);
+		uint8_t *chunk_decomp = decompressed + (CHUNK_SIZE * chunk_num);
 		int err = lib842_decompress(chunk_out,
-				  compressed_chunk_sizes[chunk_num],
-				  chunk_decomp, &chunk_dlen);
+					    compressed_chunk_sizes[chunk_num],
+					    chunk_decomp, &chunk_dlen);
 		if (err < 0) {
 			bool is_first_failure;
 			#pragma omp atomic capture
@@ -144,15 +155,19 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		}
 		decompressed_chunk_sizes[chunk_num] = chunk_dlen;
 	}
-	*time_decomp = timestamp() - timestart_decomp;
 
 	if (!omp_success)
 		goto exit_free_out_condensed;
+
+	*time_decomp = timestamp() - timestart_decomp;
 
 	*dlen = 0;
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++)
 		*dlen += decompressed_chunk_sizes[chunk_num];
 
+	// ----------
+	// VALIDATION
+	// ----------
 	if (ilen != *dlen || memcmp(in, decompressed, ilen) != 0) {
 		fprintf(stderr,
 			"FAIL: Decompressed data differs from the original input data.\n");
