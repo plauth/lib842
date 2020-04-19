@@ -158,36 +158,10 @@ public:
 			   const std::function<int(size_t)> &worker_func)
 		: thread_kind(thread_kind), worker_func(worker_func),
 		  threads(num_threads), handled_chunks_per_thread(num_threads, 0) {
-		for (size_t thread_idx = 0; thread_idx < threads.size(); thread_idx++) {
-			threads[thread_idx] = std::thread([thread_idx, this, &worker_func] {
-				// Notify the owner we're ready
-				{
-					std::unique_lock<std::mutex> lock(thread_mutex);
-					threads_ready++;
-					thread_trigger.notify_all();
-				}
-
-				while (true) {
-					// Wait for work on the queue, or an exit message
-					std::unique_lock<std::mutex> lock(thread_mutex);
-					thread_trigger.wait(lock, [this] {
-						return !thread_queue.empty() || thread_exit;
-					});
-					if (thread_queue.empty() && thread_exit)
-						break;
-					size_t chunk_num = thread_queue.front();
-					thread_queue.pop();
-					lock.unlock();
-					handled_chunks_per_thread[thread_idx]++;
-
-					// Do the actual work
-					int err = worker_func(chunk_num);
-					if (err != 0 && !thread_error.exchange(true)) {
-						fprintf(stderr, "FAIL: Error during %s (%d): %s\n",
-						        this->thread_kind, err, strerror(err));
-					}
-				}
-			});
+		for (unsigned int thread_idx = 0; thread_idx < num_threads; thread_idx++) {
+			threads[thread_idx] = std::thread{
+				&compdecomp_threads::thread_func, this, thread_idx
+			};
 		}
 
 #ifdef SPREAD_THREADS_AMONG_NUMA_NODES
@@ -201,6 +175,36 @@ public:
 			thread_trigger.wait(lock, [this] {
 				return threads_ready == threads.size();
 			});
+		}
+	}
+
+	void thread_func(unsigned int thread_idx) {
+		// Notify the owner we're ready
+		{
+			std::unique_lock<std::mutex> lock(thread_mutex);
+			threads_ready++;
+			thread_trigger.notify_all();
+		}
+
+		while (true) {
+			// Wait for work on the queue, or an exit message
+			std::unique_lock<std::mutex> lock(thread_mutex);
+			thread_trigger.wait(lock, [this] {
+				return !thread_queue.empty() || thread_exit;
+			});
+			if (thread_queue.empty() && thread_exit)
+				break;
+			size_t chunk_num = thread_queue.front();
+			thread_queue.pop();
+			lock.unlock();
+			handled_chunks_per_thread[thread_idx]++;
+
+			// Do the actual work
+			int err = worker_func(chunk_num);
+			if (err != 0 && !thread_error.exchange(true)) {
+				fprintf(stderr, "FAIL: Error during %s (%d): %s\n",
+				        thread_kind, err, strerror(err));
+			}
 		}
 	}
 
