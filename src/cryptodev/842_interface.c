@@ -8,11 +8,19 @@
 #ifndef __STDC_NO_THREADS__
 #include <threads.h>
 #else
+// Even though all systems we are currently targetting support threads,
+// implementations such as glibc didn't support for C11 threads until recently
+// But since C11 threads are almost a clone of pthreads, we can easily fall
+// back to those if C11 threads are not supported but pthreads is
 #include <pthread.h>
-#define mtx_t pthread_mutex_t
-#define mtx_lock pthread_mutex_lock
-#define mtx_unlock pthread_mutex_unlock
-#define thread_local __thread
+#define ONCE_FLAG_INIT PTHREAD_ONCE_INIT
+#define once_flag pthread_once_t
+#define call_once pthread_once
+#define tss_t pthread_key_t
+#define tss_create pthread_key_create
+#define thrd_success 0
+#define tss_set pthread_setspecific
+#define tss_get pthread_getspecific
 #endif
 #include <stdbool.h>
 #include <sys/ioctl.h>
@@ -189,89 +197,76 @@ static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
 	return 0;
 }
 
-// Unfortunately, there doesn't seem to be any really nice way to
-// release the thread local cryptodev context at thread exit without
-// the help of the caller. As an alternative, store all the contexts
-// in a global list which will get released at program exit (atexit)
-static mtx_t release_contexts_mutex;
-static struct cryptodev_ctx *release_contexts_list = NULL;
-static size_t release_contexts_count = 0;
-static size_t release_contexts_capacity = 0;
+// From the outside, we present an easy-to-use interface with only two
+// functions (compress and decompress). For performance, we create just a
+// cryptodev context per thread, which is stored in a thread-local variable
+static tss_t thread_ctx_key;
+static int thread_ctx_key_err;
+static once_flag thread_ctx_key_once = ONCE_FLAG_INIT;
 
-static void atexit_release_cryptodev_contexts()
+static void destroy_thread_ctx(void *ctx)
 {
-	for (size_t i = 0; i < release_contexts_count; i++)
-		c842_ctx_deinit(&release_contexts_list[i]);
-	free(release_contexts_list);
+	// We can't do anything with errors here, so ignore them
+	(void)c842_ctx_deinit((struct cryptodev_ctx *)ctx);
+	free(ctx);
 }
 
-static int register_cryptodev_context(struct cryptodev_ctx *ctx) {
-	mtx_lock(&release_contexts_mutex);
+static void create_thread_ctx_key()
+{
+	if (tss_create(&thread_ctx_key, destroy_thread_ctx) != thrd_success)
+		thread_ctx_key_err = -ENOMEM;
 
-	if (release_contexts_capacity == release_contexts_count) {
-		size_t new_capacity = release_contexts_capacity != 0
-			? release_contexts_capacity * 2
-			: 4;
-		struct cryptodev_ctx *new_list = realloc(release_contexts_list,
-			new_capacity * sizeof(struct cryptodev_ctx));
-		if (new_list == NULL) {
-			mtx_unlock(&release_contexts_mutex);
-			return -ENOMEM;
-		}
-
-		release_contexts_list = new_list;
-		release_contexts_capacity = new_capacity;
-	}
-
-	if (release_contexts_count == 0) {
-		if (atexit(atexit_release_cryptodev_contexts) != 0) {
-			mtx_unlock(&release_contexts_mutex);
-			return -ENOMEM;
-		}
-	}
-
-	release_contexts_list[release_contexts_count++] = *ctx;
-	mtx_unlock(&release_contexts_mutex);
-
-	return 0;
+	thread_ctx_key_err = 0;
 }
 
-static thread_local bool have_thread_ctx = false;
-static thread_local struct cryptodev_ctx thread_ctx;
-
-static int ensure_thread_ctx_exists()
+static int get_thread_cryptodev_ctx(struct cryptodev_ctx **rctx)
 {
-	if (have_thread_ctx)
+	call_once(&thread_ctx_key_once, create_thread_ctx_key);
+	if (thread_ctx_key_err)
+		return thread_ctx_key_err;
+
+	struct cryptodev_ctx *ctx = tss_get(thread_ctx_key);
+	if (ctx != NULL) { // Context already created for this thread
+		*rctx = ctx;
 		return 0;
+	}
 
-	int err = c842_ctx_init(&thread_ctx);
-	if (err)
-		return err;
+	ctx = malloc(sizeof(struct cryptodev_ctx));
+	if (ctx == NULL)
+		return -ENOMEM;
 
-	err = register_cryptodev_context(&thread_ctx);
+	int err = c842_ctx_init(ctx);
 	if (err) {
-		c842_ctx_deinit(&thread_ctx);
+		free(ctx);
 		return err;
 	}
 
-	have_thread_ctx = true;
+	if (tss_set(thread_ctx_key, ctx) != thrd_success) {
+		c842_ctx_deinit(ctx);
+		free(ctx);
+		return -ENOMEM;
+	}
+
+	*rctx = ctx;
 	return 0;
 }
 
 int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 {
-	int err = ensure_thread_ctx_exists();
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
 	if (err)
 		return err;
 
-	return c842_compress(&thread_ctx, in, ilen, out, olen);
+	return c842_compress(thread_ctx, in, ilen, out, olen);
 }
 
 int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 {
-	int err = ensure_thread_ctx_exists();
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
 	if (err)
 		return err;
 
-	return c842_decompress(&thread_ctx, in, ilen, out, olen);
+	return c842_decompress(thread_ctx, in, ilen, out, olen);
 }
