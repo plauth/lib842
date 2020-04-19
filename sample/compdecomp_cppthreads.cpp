@@ -102,13 +102,14 @@ static std::vector<cpu_set_t> get_numa_cpusets()
 	}
 
 	int numa_max_nodes = numa_max_node(), nprocs = get_nprocs();
-	struct bitmask *bm = numa_get_mems_allowed();
+	std::unique_ptr<struct bitmask, decltype(&numa_free_cpumask)>
+		bm { numa_get_mems_allowed(), numa_free_cpumask };
 	std::unique_ptr<struct bitmask, decltype(&numa_free_cpumask)>
 		cpumask { numa_allocate_cpumask(), numa_free_cpumask };
 	std::vector<cpu_set_t> numa_cpusets;
 
 	for (int n = 0; n <= numa_max_nodes; n++) {
-		if (!numa_bitmask_isbitset(bm, n))
+		if (!numa_bitmask_isbitset(bm.get(), n))
 			continue;
 
 		numa_node_to_cpus(n, cpumask.get());
