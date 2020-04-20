@@ -41,14 +41,16 @@ static int c842_ctx_init(struct cryptodev_ctx *ctx)
 	ctx->cfd = open("/dev/crypto", O_RDWR, 0);
 	if (ctx->cfd < 0) {
 		err = -errno;
-		fprintf(stderr, "open(/dev/crypto) errno=%d\n", errno);
+		fprintf(stderr, "open(/dev/crypto) failed (%d): %s\n",
+			errno, strerror(errno));
 		goto return_error;
 	}
 
 	/* Set close-on-exec (not really needed here) */
 	if (fcntl(ctx->cfd, F_SETFD, 1) == -1) {
 		err = -errno;
-		fprintf(stderr, "fcntl(F_SETFD) errno=%d\n", errno);
+		fprintf(stderr, "fcntl(F_SETFD) failed (%d): %s\n",
+			errno, strerror(errno));
 		goto cleanup_file;
 	}
 
@@ -57,7 +59,8 @@ static int c842_ctx_init(struct cryptodev_ctx *ctx)
 
 	if (ioctl(ctx->cfd, CIOCGSESSION, &ctx->sess)) {
 		err = -errno;
-		fprintf(stderr, "ioctl(CIOCGSESSION) errno=%d\n", errno);
+		fprintf(stderr, "ioctl(CIOCGSESSION) failed (%d): %s\n",
+			errno, strerror(errno));
 		goto cleanup_file;
 	}
 
@@ -66,7 +69,8 @@ static int c842_ctx_init(struct cryptodev_ctx *ctx)
 	siop.ses = ctx->sess.ses;
 	if (ioctl(ctx->cfd, CIOCGSESSINFO, &siop)) {
 		err = -errno;
-		fprintf(stderr, "ioctl(CIOCGSESSINFO) errno=%d\n", errno);
+		fprintf(stderr, "ioctl(CIOCGSESSINFO) failed (%d): %s\n",
+			errno, strerror(errno));
 		goto cleanup_file_and_session;
 	}
 #ifdef DEBUG
@@ -95,14 +99,16 @@ static int c842_ctx_deinit(struct cryptodev_ctx *ctx)
 
 	if (ioctl(ctx->cfd, CIOCFSESSION, &ctx->sess.ses)) {
 		err = -errno;
-		fprintf(stderr, "ioctl(CIOCFSESSION) errno=%d\n", errno);
+		fprintf(stderr, "ioctl(CIOCFSESSION) failed (%d): %s\n",
+			errno, strerror(errno));
 	}
 
 	/* Close the original descriptor */
 	if (close(ctx->cfd)) {
 		if (err == 0)
 			err = -errno;
-		fprintf(stderr, "close(cfd) errno=%d\n", errno);
+		fprintf(stderr, "close(cfd) failed (%d): %s\n",
+			errno, strerror(errno));
 	}
 
 	return err;
@@ -147,7 +153,8 @@ static int c842_compress(struct cryptodev_ctx *ctx, const void *input,
 	cryp.dst = (__u8 *)output;
 	cryp.op = COP_ENCRYPT;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
-		fprintf(stderr, "ioctl(CIOCCRYPT) errno=%d\n", errno);
+		fprintf(stderr, "ioctl(CIOCCRYPT) failed (%d): %s\n",
+			errno, strerror(errno));
 		return -errno;
 	}
 
@@ -188,8 +195,10 @@ static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
 	cryp.dst = (__u8 *)output;
 	cryp.op = COP_DECRYPT;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
-		fprintf(stderr, "ioctl(CIOCCRYPT) errno=%i\n", errno);
-		return -errno;
+		int err = -errno;
+		fprintf(stderr, "ioctl(CIOCCRYPT) failed (%d): %s\n",
+			errno, strerror(errno));
+		return err;
 	}
 
 	*olen = cryp.dlen;
