@@ -303,10 +303,17 @@ void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 int cl842_decompress(const uint8_t *in, size_t ilen,
 		     uint8_t *out, size_t *olen)
 {
-	static CL842HostDecompressor decompressor(65536, 99999 /* Doesn't matter */,
-						 CL842InputFormat::ALWAYS_COMPRESSED_CHUNKS,
-						 true);
-	int ret;
-	decompressor.decompress(in, ilen, &ilen, out, *olen, olen, &ret);
-	return ret;
+	try {
+		static CL842HostDecompressor decompressor(65536, 99999 /* Doesn't matter */,
+							 CL842InputFormat::ALWAYS_COMPRESSED_CHUNKS,
+							 true);
+		int ret;
+		decompressor.decompress(in, ilen, &ilen, out, *olen, olen, &ret);
+
+		return ret;
+	} catch (cl::Error) {
+		// Not a great error value, but we shouldn't let C++ exceptions
+		// propagate out from the C API
+		return -ENOMEM;
+	}
 }
