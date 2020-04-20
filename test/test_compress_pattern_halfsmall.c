@@ -1,5 +1,7 @@
 // Tests the case where during compression, the output buffer is too small
 // (half length, so noticeably smaller than required)
+// FIXME TESTFAILURE: Compression (but not decompression) fails on real hardware
+//                    (cryptodev + nx-842) because the driver doesn't accept ilen=0
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

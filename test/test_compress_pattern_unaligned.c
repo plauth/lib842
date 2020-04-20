@@ -1,5 +1,7 @@
 // Tests the case where the input and output buffers are unaligned
 // (not aligned to a 8-byte boundary)
+// FIXME TESTFAILURE: Compression (but not decompression) fails on real hardware
+//                    (cryptodev + nx-842) because the driver doesn't accept ilen=0
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -18,20 +20,22 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	// Note: We overallocate recovered_in a bit (5 bytes), to make sure
-	// the decompressor recovers the correct uncompressed length
 	alignas(8) uint8_t inb[pattern->uncompressed_len + 3],
-		outb[(pattern->uncompressed_len * 2 + 8) + 3],
-		recovered_inb[pattern->uncompressed_len + 5 + 3];
-	uint8_t *in = inb + 3, *out = outb + 3,
-		*recovered_in = recovered_inb + 3;
+		outb[(pattern->uncompressed_len * 2 + 8) + 3];
+	uint8_t *in = inb + 3, *out = outb + 3;
 	memcpy(in, pattern->uncompressed, pattern->uncompressed_len);
-	size_t olen = pattern->uncompressed_len * 2 + 8,
-	       recovered_ilen = pattern->uncompressed_len + 5;
+	size_t olen = pattern->uncompressed_len * 2 + 8;
 	if (impl->compress(in, pattern->uncompressed_len, out, &olen) != 0) {
 		printf("Compression failed\n");
 		return EXIT_FAILURE;
 	}
+	// Note: We overallocate recovered_in a bit (5 bytes), to make sure
+	// the decompressor recovers the correct uncompressed length
+	// This also makes the test work on real HW (the nx-842 kernel driver
+	// doesn't accept an output buffer of size 0 even if it's sufficient)
+	alignas(8) uint8_t recovered_inb[pattern->uncompressed_len + 5 + 3];
+	uint8_t *recovered_in = recovered_inb + 3;
+	size_t recovered_ilen = pattern->uncompressed_len + 5;
 	if (impl->decompress(out, olen, recovered_in, &recovered_ilen) != 0) {
 		printf("Decompression failed\n");
 		return EXIT_FAILURE;

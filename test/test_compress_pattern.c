@@ -2,6 +2,8 @@
 // returns back the same data.
 // Compression and decompression can be done with different implementations,
 // which allows validating that they are mutually compatible
+// FIXME TESTFAILURE: Compression (but not decompression) fails on real hardware
+//                    (cryptodev + nx-842) because the driver doesn't accept ilen=0
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -22,19 +24,21 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	// Note: We overallocate recovered_in a bit (5 bytes), to make sure
-	// the decompressor recovers the correct uncompressed length
 	alignas(8) uint8_t in[pattern->uncompressed_len],
-		out[pattern->uncompressed_len * 2 + 8],
-		recovered_in[pattern->uncompressed_len + 5];
+		out[pattern->uncompressed_len * 2 + 8];
 	memcpy(in, pattern->uncompressed, pattern->uncompressed_len);
-	size_t olen = pattern->uncompressed_len * 2 + 8,
-	       recovered_ilen = pattern->uncompressed_len + 5;
+	size_t olen = pattern->uncompressed_len * 2 + 8;
 	if (impl_compression->compress(in, pattern->uncompressed_len, out,
 				       &olen) != 0) {
 		printf("Compression failed\n");
 		return EXIT_FAILURE;
 	}
+	// Note: We overallocate recovered_in a bit (5 bytes), to make sure
+	// the decompressor recovers the correct uncompressed length
+	// This also makes the test work on real HW (the nx-842 kernel driver
+	// doesn't accept an output buffer of size 0 even if it's sufficient)
+	alignas(8) uint8_t recovered_in[pattern->uncompressed_len + 5];
+	size_t recovered_ilen = pattern->uncompressed_len + 5;
 	if (impl_decompression->decompress(out, olen, recovered_in,
 					   &recovered_ilen) != 0) {
 		printf("Decompression failed\n");

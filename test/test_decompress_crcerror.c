@@ -1,4 +1,6 @@
 // Tests that decompressing an otherwise valid stream with an invalid CRC fails
+// FIXME TESTFAILURE: This test fails on the OpenCL implementation because
+//                    it currently doesn't check that the CRC is valid
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

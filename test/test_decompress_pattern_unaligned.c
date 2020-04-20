@@ -18,11 +18,15 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	// Note: We overallocate the output buffer a bit (5 bytes), to make sure
+	// the decompressor recovers the correct uncompressed length
+	// This also makes the test work on real HW (the nx-842 kernel driver
+	// doesn't accept an output buffer of size 0 even if it's sufficient)
 	alignas(8) uint8_t inb[pattern->compressed_len + 3],
-		outb[pattern->uncompressed_len + 3];
+		outb[pattern->uncompressed_len + 5 + 3];
 	uint8_t *in = inb + 3, *out = outb + 3;
 	memcpy(in, pattern->compressed, pattern->compressed_len);
-	size_t olen = pattern->uncompressed_len;
+	size_t olen = pattern->uncompressed_len + 5;
 	if (impl->decompress(in, pattern->compressed_len, out, &olen) != 0) {
 		printf("Decompression failed\n");
 		return EXIT_FAILURE;
