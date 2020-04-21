@@ -63,13 +63,13 @@ if (OpenCL_FOUND)
 
     add_executable(cl2c src/tools/cl2c.cpp)
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_842defs.c
-        COMMAND cl2c ${CMAKE_CURRENT_SOURCE_DIR}/src/common/842.h ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_842defs.c CL842_DECOMPRESS_842DEFS_SOURCE
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/842.h)
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_842defs.c"
+        COMMAND cl2c "${CMAKE_CURRENT_SOURCE_DIR}/src/common/842.h" "${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_842defs.c" CL842_DECOMPRESS_842DEFS_SOURCE
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/common/842.h")
     add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_kernel.c
-        COMMAND cl2c ${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/decompress.cl ${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_kernel.c CL842_DECOMPRESS_KERNEL_SOURCE
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/decompress.cl)
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_kernel.c"
+        COMMAND cl2c "${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/decompress.cl" "${CMAKE_CURRENT_BINARY_DIR}/decompress_cl_kernel.c" CL842_DECOMPRESS_KERNEL_SOURCE
+        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/decompress.cl")
 
     set(SRCFILES ${SRCFILES} src/ocl/cl842decompress.cpp decompress_cl_842defs.c decompress_cl_kernel.c)
 endif()
@@ -81,7 +81,7 @@ if (CUDA_FOUND)
 endif()
 
 configure_file(include/config842.h.in include/config842.h @ONLY)
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
+include_directories("${CMAKE_CURRENT_BINARY_DIR}/include")
 
 if (CUDA_FOUND)
     cuda_add_library(842 STATIC ${SRCFILES})
