@@ -17,7 +17,7 @@
  */
 #include "842-internal.h"
 #include "bitstream.h"
-#include "../../include/sw842.h"
+#include "sw842.h"
 #include "../common/opcodes.h"
 #include "../common/endianness.h"
 #include "../common/memaccess.h"

@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-#include "../include/sw842.h"
-#include "../include/cuda842.h"
+#include "sw842.h"
+#include "cuda842.h"
 
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32

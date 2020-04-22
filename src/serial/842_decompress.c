@@ -20,7 +20,7 @@
 #include "kerneldeps.h"
 #include "../common/crc32.h"
 #include "../common/endianness.h"
-#include "../../include/sw842.h"
+#include "sw842.h"
 
 #include <stdio.h>
 #include <limits.h>

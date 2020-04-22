@@ -3,7 +3,7 @@
 #define __842_INTERNAL_H__
 
 #include "../common/842.h"
-#include "../../include/cuda842.h"
+#include "cuda842.h"
 
 #ifndef CUDA842_STRICT
 #undef I2_BITS

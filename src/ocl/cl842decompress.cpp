@@ -1,4 +1,4 @@
-#include "../../include/cl842.h"
+#include "cl842.h"
 
 #include <iostream>
 #include <sstream>
