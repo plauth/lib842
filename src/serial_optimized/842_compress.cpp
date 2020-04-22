@@ -23,15 +23,16 @@
 #include "../common/memaccess.h"
 #include "../common/crc32.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
+#include <cstdio>
+#include <cerrno>
+#include <algorithm>
+#include <iterator>
 
 #define PRIME64 (11400714785074694791ULL)
 
 #define NO_ENTRY (-1)
 
-static inline void hash(uint64_t *values, uint64_t *results)
+static inline void hash(const uint64_t *values, uint64_t *results)
 {
 	results[0] = (PRIME64 * values[0]) >> (64 - DICT16_BITS); // 2
 	results[1] = (PRIME64 * values[1]) >> (64 - DICT16_BITS); // 2
@@ -115,13 +116,11 @@ static inline uint16_t max(uint16_t a, uint16_t b)
 
 static inline uint8_t get_template(struct sw842_param *p)
 {
-	uint16_t template_key = 0;
-
 	uint16_t former = max(p->templateKeys[4],
 			      p->templateKeys[0] + p->templateKeys[1]);
 	uint16_t latter = max(p->templateKeys[5],
 			      p->templateKeys[2] + p->templateKeys[3]);
-	template_key = max(p->templateKeys[6], former + latter);
+	uint16_t template_key = max(p->templateKeys[6], former + latter);
 
 	template_key >>= 1;
 
@@ -558,25 +557,16 @@ int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 		return -EINVAL;
 	}
 
-	struct sw842_param *p = (struct sw842_param *)malloc(
-		sizeof(struct sw842_param));
+	auto *p = (struct sw842_param *)malloc(sizeof(struct sw842_param));
 
-	memset(&p->hashes, 0, sizeof(p->hashes));
+	std::fill(std::begin(p->hashes), std::end(p->hashes), 0);
 
 	uint64_t last, next;
 	uint8_t repeat_count = 0;
 
-	for (uint16_t i = 0; i < (1 << DICT16_BITS); i++) {
-		p->hashTable16[i] = NO_ENTRY;
-	}
-
-	for (uint16_t i = 0; i < (1 << DICT32_BITS); i++) {
-		p->hashTable32[i] = NO_ENTRY;
-	}
-
-	for (uint16_t i = 0; i < (1 << DICT64_BITS); i++) {
-		p->hashTable64[i] = NO_ENTRY;
-	}
+	std::fill(std::begin(p->hashTable16), std::end(p->hashTable16), NO_ENTRY);
+	std::fill(std::begin(p->hashTable32), std::end(p->hashTable32), NO_ENTRY);
+	std::fill(std::begin(p->hashTable64), std::end(p->hashTable64), NO_ENTRY);
 
 	p->in = in;
 	p->instart = in;

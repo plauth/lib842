@@ -91,7 +91,6 @@ class CL842HostDecompressor
 				size_t *outputSizes, int *returnValues);
 
 	private:
-		size_t m_inputChunkSize;
 		size_t m_inputChunkStride;
 		CL842InputFormat m_inputFormat;
 		bool m_verbose;
@@ -100,7 +99,7 @@ class CL842HostDecompressor
 		cl::CommandQueue m_queue;
 		CL842DeviceDecompressor m_deviceCompressor;
 
-		VECTOR_CLASS<cl::Device> findDevices();
+		VECTOR_CLASS<cl::Device> findDevices() const;
 };
 
 extern "C" {

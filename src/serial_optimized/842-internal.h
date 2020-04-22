@@ -3,7 +3,7 @@
 #define __842_INTERNAL_H__
 
 #include "../common/842.h"
-#include <stdint.h>
+#include <cstdint>
 
 #define CUDA842_STRICT
 
@@ -18,7 +18,7 @@
 #define ONLY_WELL_DEFINED_BEHAVIOUR
 
 #ifdef ENABLE_ERROR_HANDLING
-#include <stddef.h>
+#include <cstddef>
 #endif
 
 #define BRANCH_FREE (0)

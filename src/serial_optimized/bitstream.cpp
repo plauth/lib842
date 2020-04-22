@@ -4,15 +4,11 @@
 // zpf is Copyright (c) 2014-2019, Lawrence Livermore National Security, LLC.
 // and licensed under a BSD license
 
-#include <stdlib.h>
-#include <stdint.h>
+#include <cstdlib>
+#include <cstdint>
 
 #include "842-internal.h"
 #include "../common/endianness.h"
-
-#ifdef ENABLE_ERROR_HANDLING
-#include <errno.h>
-#endif
 
 /* number of bits in a buffered word */
 #define wsize 64
@@ -83,7 +79,6 @@ void stream_write_bits(struct bitstream *s, uint64_t value, uint8_t n)
 		stream_write_word(s, s->buffer);
 		s->buffer = value << (n - s->bits);
 	}
-	return;
 }
 
 /* position stream for reading or writing at beginning */
@@ -114,8 +109,7 @@ void stream_flush(struct bitstream *s)
 /* allocate and initialize bit stream to user-allocated buffer */
 struct bitstream *stream_open(void *buffer, size_t bytes)
 {
-	struct bitstream *s =
-		(struct bitstream *)malloc(sizeof(struct bitstream));
+	auto *s = (struct bitstream *)malloc(sizeof(struct bitstream));
 	if (s) {
 		s->begin = (uint64_t *)buffer;
 #ifdef ENABLE_ERROR_HANDLING

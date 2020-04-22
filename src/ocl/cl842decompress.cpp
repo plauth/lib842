@@ -1,6 +1,5 @@
 #include "../../include/cl842.h"
 
-#include <errno.h>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -12,9 +11,7 @@
 extern const char *CL842_DECOMPRESS_842DEFS_SOURCE;
 extern const char *CL842_DECOMPRESS_KERNEL_SOURCE;
 
-#ifndef LOCAL_SIZE
-#define LOCAL_SIZE 256
-#endif
+static constexpr size_t LOCAL_SIZE = 256;
 
 CL842DeviceDecompressor::CL842DeviceDecompressor(const cl::Context &context,
 						 const VECTOR_CLASS<cl::Device> &devices,
@@ -86,14 +83,13 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 			std::chrono::steady_clock::now();
 
 		auto duration =
-			std::chrono::duration_cast<std::chrono::milliseconds>(
-				t2 - t1)
+			std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
 				.count();
 
 		std::cerr
 			<< "Decompression performance: " << duration << "ms"
 			<< " / "
-			<< (outputSize / 1024 / 1024) / ((float)duration / 1000)
+			<< (static_cast<float>(outputSize) / 1024 / 1024) / (static_cast<float>(duration) / 1000)
 			<< "MiB/s" << std::endl;
 	}
 }
@@ -125,7 +121,7 @@ void CL842DeviceDecompressor::buildProgram(
 			std::cerr
 				<< "Build Log: "
 				<< m_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(
-					   devices[0], NULL)
+					   devices[0], nullptr)
 				<< std::endl;
 		}
 		throw;
@@ -146,7 +142,7 @@ CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkSize,
 {
 }
 
-VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices()
+VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices() const
 {
 	VECTOR_CLASS<cl::Platform> platforms;
 	cl::Platform::get(&platforms);
@@ -177,16 +173,15 @@ VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices()
 				  << platform->getInfo<CL_PLATFORM_NAME>()
 				  << std::endl;
 		}
-		for (auto device = platformDevices.begin();
-		     device != platformDevices.end(); device++) {
-			if (!device->getInfo<CL_DEVICE_AVAILABLE>())
+		for (auto &device : platformDevices) {
+			if (!device.getInfo<CL_DEVICE_AVAILABLE>())
 				continue;
 			if (m_verbose) {
 				std::cerr << "Device: "
-					  << device->getInfo<CL_DEVICE_NAME>()
+					  << device.getInfo<CL_DEVICE_NAME>()
 					  << std::endl;
 			}
-			devices.push_back(*device);
+			devices.push_back(device);
 		}
 	}
 

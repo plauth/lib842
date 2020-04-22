@@ -71,8 +71,6 @@ static uint8_t comp_ops[OPS_MAX][5] = { /* params size in bits */
 	{ D8, N0, N0, N0, 0x00 }, /* 64 */
 };
 
-//static uint64_t outbits = 0;
-
 #define INDEX_NOT_FOUND		(-1)
 #define INDEX_NOT_CHECKED	(-2)
 
@@ -508,7 +506,7 @@ int sw842_compress(const uint8_t *in, size_t ilen,
 
 	*olen = 0;
 	/* if using strict mode, we can only compress a multiple of 8 */
-	if (ilen % 8) {
+	if (SW842_STRICT && (ilen % 8)) {
 		fprintf(stderr,
 			"Can only compress multiples of 8 bytes, but len is len %zu (%% 8 = %zu)\n",
 			ilen, ilen % 8);

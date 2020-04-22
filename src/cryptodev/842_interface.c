@@ -22,7 +22,6 @@
 #define tss_set pthread_setspecific
 #define tss_get pthread_getspecific
 #endif
-#include <stdbool.h>
 #include <sys/ioctl.h>
 #include <crypto/cryptodev.h>
 #include "../../include/hw842.h"
@@ -35,7 +34,7 @@ struct cryptodev_ctx {
 
 static int c842_ctx_init(struct cryptodev_ctx *ctx)
 {
-	int err = 0;
+	int err;
 
 	/* Open the crypto device */
 	ctx->cfd = open("/dev/crypto", O_RDWR, 0);

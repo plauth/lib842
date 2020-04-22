@@ -21,10 +21,10 @@
 #include "../common/endianness.h"
 #include "../common/crc32.h"
 
-#include <stdio.h>
-#include <string.h>
-#include <inttypes.h>
-#include <errno.h>
+#include <cstdio>
+#include <cstring>
+#include <cinttypes>
+#include <cerrno>
 
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE (2 * (1 << I2_BITS))
