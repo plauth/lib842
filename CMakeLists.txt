@@ -16,9 +16,11 @@ endif()
 ################
 # DEPENDENCIES #
 ################
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 try_compile(CRYPTODEV_LINUX_COMP_FOUND
             "${CMAKE_BINARY_DIR}/temp"
-            "${PROJECT_SOURCE_DIR}/check_cryptodev_linux_comp.c")
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_cryptodev_linux_comp.c")
 
 include(CheckSymbolExists)
 check_symbol_exists(accel_compress "sys/types.h;sys/vminfo.h" AIX_HWCOMPRESSION_FOUND)
