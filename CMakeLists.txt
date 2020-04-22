@@ -83,13 +83,16 @@ endif()
 configure_file(include/config842.h.in include/config842.h @ONLY)
 
 if (CUDA_FOUND)
+    # NB: This is necessary for the CUDA build to work on CMake 3.5.1,
+    #     as it appears that (target_)include_directories is not respected there
+    cuda_include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include")
+
     cuda_add_library(842 STATIC ${SRCFILES})
 else ()
     add_library(842 STATIC ${SRCFILES})
 endif()
 set_property(TARGET 842 PROPERTY POSITION_INDEPENDENT_CODE ON)
-target_include_directories(842 PUBLIC include)
-target_include_directories(842 PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/include")
+target_include_directories(842 PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include")
 if (OpenCL_FOUND)
     target_link_libraries (842 ${OpenCL_LIBRARY})
 endif()
