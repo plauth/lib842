@@ -26,17 +26,13 @@ include(CheckSymbolExists)
 check_symbol_exists(accel_compress "sys/types.h;sys/vminfo.h" AIX_HWCOMPRESSION_FOUND)
 
 find_package(OpenCL)
-if (OpenCL_FOUND)
-    include_directories(${OpenCL_INCLUDE_DIRS})
-    link_directories(${OpenCL_LIBRARY})
-endif()
 find_package(CUDA)
 
 find_package(OpenMP)
 if (OpenMP_FOUND)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
 ###########
@@ -96,54 +92,58 @@ endif()
 set_property(TARGET 842 PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_include_directories(842 PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include")
 if (OpenCL_FOUND)
-    target_link_libraries (842 ${OpenCL_LIBRARY})
+    target_include_directories(842 PRIVATE ${OpenCL_INCLUDE_DIRS})
+    target_link_libraries(842 ${OpenCL_LIBRARIES})
 endif()
 
 ###########
 # SAMPLES #
 ###########
 add_executable(test_serial sample/compdecomp.c sample/compdecomp_driver.c)
-target_link_libraries (test_serial 842)
+target_link_libraries(test_serial 842)
 
 add_executable(test_serial_optimized sample/compdecomp.c sample/compdecomp_driver.c)
-set_target_properties(test_serial_optimized PROPERTIES COMPILE_DEFINITIONS "USEOPTSW")
-target_link_libraries (test_serial_optimized 842)
+target_compile_definitions(test_serial_optimized PRIVATE "USEOPTSW")
+target_link_libraries(test_serial_optimized 842)
 
 add_executable(test_serial_optimized_cppthreads sample/compdecomp_cppthreads.cpp sample/compdecomp_driver.c)
-set_target_properties(test_serial_optimized_cppthreads PROPERTIES COMPILE_DEFINITIONS "USEOPTSW")
-target_link_libraries (test_serial_optimized_cppthreads 842 numa)
+target_compile_definitions(test_serial_optimized_cppthreads PRIVATE "USEOPTSW")
+target_link_libraries(test_serial_optimized_cppthreads 842)
 
 if (CRYPTODEV_LINUX_COMP_FOUND)
     add_executable(test_cryptodev sample/compdecomp.c sample/compdecomp_driver.c)
-    set_target_properties(test_cryptodev PROPERTIES COMPILE_DEFINITIONS "USEHW")
-    target_link_libraries (test_cryptodev 842)
+    target_compile_definitions(test_cryptodev PRIVATE "USEHW")
+    target_link_libraries(test_cryptodev 842 numa)
 
     add_executable(test_cryptodev_cppthreads sample/compdecomp_cppthreads.cpp sample/compdecomp_driver.c)
-    set_target_properties(test_cryptodev_cppthreads PROPERTIES COMPILE_DEFINITIONS "USEHW")
-    target_link_libraries (test_cryptodev_cppthreads 842 numa)
+    target_compile_definitions(test_cryptodev_cppthreads PRIVATE "USEHW")
+    target_link_libraries(test_cryptodev_cppthreads 842 numa)
 endif()
 
 if (AIX_HWCOMPRESSION_FOUND)
     add_executable(test_aix_standalone sample/compdecomp.c sample/compdecomp_driver.c)
-    set_target_properties(test_aix_standalone PROPERTIES COMPILE_DEFINITIONS "USEAIX")
+    target_compile_definitions(test_aix_standalone PRIVATE "USEAIX")
 endif()
 
 if (CUDA_FOUND)
     cuda_add_executable(test_cuda sample/compdecomp.cu)
-    target_link_libraries (test_cuda 842)
+    target_link_libraries(test_cuda 842)
 endif()
 
 if (OpenCL_FOUND)
     add_executable(test_ocl sample/compdecomp_cl.cpp)
-    target_link_libraries (test_ocl 842 ${OpenCL_LIBRARY})
+    target_link_libraries(test_ocl 842 ${OpenCL_LIBRARIES})
+    target_include_directories(test_ocl PRIVATE ${OpenCL_INCLUDE_DIRS})
 
     add_executable(test_ocl_inplace sample/compdecomp_cl.cpp)
-    set_target_properties(test_ocl_inplace PROPERTIES COMPILE_DEFINITIONS "USE_INPLACE_COMPRESSED_CHUNKS")
-    target_link_libraries (test_ocl_inplace 842 ${OpenCL_LIBRARY})
+    target_compile_definitions(test_ocl_inplace PRIVATE "USE_INPLACE_COMPRESSED_CHUNKS")
+    target_link_libraries(test_ocl_inplace 842 ${OpenCL_LIBRARIES})
+    target_include_directories(test_ocl_inplace PRIVATE ${OpenCL_INCLUDE_DIRS})
 
     add_executable(test_ocl_maybe sample/compdecomp_cl.cpp)
-    set_target_properties(test_ocl_maybe PROPERTIES COMPILE_DEFINITIONS "USE_MAYBE_COMPRESSED_CHUNKS")
-    target_link_libraries (test_ocl_maybe 842 ${OpenCL_LIBRARY})
+    target_compile_definitions(test_ocl_maybe PRIVATE "USE_MAYBE_COMPRESSED_CHUNKS")
+    target_link_libraries(test_ocl_maybe 842 ${OpenCL_LIBRARIES})
+    target_include_directories(test_ocl_maybe PRIVATE ${OpenCL_INCLUDE_DIRS})
 endif()
 
 ###################
@@ -163,7 +163,7 @@ foreach(test test_compress_pattern
              test_decompress_invalid_generator
              test_decompress_crcerror)
     add_executable(${test} test/${test}.c test/test_patterns.c test/test_util.c)
-    target_link_libraries (${test} 842)
+    target_link_libraries(${test} 842)
 endforeach()
 
 set(IMPLS_COMPRESS sw optsw)
