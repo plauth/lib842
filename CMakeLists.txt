@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.1)
 
 project(lib842)
 
-enable_testing()
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    include(CTest)
+endif()
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -197,57 +199,59 @@ endif()
 ###################
 # AUTOMATIC TESTS #
 ###################
-foreach(test test_compress_pattern
-             test_compress_pattern_unaligned
-             test_compress_pattern_halfsmall
-             test_compress_pattern_barelysmall
-             test_compress_diffuse
-             test_compress_notmultipleof8
-             test_decompress_pattern
-             test_decompress_pattern_unaligned
-             test_decompress_pattern_halfsmall
-             test_decompress_pattern_barelysmall
-             test_decompress_invalid_simple
-             test_decompress_invalid_generator
-             test_decompress_crcerror)
-    add_executable(${test} test/${test}.c test/test_patterns.c test/test_util.c)
-    target_link_libraries(${test} 842)
-endforeach()
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
+    foreach(test test_compress_pattern
+                 test_compress_pattern_unaligned
+                 test_compress_pattern_halfsmall
+                 test_compress_pattern_barelysmall
+                 test_compress_diffuse
+                 test_compress_notmultipleof8
+                 test_decompress_pattern
+                 test_decompress_pattern_unaligned
+                 test_decompress_pattern_halfsmall
+                 test_decompress_pattern_barelysmall
+                 test_decompress_invalid_simple
+                 test_decompress_invalid_generator
+                 test_decompress_crcerror)
+        add_executable(${test} test/${test}.c test/test_patterns.c test/test_util.c)
+        target_link_libraries(${test} 842)
+    endforeach()
 
-set(IMPLS_COMPRESS sw optsw)
-set(IMPLS_DECOMPRESS sw optsw)
-if (CRYPTODEV_LINUX_COMP_FOUND)
-    set(IMPLS_COMPRESS ${IMPLS_COMPRESS} hw)
-    set(IMPLS_DECOMPRESS ${IMPLS_DECOMPRESS} hw)
-endif()
-if (OpenCL_FOUND)
-    set(IMPLS_DECOMPRESS ${IMPLS_DECOMPRESS} cl)
-endif()
-set(PATTERNS empty zeros random mixed limit text)
+    set(IMPLS_COMPRESS sw optsw)
+    set(IMPLS_DECOMPRESS sw optsw)
+    if (CRYPTODEV_LINUX_COMP_FOUND)
+        set(IMPLS_COMPRESS ${IMPLS_COMPRESS} hw)
+        set(IMPLS_DECOMPRESS ${IMPLS_DECOMPRESS} hw)
+    endif()
+    if (OpenCL_FOUND)
+        set(IMPLS_DECOMPRESS ${IMPLS_DECOMPRESS} cl)
+    endif()
+    set(PATTERNS empty zeros random mixed limit text)
 
-foreach (IMPL ${IMPLS_COMPRESS})
-    foreach(PATTERN ${PATTERNS})
-        foreach (IMPLD ${IMPLS_DECOMPRESS})
-            add_test(test_compress_pattern_${IMPL}_${IMPLD}_${PATTERN} test_compress_pattern ${IMPL} ${IMPLD} ${PATTERN})
+    foreach (IMPL ${IMPLS_COMPRESS})
+        foreach(PATTERN ${PATTERNS})
+            foreach (IMPLD ${IMPLS_DECOMPRESS})
+                add_test(test_compress_pattern_${IMPL}_${IMPLD}_${PATTERN} test_compress_pattern ${IMPL} ${IMPLD} ${PATTERN})
+            endforeach()
+            add_test(test_compress_pattern_unaligned_${IMPL}_${PATTERN} test_compress_pattern_unaligned ${IMPL} ${PATTERN})
+            add_test(test_compress_pattern_halfsmall_${IMPL}_${PATTERN} test_compress_pattern_halfsmall ${IMPL} ${PATTERN})
+            add_test(test_compress_pattern_barelysmall_${IMPL}_${PATTERN} test_compress_pattern_barelysmall ${IMPL} ${PATTERN})
         endforeach()
-        add_test(test_compress_pattern_unaligned_${IMPL}_${PATTERN} test_compress_pattern_unaligned ${IMPL} ${PATTERN})
-        add_test(test_compress_pattern_halfsmall_${IMPL}_${PATTERN} test_compress_pattern_halfsmall ${IMPL} ${PATTERN})
-        add_test(test_compress_pattern_barelysmall_${IMPL}_${PATTERN} test_compress_pattern_barelysmall ${IMPL} ${PATTERN})
+        add_test(test_compress_diffuse_${IMPL} test_compress_diffuse ${IMPL})
+        add_test(test_compress_notmultipleof8_${IMPL} test_compress_notmultipleof8 ${IMPL})
     endforeach()
-    add_test(test_compress_diffuse_${IMPL} test_compress_diffuse ${IMPL})
-    add_test(test_compress_notmultipleof8_${IMPL} test_compress_notmultipleof8 ${IMPL})
-endforeach()
 
-foreach (IMPL ${IMPLS_DECOMPRESS})
-    foreach(PATTERN ${PATTERNS})
-        add_test(test_decompress_pattern_${IMPL}_${PATTERN} test_decompress_pattern ${IMPL} ${PATTERN})
-        add_test(test_decompress_pattern_unaligned_${IMPL}_${PATTERN} test_decompress_pattern_unaligned ${IMPL} ${PATTERN})
-        if (NOT ("${PATTERN}" STREQUAL "empty"))
-            add_test(test_decompress_pattern_halfsmall_${IMPL}_${PATTERN} test_decompress_pattern_halfsmall ${IMPL} ${PATTERN})
-            add_test(test_decompress_pattern_barelysmall_${IMPL}_${PATTERN} test_decompress_pattern_barelysmall ${IMPL} ${PATTERN})
-        endif()
+    foreach (IMPL ${IMPLS_DECOMPRESS})
+        foreach(PATTERN ${PATTERNS})
+            add_test(test_decompress_pattern_${IMPL}_${PATTERN} test_decompress_pattern ${IMPL} ${PATTERN})
+            add_test(test_decompress_pattern_unaligned_${IMPL}_${PATTERN} test_decompress_pattern_unaligned ${IMPL} ${PATTERN})
+            if (NOT ("${PATTERN}" STREQUAL "empty"))
+                add_test(test_decompress_pattern_halfsmall_${IMPL}_${PATTERN} test_decompress_pattern_halfsmall ${IMPL} ${PATTERN})
+                add_test(test_decompress_pattern_barelysmall_${IMPL}_${PATTERN} test_decompress_pattern_barelysmall ${IMPL} ${PATTERN})
+            endif()
+        endforeach()
+        add_test(test_decompress_invalid_simple_${IMPL} test_decompress_invalid_simple ${IMPL})
+        add_test(test_decompress_invalid_generator_${IMPL} test_decompress_invalid_generator ${IMPL})
+        add_test(test_decompress_crcerror_${IMPL} test_decompress_crcerror ${IMPL})
     endforeach()
-    add_test(test_decompress_invalid_simple_${IMPL} test_decompress_invalid_simple ${IMPL})
-    add_test(test_decompress_invalid_generator_${IMPL} test_decompress_invalid_generator ${IMPL})
-    add_test(test_decompress_crcerror_${IMPL} test_decompress_crcerror ${IMPL})
-endforeach()
+endif()
