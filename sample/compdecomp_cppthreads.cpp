@@ -15,8 +15,6 @@
 
 // If set, threads will be distributed evenly among available NUMA nodes
 // This should provide an effect like OpenMP's OMP_PLACES=sockets OMP_PROC_BIND=spread
-#define SPREAD_THREADS_AMONG_NUMA_NODES
-
 #ifdef SPREAD_THREADS_AMONG_NUMA_NODES
 #include <pthread.h>
 #include <numa.h>

@@ -35,6 +35,8 @@ if (OpenMP_FOUND)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
+find_package(NUMA)
+
 ###########
 # LIBRARY #
 ###########
@@ -109,15 +111,25 @@ target_link_libraries(test_serial_optimized 842)
 add_executable(test_serial_optimized_cppthreads sample/compdecomp_cppthreads.cpp sample/compdecomp_driver.c)
 target_compile_definitions(test_serial_optimized_cppthreads PRIVATE "USEOPTSW")
 target_link_libraries(test_serial_optimized_cppthreads 842)
+if (NUMA_FOUND)
+    target_compile_definitions(test_serial_optimized_cppthreads PRIVATE "SPREAD_THREADS_AMONG_NUMA_NODES")
+    target_include_directories(test_serial_optimized_cppthreads PRIVATE ${NUMA_INCLUDE_DIRS})
+    target_link_libraries(test_serial_optimized_cppthreads ${NUMA_LIBRARIES})
+endif()
 
 if (CRYPTODEV_LINUX_COMP_FOUND)
     add_executable(test_cryptodev sample/compdecomp.c sample/compdecomp_driver.c)
     target_compile_definitions(test_cryptodev PRIVATE "USEHW")
-    target_link_libraries(test_cryptodev 842 numa)
+    target_link_libraries(test_cryptodev 842)
 
     add_executable(test_cryptodev_cppthreads sample/compdecomp_cppthreads.cpp sample/compdecomp_driver.c)
     target_compile_definitions(test_cryptodev_cppthreads PRIVATE "USEHW")
-    target_link_libraries(test_cryptodev_cppthreads 842 numa)
+    target_link_libraries(test_cryptodev_cppthreads 842)
+    if (NUMA_FOUND)
+        target_compile_definitions(test_cryptodev_cppthreads PRIVATE "SPREAD_THREADS_AMONG_NUMA_NODES")
+        target_include_directories(test_cryptodev_cppthreads PRIVATE ${NUMA_INCLUDE_DIRS})
+        target_link_libraries(test_cryptodev_cppthreads ${NUMA_LIBRARIES})
+    endif()
 endif()
 
 if (AIX_HWCOMPRESSION_FOUND)
