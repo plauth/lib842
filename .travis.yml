@@ -1,0 +1,15 @@
+
+language: cpp
+os:
+- linux
+dist:
+- bionic
+- xenial
+compiler:
+- clang
+- gcc
+script:
+- mkdir build && cd build
+- cmake -DCMAKE_BUILD_TYPE=Release ..
+- make
+- ctest
