@@ -13,6 +13,8 @@ matrix:
   - dist: xenial # Ubuntu 16.04
     compiler: clang
     os: linux
+before_install:
+  - sudo apt-get -y install pocl-opencl-icd opencl-headers ocl-icd-opencl-dev libnuma-dev
 script:
 - mkdir build && cd build
 - cmake -DCMAKE_BUILD_TYPE=Release ..
