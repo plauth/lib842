@@ -214,7 +214,7 @@ static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 #endif
 
 /**
- * sw842_decompress
+ * optsw842_decompress
  *
  * Decompress the 842-compressed buffer of length @ilen at @in
  * to the output buffer @out, using no more than @olen bytes.

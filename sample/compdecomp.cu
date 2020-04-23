@@ -161,8 +161,8 @@ int main(int argc, const char *argv[])
 				compressed +
 				((CUDA842_CHUNK_SIZE * 2) * chunk_num);
 
-			sw842_compress(chunk_in, CUDA842_CHUNK_SIZE, chunk_out,
-				       &chunk_olen);
+			optsw842_compress(chunk_in, CUDA842_CHUNK_SIZE, chunk_out,
+				          &chunk_olen);
 			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
 		timeend_comp = timestamp();
@@ -247,7 +247,7 @@ int main(int argc, const char *argv[])
 				1000));
 
 	} else {
-		sw842_compress(in, ilen, compressed, &olen);
+		optsw842_compress(in, ilen, compressed, &olen);
 #ifdef USE_UNIFIED_MEM
 		cuda842_decompress<<<1, 1>>>((uint64_t *)compressed,
 					       (uint64_t *)decompressed);

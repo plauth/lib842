@@ -537,7 +537,7 @@ static inline void process_next(struct sw842_param *p)
 }
 
 /**
- * sw842_compress
+ * optsw842_compress
  *
  * Compress the uncompressed buffer of length @ilen at @in to the output buffer
  * @out, using no more than @olen bytes, using the 842 compression format.

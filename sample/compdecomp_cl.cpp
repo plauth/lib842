@@ -126,8 +126,8 @@ int main(int argc, char *argv[])
 			uint8_t *chunk_out =
 				compressOut + (CHUNK_SIZE * chunk_num);
 
-			sw842_compress(chunk_in, CHUNK_SIZE,
-				       &temp_buffer[0], &chunk_olen);
+			optsw842_compress(chunk_in, CHUNK_SIZE,
+					  &temp_buffer[0], &chunk_olen);
 			if (chunk_olen <=
 			    CHUNK_SIZE -
 				    sizeof(CL842_COMPRESSED_CHUNK_MAGIC) -
@@ -154,8 +154,8 @@ int main(int argc, char *argv[])
 		uint8_t *chunk_out =
 			compressOut + ((CHUNK_SIZE * 2) * chunk_num);
 
-		sw842_compress(chunk_in, CHUNK_SIZE, chunk_out,
-			       &chunk_olen);
+		optsw842_compress(chunk_in, CHUNK_SIZE, chunk_out,
+				  &chunk_olen);
 	}
 #endif
 

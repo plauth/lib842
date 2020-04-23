@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
 		int ret_compress = impl->compress(data_buffer, BUFFER_SIZE,
 						  comp_data, &comp_size);
 		if (ret_compress != 0) {
-			printf("it=%i: sw842_compress FAILED (ret=%d)\n", it, ret_compress);
+			printf("it=%i: Compression FAILED (ret=%d)\n", it, ret_compress);
 			ret = EXIT_FAILURE;
 			goto cleanup;
 		}

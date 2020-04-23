@@ -124,8 +124,8 @@ int main(int argc, const char *argv[])
 			hw842_compress(chunk_in, CHUNK_SIZE, chunk_out,
 				       &chunk_olen);
 #else
-			sw842_compress(chunk_in, CHUNK_SIZE, chunk_out,
-				       &chunk_olen);
+			optsw842_compress(chunk_in, CHUNK_SIZE, chunk_out,
+					  &chunk_olen);
 #endif
 			compressedChunkSizes[chunk_num] = chunk_olen;
 			cuda_error =
@@ -175,9 +175,9 @@ int main(int argc, const char *argv[])
 					 compressedChunkSizes[chunk_num],
 					 chunk_decomp, &chunk_dlen);
 #else
-			sw842_decompress(chunk_condensed,
-					 compressedChunkSizes[chunk_num],
-					 chunk_decomp, &chunk_dlen);
+			optsw842_decompress(chunk_condensed,
+					    compressedChunkSizes[chunk_num],
+					    chunk_decomp, &chunk_dlen);
 #endif
 
 			if (!(memcmp(chunk_in, chunk_decomp, CHUNK_SIZE) ==
@@ -207,13 +207,13 @@ int main(int argc, const char *argv[])
 #ifdef USEHW
 		hw842_compress(in, ilen, out, &olen);
 #else
-		sw842_compress(in, ilen, out, &olen);
+		optsw842_compress(in, ilen, out, &olen);
 #endif
 
 #ifdef USEHW
 		hw842_decompress(out, olen, decompressed, &dlen);
 #else
-		sw842_decompress(out, olen, decompressed, &dlen);
+		optsw842_decompress(out, olen, decompressed, &dlen);
 #endif
 
 		printf("Input: %zu bytes\n", ilen);
