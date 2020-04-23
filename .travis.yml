@@ -1,12 +1,18 @@
 language: cpp
-os:
-- linux
-dist:
-- bionic
-- xenial
-compiler:
-- clang
-- gcc
+matrix:
+  include:
+  - dist: bionic # Ubuntu 18.04
+    compiler: gcc
+    os: linux
+  - dist: bionic # Ubuntu 18.04
+    compiler: clang
+    os: linux
+  - dist: xenial # Ubuntu 16.04
+    compiler: gcc
+    os: linux
+  - dist: xenial # Ubuntu 16.04
+    compiler: clang
+    os: linux
 script:
 - mkdir build && cd build
 - cmake -DCMAKE_BUILD_TYPE=Release ..
