@@ -148,7 +148,7 @@ VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices() const
 	cl::Platform::get(&platforms);
 	if (platforms.empty()) {
 		if (m_verbose) {
-			std::cerr << "No OpenCL platforms are available!"
+			std::cerr << "ERROR: No OpenCL platforms are available!"
 				  << std::endl;
 		}
 		throw cl::Error(CL_DEVICE_NOT_FOUND);
@@ -161,39 +161,48 @@ VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices() const
 
 	VECTOR_CLASS<cl::Device> devices;
 
-	for (auto platform = platforms.begin();
-	     devices.empty() && platform != platforms.end(); platform++) {
-		VECTOR_CLASS<cl::Device> platformDevices;
-		platform->getDevices(CL_DEVICE_TYPE_GPU, &platformDevices);
-		if (platformDevices.empty())
-			continue;
-
-		if (m_verbose) {
-			std::cerr << "Platform: "
-				  << platform->getInfo<CL_PLATFORM_NAME>()
+	for (auto &deviceType : {CL_DEVICE_TYPE_GPU, CL_DEVICE_TYPE_CPU}) {
+		if (m_verbose && deviceType == CL_DEVICE_TYPE_CPU) {
+			std::cerr << "WARNING: No OpenCL GPU devices available, "
+				  << "falling back to OpenCL CPU devices."
 				  << std::endl;
 		}
-		for (auto &device : platformDevices) {
-			if (!device.getInfo<CL_DEVICE_AVAILABLE>())
-				continue;
-			if (m_verbose) {
-				std::cerr << "Device: "
-					  << device.getInfo<CL_DEVICE_NAME>()
-					  << std::endl;
+		for (auto &platform : platforms) {
+			VECTOR_CLASS<cl::Device> platformDevices;
+			try {
+				platform.getDevices(deviceType, &platformDevices);
+			} catch (cl::Error &ex) {
+				if (ex.err() == CL_DEVICE_NOT_FOUND)
+					continue;
+				throw;
 			}
-			devices.push_back(device);
-		}
-	}
 
-	if (devices.empty()) {
-		if (m_verbose) {
-			std::cerr << "No GPU devices are available!!"
+			if (m_verbose) {
+				std::cerr << "Platform: "
+				  << platform.getInfo<CL_PLATFORM_NAME>()
 				  << std::endl;
+			}
+
+			for (auto &device : platformDevices) {
+				if (!device.getInfo<CL_DEVICE_AVAILABLE>())
+					continue;
+				if (m_verbose) {
+					std::cerr << "Device: "
+						  << device.getInfo<CL_DEVICE_NAME>()
+						  << std::endl;
+				}
+				devices.push_back(device);
+			}
+			if (!devices.empty())
+				return devices;
 		}
-		throw cl::Error(CL_DEVICE_NOT_FOUND);
 	}
 
-	return devices;
+	if (m_verbose) {
+		std::cerr << "ERROR: No OpenCL devices are available!"
+			  << std::endl;
+	}
+	throw cl::Error(CL_DEVICE_NOT_FOUND);
 }
 
 void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
@@ -306,7 +315,7 @@ int cl842_decompress(const uint8_t *in, size_t ilen,
 		decompressor.decompress(in, ilen, &ilen, out, *olen, olen, &ret);
 
 		return ret;
-	} catch (cl::Error) {
+	} catch (const cl::Error &) {
 		// Not a great error value, but we shouldn't let C++ exceptions
 		// propagate out from the C API
 		return -ENOMEM;

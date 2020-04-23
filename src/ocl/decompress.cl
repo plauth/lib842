@@ -8,6 +8,13 @@ typedef short int16_t;
 typedef uint uint32_t;
 typedef ulong uint64_t;
 
+// WORKAROUND: At least on pocl 1.1 on Ubuntu 18.04, NULL is not defined
+// (the error message is: "use of undeclared identifier 'NULL'"), but it
+// should according to the OpenCL C standard. But do it ourselves if not
+#ifndef NULL
+#define NULL 0L
+#endif
+
 #define ENABLE_ERROR_HANDLING
 
 struct sw842_param_decomp {
