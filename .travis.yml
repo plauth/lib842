@@ -14,7 +14,8 @@ matrix:
     compiler: clang
     os: linux
 before_install:
-  - sudo apt-get -y install pocl-opencl-icd opencl-headers ocl-icd-opencl-dev libnuma-dev
+- sudo apt-get -y install libnuma-dev
+- [[ "$(lsb_release -rs)" == "18.04" ]] && sudo apt-get -y install pocl-opencl-icd opencl-headers ocl-icd-opencl-dev
 script:
 - mkdir build && cd build
 - cmake -DCMAKE_BUILD_TYPE=Release ..
