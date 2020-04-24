@@ -20,12 +20,27 @@ matrix:
       compiler: clang
 before_install:
   - |
+    # For cryptodev-linux
+    sudo apt-get -y install "linux-headers-$(uname -r)"
+
+    # For lib842
     sudo apt-get -y install libnuma-dev
     if [[ "$(lsb_release -rs)" == "18.04" ]]; then
       sudo apt-get -y install pocl-opencl-icd opencl-headers ocl-icd-opencl-dev
     fi
 script:
-  - mkdir build && cd build
-  - cmake -DCMAKE_BUILD_TYPE=Release ..
-  - make
-  - ctest
+  - |
+    # Build cryptodev-linux dependency (for using the kernel's 842 support)
+    git clone https://github.com/joanbm/cryptodev-linux
+    cd cryptodev-linux
+    make
+    sudo make install
+    sudo depmod -a
+    sudo modprobe cryptodev
+    cd ..
+
+    # Build lib842
+    mkdir build && cd build
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make
+    ctest
