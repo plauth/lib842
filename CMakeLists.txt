@@ -107,6 +107,9 @@ if (OpenCL_FOUND)
     target_include_directories(842 PRIVATE ${OpenCL_INCLUDE_DIRS})
     target_link_libraries(842 ${OpenCL_LIBRARIES})
 endif()
+if(CRYPTODEV_LINUX_COMP_FOUND)
+    target_link_libraries(842 Threads::Threads)
+endif()
 
 ###########
 # SAMPLES #
