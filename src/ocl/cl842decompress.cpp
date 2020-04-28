@@ -14,7 +14,7 @@ extern const char *CL842_DECOMPRESS_KERNEL_SOURCE;
 static constexpr size_t LOCAL_SIZE = 256;
 
 CL842DeviceDecompressor::CL842DeviceDecompressor(const cl::Context &context,
-						 const VECTOR_CLASS<cl::Device> &devices,
+						 const cl::vector<cl::Device> &devices,
 						 size_t inputChunkSize,
 						 size_t inputChunkStride,
 						 CL842InputFormat inputFormat,
@@ -35,7 +35,7 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 					 size_t outputOffset, size_t outputSize,
 					 const cl::Buffer &outputSizes,
 					 const cl::Buffer &returnValues,
-					 const VECTOR_CLASS<cl::Event> *events,
+					 const cl::vector<cl::Event> *events,
 					 cl::Event *event)
 {
 	if (m_inputFormat == CL842InputFormat::INPLACE_COMPRESSED_CHUNKS) {
@@ -95,7 +95,7 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 }
 
 void CL842DeviceDecompressor::buildProgram(
-	const cl::Context &context, const VECTOR_CLASS<cl::Device> &devices)
+	const cl::Context &context, const cl::vector<cl::Device> &devices)
 {
 	std::ostringstream options;
 	options << "-D CL842_CHUNK_SIZE=" << m_inputChunkSize;
@@ -142,9 +142,9 @@ CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkSize,
 {
 }
 
-VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices() const
+cl::vector<cl::Device> CL842HostDecompressor::findDevices() const
 {
-	VECTOR_CLASS<cl::Platform> platforms;
+	cl::vector<cl::Platform> platforms;
 	cl::Platform::get(&platforms);
 	if (platforms.empty()) {
 		if (m_verbose) {
@@ -159,7 +159,7 @@ VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices() const
 			<< std::endl;
 	}
 
-	VECTOR_CLASS<cl::Device> devices;
+	cl::vector<cl::Device> devices;
 
 	for (auto &deviceType : {CL_DEVICE_TYPE_GPU, CL_DEVICE_TYPE_CPU}) {
 		if (m_verbose && deviceType == CL_DEVICE_TYPE_CPU) {
@@ -168,7 +168,7 @@ VECTOR_CLASS<cl::Device> CL842HostDecompressor::findDevices() const
 				  << std::endl;
 		}
 		for (auto &platform : platforms) {
-			VECTOR_CLASS<cl::Device> platformDevices;
+			cl::vector<cl::Device> platformDevices;
 			try {
 				platform.getDevices(deviceType, &platformDevices);
 			} catch (cl::Error &ex) {

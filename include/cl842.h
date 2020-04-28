@@ -9,11 +9,11 @@
 
 #define CL_HPP_MINIMUM_OPENCL_VERSION 120
 #define CL_HPP_TARGET_OPENCL_VERSION 120
-#define __CL_ENABLE_EXCEPTIONS
+#define CL_HPP_ENABLE_EXCEPTIONS
 #ifdef __APPLE__
-#include <OpenCL/cl.hpp>
+#include <OpenCL/cl2.hpp>
 #else
-#include <CL/cl.hpp>
+#include <CL/cl2.hpp>
 #endif
 
 #include <stddef.h>
@@ -51,7 +51,7 @@ class CL842DeviceDecompressor
 {
 	public:
 		CL842DeviceDecompressor(const cl::Context& context,
-					const VECTOR_CLASS<cl::Device>& devices,
+					const cl::vector<cl::Device>& devices,
 					size_t inputChunkSize,
 					size_t inputChunkStride,
 					CL842InputFormat inputFormat,
@@ -62,7 +62,7 @@ class CL842DeviceDecompressor
 				const cl::Buffer& outputBuffer, size_t outputOffset,
 				size_t outputSize, const cl::Buffer &outputSizes,
 				const cl::Buffer &returnValues,
-				const VECTOR_CLASS<cl::Event>* events = nullptr, cl::Event* event = nullptr);
+				const cl::vector<cl::Event>* events = nullptr, cl::Event* event = nullptr);
 
 	private:
 		size_t m_inputChunkSize;
@@ -71,7 +71,7 @@ class CL842DeviceDecompressor
 		bool m_verbose;
 		cl::Program m_program;
 
-		void buildProgram(const cl::Context& context, const VECTOR_CLASS<cl::Device>& devices);
+		void buildProgram(const cl::Context& context, const cl::vector<cl::Device>& devices);
 };
 
 /**
@@ -94,12 +94,12 @@ class CL842HostDecompressor
 		size_t m_inputChunkStride;
 		CL842InputFormat m_inputFormat;
 		bool m_verbose;
-		VECTOR_CLASS<cl::Device> m_devices;
+		cl::vector<cl::Device> m_devices;
 		cl::Context m_context;
 		cl::CommandQueue m_queue;
 		CL842DeviceDecompressor m_deviceCompressor;
 
-		VECTOR_CLASS<cl::Device> findDevices() const;
+		cl::vector<cl::Device> findDevices() const;
 };
 
 extern "C" {
