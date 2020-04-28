@@ -25,6 +25,10 @@ before_install:
 
     # For lib842
     sudo apt-get -y install libnuma-dev opencl-headers ocl-icd-opencl-dev
+    # cl.hpp is not included in opencl-headers or any other package for Ubuntu 16.04
+    if [[ "$(lsb_release -rs)" == "16.04" ]]; then
+      sudo wget -O /usr/include/CL/cl.hpp https://www.khronos.org/registry/OpenCL/api/2.1/cl.hpp
+    fi
     # Rely on POCL to provide a generic OpenCL implementation that can run the tests
     # Unfortunately however,it is not available on Ubuntu 16.04, only on Ubuntu 18.04
     if [[ "$(lsb_release -rs)" == "18.04" ]]; then
