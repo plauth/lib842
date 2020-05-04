@@ -36,7 +36,7 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 					 const cl::Buffer &outputSizes,
 					 const cl::Buffer &returnValues,
 					 const cl::vector<cl::Event> *events,
-					 cl::Event *event)
+					 cl::Event *event) const
 {
 	if (m_inputFormat == CL842InputFormat::INPLACE_COMPRESSED_CHUNKS) {
 		if (inputBuffer() != outputBuffer() ||
@@ -209,7 +209,7 @@ void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 				       const size_t *inputSizes,
 				       uint8_t *output, size_t outputSize,
 				       size_t *outputSizes,
-				       int *returnValues)
+				       int *returnValues) const
 {
 	size_t numChunks =
 		(inputSize + m_inputChunkStride - 1) / (m_inputChunkStride);
