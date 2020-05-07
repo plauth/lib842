@@ -179,7 +179,7 @@ public:
 	void thread_func(unsigned int thread_idx) {
 		// Notify the owner we're ready
 		{
-			std::unique_lock<std::mutex> lock(thread_mutex);
+			std::lock_guard<std::mutex> lock(thread_mutex);
 			threads_ready++;
 			thread_trigger.notify_all();
 		}
@@ -208,7 +208,7 @@ public:
 
 	bool push_work(size_t num_chunks) {
 		for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-			std::unique_lock<std::mutex> lock(thread_mutex);
+			std::lock_guard<std::mutex> lock(thread_mutex);
 			thread_queue.push(chunk_num);
 			thread_trigger.notify_one();
 		}
