@@ -2,9 +2,17 @@
 
 #include <iostream>
 #include <sstream>
-#include <string>
+#include <vector>
 #include <chrono>
 #include <algorithm>
+
+#define CL842_USE_PROGRAM_CACHE
+
+#ifdef CL842_USE_PROGRAM_CACHE
+#include <cassert>
+#include <fstream>
+#include "../common/crc32.h"
+#endif
 
 // Those two symbols are generated during the build process and define
 // the source of the decompression OpenCL kernel and the common 842 definitions
@@ -94,9 +102,132 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 	}
 }
 
+#ifdef CL842_USE_PROGRAM_CACHE
+/* In OpenCL, for portability, programs are normally passed as strings and
+ * built at run-time for the specific device they are run on, which is
+ * expensive, specially if running many small applications (e.g. unit tests).
+ *
+ * Unfortunately, OpenCL does not require implementations to provide a
+ * program cache (as of 2020-05-09, NVIDIA does, Intel and AMD don't),
+ * however, it provides the means for applications to implement it themselves.
+ *
+ * This is a very simple cache for the OpenCL decompression kernel.
+ */
+struct program_cache
+{
+	// Hash of the program source
+	uint32_t sourceHash;
+	// Program build options (#define's)
+	size_t inputChunkSize;
+	size_t inputChunkStride;
+	CL842InputFormat inputFormat;
+	// Information of the devices the program was built for
+	// TODO: Is this enough to ensure we don't accidentally use the wrong cache?
+	cl::vector<cl::string> deviceNames;
+
+	cl::Program::Binaries find() const {
+		try {
+			std::ifstream in(CACHE_PATH, std::ifstream::in | std::ifstream::binary);
+			in.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+			program_cache disk_cache;
+			disk_cache.readMetadata(in);
+			if (inputChunkSize != disk_cache.inputChunkSize ||
+			    inputChunkStride != disk_cache.inputChunkStride ||
+			    inputFormat != disk_cache.inputFormat ||
+			    sourceHash != disk_cache.sourceHash ||
+			    deviceNames != disk_cache.deviceNames) {
+				return {};
+			}
+
+			return readBinaries(in, deviceNames.size());
+		}
+		catch (const std::ifstream::failure &)
+		{
+			std::cerr
+				<< "WARNING: Could not read CL842 program cache" << std::endl;
+			return {};
+		}
+	}
+
+	void set(const cl::Program::Binaries &binaries) const {
+		assert(deviceNames.size() == binaries.size());
+
+		std::ofstream out(CACHE_PATH, std::ofstream::out | std::ofstream::binary);
+		out.exceptions(std::ofstream::failbit | std::ofstream::badbit);
+		writeMetadata(out);
+		writeBinaries(out, binaries);
+	}
+
+private:
+	static constexpr const char *CACHE_PATH = "/tmp/cl842_cache.bin";
+
+	void readMetadata(std::ifstream &in) {
+		in.read(reinterpret_cast<char *>(&inputChunkSize), sizeof(inputChunkSize));
+		in.read(reinterpret_cast<char *>(&inputChunkStride), sizeof(inputChunkStride));
+		in.read(reinterpret_cast<char *>(&inputFormat), sizeof(inputFormat));
+		in.read(reinterpret_cast<char *>(&sourceHash), sizeof(sourceHash));
+
+		size_t numDevices;
+		in.read(reinterpret_cast<char *>(&numDevices), sizeof(numDevices));
+
+		for (size_t i = 0; i < numDevices; i++) {
+			size_t length;
+			in.read(reinterpret_cast<char *>(&length), sizeof(length));
+			cl::string deviceName(length, '\0');
+			in.read(&deviceName[0], deviceName.size());
+			deviceNames.push_back(deviceName);
+		}
+	}
+
+	static cl::Program::Binaries readBinaries(std::ifstream &in, size_t numDevices) {
+		cl::Program::Binaries binaries;
+		for (size_t i = 0; i < numDevices; i++) {
+			size_t size;
+			in.read(reinterpret_cast<char *>(&size), sizeof(size));
+			cl::vector<uint8_t> binary(size);
+			in.read(reinterpret_cast<char *>(binary.data()), binary.size());
+			binaries.push_back(binary);
+		}
+		return binaries;
+	}
+
+	void writeMetadata(std::ofstream &out) const {
+		out.write(reinterpret_cast<const char *>(&inputChunkSize), sizeof(inputChunkSize));
+		out.write(reinterpret_cast<const char *>(&inputChunkStride), sizeof(inputChunkStride));
+		out.write(reinterpret_cast<const char *>(&inputFormat), sizeof(inputFormat));
+		out.write(reinterpret_cast<const char *>(&sourceHash), sizeof(sourceHash));
+
+		size_t numDevices = deviceNames.size();
+		out.write(reinterpret_cast<const char *>(&numDevices), sizeof(numDevices));
+
+		for (const auto &dn : deviceNames) {
+			size_t length = dn.length();
+			out.write(reinterpret_cast<const char *>(&length), sizeof(length));
+			out.write(dn.data(), dn.size());
+		}
+	}
+
+	static void writeBinaries(std::ofstream &out, const cl::Program::Binaries &binaries) {
+		for (const auto &b : binaries) {
+			size_t size = b.size();
+			out.write(reinterpret_cast<const char *>(&size), sizeof(size));
+			out.write(reinterpret_cast<const char *>(b.data()), b.size());
+		}
+	}
+};
+#endif
+
 void CL842DeviceDecompressor::buildProgram(
 	const cl::Context &context, const cl::vector<cl::Device> &devices)
 {
+	cl::string src(CL842_DECOMPRESS_KERNEL_SOURCE);
+	// Instead of using OpenCL's include mechanism, or duplicating the common 842
+	// definitions, we just paste the entire header file on top ourselves
+	// This works nicely and avoids us many headaches due to OpenCL headers
+	// (most importantly, that for our project, dOpenCL doesn't support them)
+	src.insert(0, CL842_DECOMPRESS_842DEFS_SOURCE);
+
 	std::ostringstream options;
 	options << "-D CL842_CHUNK_SIZE=" << m_inputChunkSize;
 	options << " -D CL842_CHUNK_STRIDE=" << m_inputChunkStride;
@@ -107,12 +238,29 @@ void CL842DeviceDecompressor::buildProgram(
 	else if (m_inputFormat == CL842InputFormat::INPLACE_COMPRESSED_CHUNKS)
 		options << " -D USE_INPLACE_COMPRESSED_CHUNKS=1";
 
-	std::string src(CL842_DECOMPRESS_KERNEL_SOURCE);
-	// Instead of using OpenCL's include mechanism, or duplicating the common 842
-	// definitions, we just paste the entire header file on top ourselves
-	// This works nicely and avoids us many headaches due to OpenCL headers
-	// (most importantly, that for our project, dOpenCL doesn't support them)
-	src.insert(0, CL842_DECOMPRESS_842DEFS_SOURCE);
+#ifdef CL842_USE_PROGRAM_CACHE
+	program_cache cache;
+	cache.sourceHash = crc32_be(0, reinterpret_cast<const uint8_t *>(src.data()), src.length());
+	cache.inputChunkSize = m_inputChunkSize;
+	cache.inputChunkStride = m_inputChunkStride;
+	cache.inputFormat = m_inputFormat;
+	for (const auto &d : devices)
+		cache.deviceNames.push_back(d.getInfo<CL_DEVICE_NAME>());
+
+	auto binaries = cache.find();
+	if (!binaries.empty()) {
+		try {
+			m_program = cl::Program(context, devices, binaries);
+			m_program.build(devices, options.str().c_str());
+			return;
+		} catch (const cl::Error &ex) {
+			std::cerr
+				<< "WARNING: Building the CL842 program from cache failed, "
+				<< "rebuilding from source" << std::endl;
+		}
+	}
+#endif
+
 	m_program = cl::Program(context, src);
 	try {
 		m_program.build(devices, options.str().c_str());
@@ -126,6 +274,9 @@ void CL842DeviceDecompressor::buildProgram(
 		}
 		throw;
 	}
+#ifdef CL842_USE_PROGRAM_CACHE
+	cache.set(m_program.getInfo<CL_PROGRAM_BINARIES>());
+#endif
 }
 
 CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkSize,
