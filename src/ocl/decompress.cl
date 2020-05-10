@@ -321,7 +321,7 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset, __global c
 
 #if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
 	if (my_in[0] != 0xd72de597bf465abe ||
-	    my_in[1] != 0x7670d6ee1a947cb2) { // = CL842_COMPRESSED_CHUNK_MAGIC
+	    my_in[1] != 0x7670d6ee1a947cb2) { // = LIB842_COMPRESSED_CHUNK_MARKER
 #ifdef USE_MAYBE_COMPRESSED_CHUNKS
 		for (size_t i = 0; i < CL842_CHUNK_SIZE; i++) {
 			my_out[i] = my_in[i];

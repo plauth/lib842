@@ -19,10 +19,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-static const uint8_t CL842_COMPRESSED_CHUNK_MAGIC[16] = {
-	0xbe, 0x5a, 0x46, 0xbf, 0x97, 0xe5, 0x2d, 0xd7, 0xb2, 0x7c, 0x94, 0x1a, 0xee, 0xd6, 0x70, 0x76
-};
-
 enum class CL842InputFormat {
 	// This is the simplest format, in which the input buffer contains blocks
 	// of size (inputChunkSize*2), which are always compressed
@@ -31,7 +27,7 @@ enum class CL842InputFormat {
 	ALWAYS_COMPRESSED_CHUNKS,
 	// In this format, the input buffer contains blocks of size inputChunkSize
 	// Inside this buffer, uncompressible data is stored as-is and compressible
-	// data is stored with a "marker" header (see CL842_COMPRESSED_CHUNK_MAGIC et al.)
+	// data is stored with a "marker" header (see LIB842_COMPRESSED_CHUNK_MARKER et al.)
 	// This format allows mixing compressed and uncompressed chunks, which minimizes
 	// the space overhead. However, uncompressed chunks still need to be copied
 	// from the input to the output buffer

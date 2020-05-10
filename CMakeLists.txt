@@ -72,6 +72,10 @@ if(CRYPTODEV_LINUX_COMP_FOUND)
     set(SRCFILES ${SRCFILES} src/cryptodev/842_interface.c)
 endif()
 
+# Streams
+set(SRCFILES ${SRCFILES} src/stream/DataCompressionStream.cpp
+                         src/stream/DataDecompressionStream.cpp)
+
 # OpenCL implementation
 if (OpenCL_FOUND)
     set(LIB842_HAVE_OPENCL ON)

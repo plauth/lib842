@@ -4,6 +4,7 @@
 
 #include "sw842.h"
 #include "cl842.h"
+#include "common842.h"
 
 using namespace std;
 
@@ -92,14 +93,14 @@ int main(int argc, char *argv[])
         A file is compressed as follows: It is first chunked into chunks of size
         CHUNK_SIZE, and each chunk is compressed with 842. Chunks are
         classified as compressible if the compressed size is
-        <= CHUNK_SIZE - sizeof(CL842_COMPRESSED_CHUNK_MAGIC) - sizeof(uint64_t),
+        <= CHUNK_SIZE - sizeof(LIB842_COMPRESSED_CHUNK_MARKER) - sizeof(uint64_t),
         otherwise they are considered incompressible.
 
         The chunks are placed into the decompression buffer as follows:
         * For incompressible chunks, the compressed version is thrown away
           and the uncompressed data is written directly to the buffer.
         * For compressible chunks, the following is written to the buffer:
-          CL842_COMPRESSED_CHUNK_MAGIC: A sequence of bytes (similar to a UUID) that allows
+          LIB842_COMPRESSED_CHUNK_MARKER: A sequence of bytes (similar to a UUID) that allows
                                         recognizing that this is a compressed chunk.
           Size (64-bit): The size of the data after compression.
           *BLANK*: All unused space in the chunk is placed here.
@@ -108,7 +109,7 @@ int main(int argc, char *argv[])
         The (MAYBE|INPLACE)_COMPRESSED_CHUNKS flag is propagated to the OpenCL decompression kernel,
         which recognizes this format and does a little more work to handle it.
         Mostly, it ignores uncompressed/incompressible chunks
-        (because it sees that CL842_COMPRESSED_CHUNK_MAGIC is not present),
+        (because it sees that LIB842_COMPRESSED_CHUNK_MARKER is not present),
         and decompresses compressed chunks in-place, using some lookahead
         bytes to ensure that the output pointer doesn't 'catch up' the input pointer.
     */
@@ -130,13 +131,13 @@ int main(int argc, char *argv[])
 					  &temp_buffer[0], &chunk_olen);
 			if (chunk_olen <=
 			    CHUNK_SIZE -
-				    sizeof(CL842_COMPRESSED_CHUNK_MAGIC) -
+				    sizeof(LIB842_COMPRESSED_CHUNK_MARKER) -
 				    sizeof(uint64_t)) {
-				memcpy(chunk_out, CL842_COMPRESSED_CHUNK_MAGIC,
-				       sizeof(CL842_COMPRESSED_CHUNK_MAGIC));
+				memcpy(chunk_out, LIB842_COMPRESSED_CHUNK_MARKER,
+				       sizeof(LIB842_COMPRESSED_CHUNK_MARKER));
 				*reinterpret_cast<uint64_t *>(
 					chunk_out +
-					sizeof(CL842_COMPRESSED_CHUNK_MAGIC)) =
+					sizeof(LIB842_COMPRESSED_CHUNK_MARKER)) =
 					chunk_olen;
 				memcpy(&chunk_out[CHUNK_SIZE - chunk_olen],
 				       &temp_buffer[0], chunk_olen);
