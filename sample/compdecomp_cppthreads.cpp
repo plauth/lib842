@@ -29,17 +29,17 @@
 #define lib842_decompress(in, ilen, out, olen) accel_decompress(in, ilen, out, olen, 0)
 #define lib842_compress(in, ilen, out, olen) accel_compress(in, ilen, out, olen, 0)
 #elif defined(USEHW)
-#include "hw842.h"
+#include <lib842/hw.h>
 #define ALIGNMENT 0
 #define lib842_decompress hw842_decompress
 #define lib842_compress hw842_compress
 #elif defined(USEOPTSW)
-#include "sw842.h"
+#include <lib842/sw.h>
 #define ALIGNMENT 0
 #define lib842_decompress optsw842_decompress
 #define lib842_compress optsw842_compress
 #else
-#include "sw842.h"
+#include <lib842/sw.h>
 #define ALIGNMENT 0
 #define lib842_decompress sw842_decompress
 #define lib842_compress sw842_compress

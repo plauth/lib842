@@ -1,5 +1,5 @@
-#ifndef COMPDECOMP_DRIVER_H
-#define COMPDECOMP_DRIVER_H
+#ifndef LIB842_SAMPLE_COMPDECOMP_DRIVER_H
+#define LIB842_SAMPLE_COMPDECOMP_DRIVER_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -27,4 +27,4 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 }
 #endif
 
-#endif
+#endif // LIB842_SAMPLE_COMPDECOMP_DRIVER_H

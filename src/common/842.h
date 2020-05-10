@@ -1,5 +1,5 @@
-#ifndef __842_H__
-#define __842_H__
+#ifndef LIB842_SRC_COMMON_842_H
+#define LIB842_SRC_COMMON_842_H
 
 /* The 842 compressed format is made up of multiple blocks, each of
  * which have the format:
@@ -137,4 +137,4 @@
 #define OP_DEC_I8	{(I8_BITS | OP_DEC_INDEX), 8}
 
 
-#endif
+#endif // LIB842_SRC_COMMON_842_H

@@ -16,7 +16,7 @@
  * See 842.h for details of the 842 compressed format.
  */
 #include "842-internal.h"
-#include "sw842.h"
+#include <lib842/sw.h>
 #include "../common/memaccess.h"
 #include "../common/endianness.h"
 #include "../common/crc32.h"

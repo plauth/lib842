@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <sys/time.h>
 
-#include "sw842.h"
-#include "cuda842.h"
+#include <lib842/sw.h>
+#include <lib842/cuda.h>
 
 #define THREADS_PER_BLOCK 32
 #define STRLEN 32
@@ -33,13 +33,13 @@ long long timestamp()
 size_t nextMultipleOfChunkSize(size_t input)
 {
 	size_t size =
-		CUDA842_CHUNK_SIZE * CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
+		LIB842_CUDA_CHUNK_SIZE * CHUNKS_PER_THREAD * THREADS_PER_BLOCK;
 	return (input + (size - 1)) & ~(size - 1);
 }
 
 int main(int argc, const char *argv[])
 {
-#ifdef CUDA842_STRICT
+#ifdef LIB842_CUDA_STRICT
 	printf("Running in strict mode (i.e. fully compatible to the hardware-based nx842 unit).\n");
 #endif
 	uint8_t *in, *compressed, *decompressed;
@@ -141,10 +141,10 @@ int main(int argc, const char *argv[])
 		fclose(fp);
 	}
 
-	if (ilen > CUDA842_CHUNK_SIZE) {
-		printf("Using chunks of %d bytes\n", CUDA842_CHUNK_SIZE);
+	if (ilen > LIB842_CUDA_CHUNK_SIZE) {
+		printf("Using chunks of %d bytes\n", LIB842_CUDA_CHUNK_SIZE);
 
-		size_t num_chunks = ilen / CUDA842_CHUNK_SIZE;
+		size_t num_chunks = ilen / LIB842_CUDA_CHUNK_SIZE;
 		size_t *compressedChunkPositions =
 			(size_t *)malloc(sizeof(size_t) * num_chunks);
 		size_t *compressedChunkSizes =
@@ -154,14 +154,14 @@ int main(int argc, const char *argv[])
 #pragma omp parallel for
 		for (size_t chunk_num = 0; chunk_num < num_chunks;
 		     chunk_num++) {
-			size_t chunk_olen = CUDA842_CHUNK_SIZE * 2;
+			size_t chunk_olen = LIB842_CUDA_CHUNK_SIZE * 2;
 			uint8_t *chunk_in =
-				in + (CUDA842_CHUNK_SIZE * chunk_num);
+				in + (LIB842_CUDA_CHUNK_SIZE * chunk_num);
 			uint8_t *chunk_out =
 				compressed +
-				((CUDA842_CHUNK_SIZE * 2) * chunk_num);
+				((LIB842_CUDA_CHUNK_SIZE * 2) * chunk_num);
 
-			optsw842_compress(chunk_in, CUDA842_CHUNK_SIZE, chunk_out,
+			optsw842_compress(chunk_in, LIB842_CUDA_CHUNK_SIZE, chunk_out,
 				          &chunk_olen);
 			compressedChunkSizes[chunk_num] = chunk_olen;
 		}
@@ -177,9 +177,9 @@ int main(int argc, const char *argv[])
 		for (size_t i = 0; i < num_chunks; i += chunks_per_kernel) {
 			cudaMemcpyAsync(
 				compressedD +
-					((i * CUDA842_CHUNK_SIZE * 2) / 8),
-				compressedH + (i * CUDA842_CHUNK_SIZE * 2),
-				chunks_per_kernel * CUDA842_CHUNK_SIZE * 2,
+					((i * LIB842_CUDA_CHUNK_SIZE * 2) / 8),
+				compressedH + (i * LIB842_CUDA_CHUNK_SIZE * 2),
+				chunks_per_kernel * LIB842_CUDA_CHUNK_SIZE * 2,
 				cudaMemcpyHostToDevice,
 				streams[stream_counter % STREAM_COUNT]);
 			cuda842_decompress<<<
@@ -187,12 +187,12 @@ int main(int argc, const char *argv[])
 				THREADS_PER_BLOCK, 0,
 				streams[stream_counter % STREAM_COUNT]>>>(
 				compressedD +
-					(i * (CUDA842_CHUNK_SIZE / 8) * 2),
-				decompressedD + (i * (CUDA842_CHUNK_SIZE / 8)));
+					(i * (LIB842_CUDA_CHUNK_SIZE / 8) * 2),
+				decompressedD + (i * (LIB842_CUDA_CHUNK_SIZE / 8)));
 			cudaMemcpyAsync(
-				decompressedH + (i * CUDA842_CHUNK_SIZE),
-				decompressedD + (i * (CUDA842_CHUNK_SIZE / 8)),
-				chunks_per_kernel * CUDA842_CHUNK_SIZE,
+				decompressedH + (i * LIB842_CUDA_CHUNK_SIZE),
+				decompressedD + (i * (LIB842_CUDA_CHUNK_SIZE / 8)),
+				chunks_per_kernel * LIB842_CUDA_CHUNK_SIZE,
 				cudaMemcpyDeviceToHost,
 				streams[stream_counter % STREAM_COUNT]);
 			stream_counter++;
@@ -209,9 +209,9 @@ int main(int argc, const char *argv[])
 			cuda842_decompress<<<chunks_per_kernel / THREADS_PER_BLOCK,
 					     THREADS_PER_BLOCK, 0>>>(
 				((uint64_t *)compressed) +
-					(i * (CUDA842_CHUNK_SIZE / 8) * 2),
+					(i * (LIB842_CUDA_CHUNK_SIZE / 8) * 2),
 				((uint64_t *)decompressed) +
-					(i * (CUDA842_CHUNK_SIZE / 8)));
+					(i * (LIB842_CUDA_CHUNK_SIZE / 8)));
 		}
 		cudaDeviceSynchronize();
 		cuda_error = cudaGetLastError();

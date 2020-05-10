@@ -1,6 +1,6 @@
 // TODOXXX: Should add the code to spread the threads among NUMA zones for HW? (From lib842 sample)
 
-#include <compstream842.h>
+#include <lib842/stream/comp.h>
 
 // If INDEPTH_TRACE is defined, more traces and statistics are generated
 //#define INDEPTH_TRACE

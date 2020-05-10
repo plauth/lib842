@@ -24,7 +24,7 @@
 #endif
 #include <sys/ioctl.h>
 #include <crypto/cryptodev.h>
-#include "hw842.h"
+#include <lib842/hw.h>
 
 struct cryptodev_ctx {
 	int cfd;

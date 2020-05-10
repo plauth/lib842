@@ -1,6 +1,5 @@
-
-#ifndef __842_INTERNAL_H__
-#define __842_INTERNAL_H__
+#ifndef LIB842_SRC_SERIAL_842_INTERNAL_H
+#define LIB842_SRC_SERIAL_842_INTERNAL_H
 
 #include "../common/842.h"
 #include "uthash/src/uthash.h"
@@ -73,4 +72,4 @@ struct sw842_param_decomp {
 	uint64_t olen;
 };
 
-#endif
+#endif // LIB842_SRC_SERIAL_842_INTERNAL_H

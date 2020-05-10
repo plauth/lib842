@@ -1,7 +1,7 @@
-#ifndef __HW842_H__
-#define __HW842_H__
+#ifndef LIB842_HW_H
+#define LIB842_HW_H
 
-#include "config842.h"
+#include <lib842/config.h>
 
 #ifdef LIB842_HAVE_CRYPTODEV_LINUX_COMP
 
@@ -24,4 +24,4 @@ int hw842_decompress(const uint8_t *in, size_t ilen,
 
 #endif
 
-#endif
+#endif // LIB842_HW_H

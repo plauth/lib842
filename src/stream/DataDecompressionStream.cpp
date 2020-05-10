@@ -1,6 +1,6 @@
 // TODOXXX: Should add the code to spread the threads among NUMA zones for HW? (From lib842 sample)
 
-#include <decompstream842.h>
+#include <lib842/stream/decomp.h>
 
 #include <cassert>
 

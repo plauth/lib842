@@ -1,7 +1,7 @@
-#ifndef __CL842_H__
-#define __CL842_H__
+#ifndef LIB842_CL_H
+#define LIB842_CL_H
 
-#include "config842.h"
+#include <lib842/config.h>
 
 #ifdef LIB842_HAVE_OPENCL
 
@@ -19,7 +19,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum class CL842InputFormat {
+namespace lib842 {
+
+enum class CLDecompressorInputFormat {
 	// This is the simplest format, in which the input buffer contains blocks
 	// of size (inputChunkSize*2), which are always compressed
 	// This format is typically not useful for realistic scenarios, due to
@@ -40,17 +42,18 @@ enum class CL842InputFormat {
 };
 
 /**
- * Low-level interface to CL842, for integration into existing OpenCL applications
+ * Low-level interface to the OpenCL-based 842 decompressor,
+ * for integration into existing OpenCL applications
  * where context, command queue, buffers, etc. are already available.
  */
-class CL842DeviceDecompressor
+class CLDeviceDecompressor
 {
 	public:
-		CL842DeviceDecompressor(const cl::Context& context,
+		CLDeviceDecompressor(const cl::Context& context,
 					const cl::vector<cl::Device>& devices,
 					size_t inputChunkSize,
 					size_t inputChunkStride,
-					CL842InputFormat inputFormat,
+					CLDecompressorInputFormat inputFormat,
 					bool verbose = false);
 		void decompress(const cl::CommandQueue& commandQueue,
 				const cl::Buffer& inputBuffer, size_t inputOffset,
@@ -63,7 +66,7 @@ class CL842DeviceDecompressor
 	private:
 		size_t m_inputChunkSize;
 		size_t m_inputChunkStride;
-		CL842InputFormat m_inputFormat;
+		CLDecompressorInputFormat m_inputFormat;
 		bool m_verbose;
 		cl::Program m_program;
 
@@ -71,16 +74,17 @@ class CL842DeviceDecompressor
 };
 
 /**
- * High-level interface to CL842, for easily compressing data available on the host
+ * High-level interface to the OpenCL-based 842 decompressor,
+ * for easily compressing data available on the host
  * using any available OpenCL-capable devices.
  */
-class CL842HostDecompressor
+class CLHostDecompressor
 {
 	public:
-		CL842HostDecompressor(size_t inputChunkSize,
-				      size_t inputChunkStride,
-				      CL842InputFormat inputFormat,
-				      bool verbose = false);
+		CLHostDecompressor(size_t inputChunkSize,
+				   size_t inputChunkStride,
+				   CLDecompressorInputFormat inputFormat,
+				   bool verbose = false);
 		void decompress(const uint8_t* input, size_t inputSize,
 				const size_t *inputSizes,
 				uint8_t* output, size_t outputSize,
@@ -88,15 +92,17 @@ class CL842HostDecompressor
 
 	private:
 		size_t m_inputChunkStride;
-		CL842InputFormat m_inputFormat;
+		CLDecompressorInputFormat m_inputFormat;
 		bool m_verbose;
 		cl::vector<cl::Device> m_devices;
 		cl::Context m_context;
 		cl::CommandQueue m_queue;
-		CL842DeviceDecompressor m_deviceCompressor;
+		CLDeviceDecompressor m_deviceCompressor;
 
 		cl::vector<cl::Device> findDevices() const;
 };
+
+} // namespace lib842
 
 extern "C" {
 #endif
@@ -113,4 +119,4 @@ int cl842_decompress(const uint8_t *in, size_t ilen,
 
 #endif
 
-#endif
+#endif // LIB842_CL_H

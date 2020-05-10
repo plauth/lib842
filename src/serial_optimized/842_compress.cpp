@@ -17,7 +17,7 @@
  */
 #include "842-internal.h"
 #include "bitstream.h"
-#include "sw842.h"
+#include <lib842/sw.h>
 #include "../common/opcodes.h"
 #include "../common/endianness.h"
 #include "../common/memaccess.h"
@@ -589,7 +589,7 @@ int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
 		 */
 		get_next_data(p);
 
-#ifdef CUDA842_STRICT
+#ifdef LIB842_CUDA_STRICT
 		/* we don't care about endianness in last or next;
 		 * we're just comparing 8 bytes to another 8 bytes,
 		 * they're both the same endianness

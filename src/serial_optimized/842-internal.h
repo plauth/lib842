@@ -1,11 +1,10 @@
-
-#ifndef __842_INTERNAL_H__
-#define __842_INTERNAL_H__
+#ifndef LIB842_SRC_SERIAL_OPTIMIZED_842_INTERNAL_H
+#define LIB842_SRC_SERIAL_OPTIMIZED_842_INTERNAL_H
 
 #include "../common/842.h"
 #include <cstdint>
 
-#define CUDA842_STRICT
+#define LIB842_CUDA_STRICT
 
 // If enabled, enables handling of invalid bitstreams and undersized
 // input or output buffers, which are exceptional errors that can be
@@ -65,4 +64,4 @@ struct sw842_param_decomp {
 	uint64_t buffer;
 };
 
-#endif
+#endif // LIB842_SRC_SERIAL_OPTIMIZED_842_INTERNAL_H

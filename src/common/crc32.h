@@ -1,5 +1,5 @@
-#ifndef __CRC32_H__
-#define __CRC32_H__
+#ifndef LIB842_SRC_COMMON_CRC32_H
+#define LIB842_SRC_COMMON_CRC32_H
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -67,4 +67,4 @@ static inline uint32_t crc32_be(uint32_t crc, unsigned char const *buf, size_t l
 #undef DO_CRC8
 }
 
-#endif
+#endif // LIB842_SRC_COMMON_CRC32_H

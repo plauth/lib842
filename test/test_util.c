@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <sw842.h>
-#include <hw842.h>
-#include <cl842.h>
+#include <lib842/sw.h>
+#include <lib842/hw.h>
+#include <lib842/cl.h>
 
 #define HEXDUMP_BYTES_PER_LINE 8
 

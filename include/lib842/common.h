@@ -1,5 +1,5 @@
-#ifndef __COMMON842_H__
-#define __COMMON842_H__
+#ifndef LIB842_COMMON_H
+#define LIB842_COMMON_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -33,4 +33,4 @@ static const uint8_t LIB842_COMPRESSED_CHUNK_MARKER[16] = {
 	0xbe, 0x5a, 0x46, 0xbf, 0x97, 0xe5, 0x2d, 0xd7, 0xb2, 0x7c, 0x94, 0x1a, 0xee, 0xd6, 0x70, 0x76
 };
 
-#endif
+#endif // LIB842_COMMON_H

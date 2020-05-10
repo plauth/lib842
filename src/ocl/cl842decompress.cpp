@@ -1,4 +1,4 @@
-#include "cl842.h"
+#include <lib842/cl.h>
 
 #include <iostream>
 #include <sstream>
@@ -6,9 +6,9 @@
 #include <chrono>
 #include <algorithm>
 
-#define CL842_USE_PROGRAM_CACHE
+#define LIB842_CLDECOMPRESS_USE_PROGRAM_CACHE
 
-#ifdef CL842_USE_PROGRAM_CACHE
+#ifdef LIB842_CLDECOMPRESS_USE_PROGRAM_CACHE
 #include <cassert>
 #include <fstream>
 #include "../common/crc32.h"
@@ -16,17 +16,19 @@
 
 // Those two symbols are generated during the build process and define
 // the source of the decompression OpenCL kernel and the common 842 definitions
-extern const char *CL842_DECOMPRESS_842DEFS_SOURCE;
-extern const char *CL842_DECOMPRESS_KERNEL_SOURCE;
+extern const char *LIB842_CLDECOMPRESS_842DEFS_SOURCE;
+extern const char *LIB842_CLDECOMPRESS_KERNEL_SOURCE;
+
+namespace lib842 {
 
 static constexpr size_t LOCAL_SIZE = 256;
 
-CL842DeviceDecompressor::CL842DeviceDecompressor(const cl::Context &context,
-						 const cl::vector<cl::Device> &devices,
-						 size_t inputChunkSize,
-						 size_t inputChunkStride,
-						 CL842InputFormat inputFormat,
-						 bool verbose)
+CLDeviceDecompressor::CLDeviceDecompressor(const cl::Context &context,
+					   const cl::vector<cl::Device> &devices,
+					   size_t inputChunkSize,
+					   size_t inputChunkStride,
+					   CLDecompressorInputFormat inputFormat,
+					   bool verbose)
 	: m_inputChunkSize(inputChunkSize),
 	  m_inputChunkStride(inputChunkStride),
 	  m_inputFormat(inputFormat),
@@ -35,18 +37,18 @@ CL842DeviceDecompressor::CL842DeviceDecompressor(const cl::Context &context,
 	buildProgram(context, devices);
 }
 
-void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
-					 const cl::Buffer &inputBuffer,
-					 size_t inputOffset, size_t inputSize,
-					 const cl::Buffer &inputSizes,
-					 const cl::Buffer &outputBuffer,
-					 size_t outputOffset, size_t outputSize,
-					 const cl::Buffer &outputSizes,
-					 const cl::Buffer &returnValues,
-					 const cl::vector<cl::Event> *events,
-					 cl::Event *event) const
+void CLDeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
+				      const cl::Buffer &inputBuffer,
+				      size_t inputOffset, size_t inputSize,
+				      const cl::Buffer &inputSizes,
+				      const cl::Buffer &outputBuffer,
+				      size_t outputOffset, size_t outputSize,
+				      const cl::Buffer &outputSizes,
+				      const cl::Buffer &returnValues,
+				      const cl::vector<cl::Event> *events,
+				      cl::Event *event) const
 {
-	if (m_inputFormat == CL842InputFormat::INPLACE_COMPRESSED_CHUNKS) {
+	if (m_inputFormat == CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS) {
 		if (inputBuffer() != outputBuffer() ||
 		    inputOffset != outputOffset || inputSize != outputSize) {
 			throw cl::Error(CL_INVALID_VALUE);
@@ -102,7 +104,7 @@ void CL842DeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 	}
 }
 
-#ifdef CL842_USE_PROGRAM_CACHE
+#ifdef LIB842_CLDECOMPRESS_USE_PROGRAM_CACHE
 /* In OpenCL, for portability, programs are normally passed as strings and
  * built at run-time for the specific device they are run on, which is
  * expensive, specially if running many small applications (e.g. unit tests).
@@ -120,7 +122,7 @@ struct program_cache
 	// Program build options (#define's)
 	size_t inputChunkSize;
 	size_t inputChunkStride;
-	CL842InputFormat inputFormat;
+	CLDecompressorInputFormat inputFormat;
 	// Information of the devices the program was built for
 	// TODO: Is this enough to ensure we don't accidentally use the wrong cache?
 	cl::vector<cl::string> deviceNames;
@@ -145,7 +147,8 @@ struct program_cache
 		catch (const std::ifstream::failure &)
 		{
 			std::cerr
-				<< "WARNING: Could not read CL842 program cache" << std::endl;
+				<< "WARNING: Could not read lib842's OpenCL program cache"
+				<< std::endl;
 			return {};
 		}
 	}
@@ -218,27 +221,27 @@ private:
 };
 #endif
 
-void CL842DeviceDecompressor::buildProgram(
+void CLDeviceDecompressor::buildProgram(
 	const cl::Context &context, const cl::vector<cl::Device> &devices)
 {
-	cl::string src(CL842_DECOMPRESS_KERNEL_SOURCE);
+	cl::string src(LIB842_CLDECOMPRESS_KERNEL_SOURCE);
 	// Instead of using OpenCL's include mechanism, or duplicating the common 842
 	// definitions, we just paste the entire header file on top ourselves
 	// This works nicely and avoids us many headaches due to OpenCL headers
 	// (most importantly, that for our project, dOpenCL doesn't support them)
-	src.insert(0, CL842_DECOMPRESS_842DEFS_SOURCE);
+	src.insert(0, LIB842_CLDECOMPRESS_842DEFS_SOURCE);
 
 	std::ostringstream options;
 	options << "-D CL842_CHUNK_SIZE=" << m_inputChunkSize;
 	options << " -D CL842_CHUNK_STRIDE=" << m_inputChunkStride;
 	options << " -D EINVAL=" << EINVAL;
 	options << " -D ENOSPC=" << ENOSPC;
-	if (m_inputFormat == CL842InputFormat::MAYBE_COMPRESSED_CHUNKS)
+	if (m_inputFormat == CLDecompressorInputFormat::MAYBE_COMPRESSED_CHUNKS)
 		options << " -D USE_MAYBE_COMPRESSED_CHUNKS=1";
-	else if (m_inputFormat == CL842InputFormat::INPLACE_COMPRESSED_CHUNKS)
+	else if (m_inputFormat == CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS)
 		options << " -D USE_INPLACE_COMPRESSED_CHUNKS=1";
 
-#ifdef CL842_USE_PROGRAM_CACHE
+#ifdef LIB842_CLDECOMPRESS_USE_PROGRAM_CACHE
 	program_cache cache;
 	cache.sourceHash = crc32_be(0, reinterpret_cast<const uint8_t *>(src.data()), src.length());
 	cache.inputChunkSize = m_inputChunkSize;
@@ -255,8 +258,9 @@ void CL842DeviceDecompressor::buildProgram(
 			return;
 		} catch (const cl::Error &ex) {
 			std::cerr
-				<< "WARNING: Building the CL842 program from cache failed, "
-				<< "rebuilding from source" << std::endl;
+				<< "WARNING: Building the lib842's OpenCL program"
+				<< " from cache failed, rebuilding from source"
+				<< std::endl;
 		}
 	}
 #endif
@@ -274,15 +278,15 @@ void CL842DeviceDecompressor::buildProgram(
 		}
 		throw;
 	}
-#ifdef CL842_USE_PROGRAM_CACHE
+#ifdef LIB842_CLDECOMPRESS_USE_PROGRAM_CACHE
 	cache.set(m_program.getInfo<CL_PROGRAM_BINARIES>());
 #endif
 }
 
-CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkSize,
-					     size_t inputChunkStride,
-					     CL842InputFormat inputFormat,
-					     bool verbose)
+CLHostDecompressor::CLHostDecompressor(size_t inputChunkSize,
+				       size_t inputChunkStride,
+				       CLDecompressorInputFormat inputFormat,
+				       bool verbose)
 	: m_inputChunkStride(inputChunkStride),
 	  m_inputFormat(inputFormat),
 	  m_verbose(verbose),
@@ -293,7 +297,7 @@ CL842HostDecompressor::CL842HostDecompressor(size_t inputChunkSize,
 {
 }
 
-cl::vector<cl::Device> CL842HostDecompressor::findDevices() const
+cl::vector<cl::Device> CLHostDecompressor::findDevices() const
 {
 	cl::vector<cl::Platform> platforms;
 	cl::Platform::get(&platforms);
@@ -356,11 +360,11 @@ cl::vector<cl::Device> CL842HostDecompressor::findDevices() const
 	throw cl::Error(CL_DEVICE_NOT_FOUND);
 }
 
-void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
-				       const size_t *inputSizes,
-				       uint8_t *output, size_t outputSize,
-				       size_t *outputSizes,
-				       int *returnValues) const
+void CLHostDecompressor::decompress(const uint8_t *input, size_t inputSize,
+				    const size_t *inputSizes,
+				    uint8_t *output, size_t outputSize,
+				    size_t *outputSizes,
+				    int *returnValues) const
 {
 	size_t numChunks =
 		(inputSize + m_inputChunkStride - 1) / (m_inputChunkStride);
@@ -391,7 +395,7 @@ void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 			numChunks * sizeof(cl_int));
 	}
 
-	if (m_inputFormat == CL842InputFormat::INPLACE_COMPRESSED_CHUNKS) {
+	if (m_inputFormat == CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS) {
 		if (input != output || inputSize != outputSize) {
 			throw cl::Error(CL_INVALID_VALUE);
 		}
@@ -416,7 +420,7 @@ void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 			throw cl::Error(CL_INVALID_VALUE);
 		}
 		if (m_inputFormat ==
-			    CL842InputFormat::MAYBE_COMPRESSED_CHUNKS &&
+			    CLDecompressorInputFormat::MAYBE_COMPRESSED_CHUNKS &&
 		    inputSize != outputSize) {
 			throw cl::Error(CL_INVALID_VALUE);
 		}
@@ -455,13 +459,16 @@ void CL842HostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 	}
 }
 
+} // namespace lib842
+
 int cl842_decompress(const uint8_t *in, size_t ilen,
 		     uint8_t *out, size_t *olen)
 {
 	try {
-		static CL842HostDecompressor decompressor(65536, 99999 /* Doesn't matter */,
-							 CL842InputFormat::ALWAYS_COMPRESSED_CHUNKS,
-							 true);
+		static lib842::CLHostDecompressor decompressor(
+			65536, 99999 /* Doesn't matter */,
+			lib842::CLDecompressorInputFormat::ALWAYS_COMPRESSED_CHUNKS,
+			true);
 		int ret;
 		decompressor.decompress(in, ilen, &ilen, out, *olen, olen, &ret);
 

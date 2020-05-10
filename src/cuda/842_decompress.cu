@@ -3,7 +3,7 @@
 /* number of bits in a buffered word */
 #define WSIZE 64 //sizeof(uint64_t)
 
-#ifdef CUDA842_STRICT
+#ifdef LIB842_CUDA_STRICT
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE (2 * (1 << I2_BITS))
 #define I4_FIFO_SIZE (4 * (1 << I4_BITS))
@@ -91,7 +91,7 @@ __device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 	return value;
 }
 
-#ifdef CUDA842_STRICT
+#ifdef LIB842_CUDA_STRICT
 __device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 				     uint64_t index, uint64_t fsize)
 {
@@ -127,8 +127,8 @@ __global__ void cuda842_decompress(__restrict__ const uint64_t *in,
 	unsigned int chunk_num = blockIdx.x * blockDim.x + threadIdx.x;
 
 	struct sw842_param_decomp p;
-	p.ostart = p.out = out + ((CUDA842_CHUNK_SIZE / 8) * chunk_num);
-	p.in = (in + ((CUDA842_CHUNK_SIZE / 8 * 2) * chunk_num));
+	p.ostart = p.out = out + ((LIB842_CUDA_CHUNK_SIZE / 8) * chunk_num);
+	p.in = (in + ((LIB842_CUDA_CHUNK_SIZE / 8 * 2) * chunk_num));
 
 	p.buffer = 0;
 	p.bits = 0;
@@ -138,7 +138,7 @@ __global__ void cuda842_decompress(__restrict__ const uint64_t *in,
 	uint64_t output_word;
 	uint32_t bits;
 
-#ifdef CUDA842_STRICT
+#ifdef LIB842_CUDA_STRICT
 	do {
 		op = read_bits(&p, OP_BITS);
 
@@ -176,7 +176,7 @@ __global__ void cuda842_decompress(__restrict__ const uint64_t *in,
 				uint32_t dst_size = dec_templates[op][i][1];
 
 				value = read_bits(&p, dec_template & 0x7F);
-#ifdef CUDA842_STRICT
+#ifdef LIB842_CUDA_STRICT
 				if (is_index) {
 					uint64_t offset =
 						get_index(&p, dst_size, value,
@@ -277,7 +277,7 @@ __global__ void cuda842_decompress(__restrict__ const uint64_t *in,
 			}
 			*p.out++ = bswap(output_word);
 
-#ifdef CUDA842_STRICT
+#ifdef LIB842_CUDA_STRICT
 		}
 	} while (op != OP_END);
 #else

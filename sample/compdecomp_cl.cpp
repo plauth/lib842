@@ -2,9 +2,9 @@
 #include <fstream>
 #include <stdint.h>
 
-#include "sw842.h"
-#include "cl842.h"
-#include "common842.h"
+#include <lib842/sw.h>
+#include <lib842/cl.h>
+#include <lib842/common.h>
 
 using namespace std;
 
@@ -164,21 +164,21 @@ int main(int argc, char *argv[])
 
 	try {
 #if defined(USE_INPLACE_COMPRESSED_CHUNKS)
-		CL842HostDecompressor clDecompress(
+		lib842::CLHostDecompressor clDecompress(
 			CHUNK_SIZE, CHUNK_SIZE,
-			CL842InputFormat::INPLACE_COMPRESSED_CHUNKS, true);
+			lib842::CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS, true);
 		clDecompress.decompress(decompressIn, olen, nullptr, decompressIn, dlen, nullptr, nullptr);
 		memcpy(decompressOut, decompressIn, olen);
 #elif defined(USE_MAYBE_COMPRESSED_CHUNKS)
-		CL842HostDecompressor clDecompress(
+		lib842::CLHostDecompressor clDecompress(
 			CHUNK_SIZE, CHUNK_SIZE,
-			CL842InputFormat::MAYBE_COMPRESSED_CHUNKS, true);
+			lib842::CLDecompressorInputFormat::MAYBE_COMPRESSED_CHUNKS, true);
 		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
 					dlen, nullptr, nullptr);
 #else
-		CL842HostDecompressor clDecompress(
+		lib842::CLHostDecompressor clDecompress(
 			CHUNK_SIZE, CHUNK_SIZE * 2,
-			CL842InputFormat::ALWAYS_COMPRESSED_CHUNKS, true);
+			lib842::CLDecompressorInputFormat::ALWAYS_COMPRESSED_CHUNKS, true);
 		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
 					dlen, nullptr, nullptr);
 #endif

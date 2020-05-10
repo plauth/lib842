@@ -1,5 +1,5 @@
-#ifndef __OPCODES_H__
-#define __OPCODES_H__
+#ifndef LIB842_SRC_COMMON_OPCODES_H
+#define LIB842_SRC_COMMON_OPCODES_H
 
 #include "842.h"
 
@@ -287,4 +287,5 @@ static uint8_t templates[26][4][2] = { // params size in bits
 };
 
 #endif
-#endif
+
+#endif // LIB842_SRC_COMMON_OPCODES_H

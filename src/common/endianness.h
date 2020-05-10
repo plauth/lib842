@@ -1,5 +1,5 @@
-#ifndef __ENDIANNESS_H__
-#define __ENDIANNESS_H__
+#ifndef LIB842_SRC_COMMON_ENDIANNESS_H
+#define LIB842_SRC_COMMON_ENDIANNESS_H
 
 static inline uint16_t swap_endianness16(uint16_t input) {
 	#ifdef __x86_64__
@@ -90,4 +90,5 @@ static inline uint64_t swap_native_to_be64(uint64_t input){
 		return input;
 	#endif
 }
-#endif
+
+#endif // LIB842_SRC_COMMON_ENDIANNESS_H

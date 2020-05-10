@@ -1,14 +1,17 @@
-#ifndef __COMPSTREAM842_H__
-#define __COMPSTREAM842_H__
+#ifndef LIB842_STREAM_COMP_H
+#define LIB842_STREAM_COMP_H
+
+// High-performance compressor for real-time streaming data
+// (e.g. data coming from the network)
 
 #ifndef __cplusplus
 #error This header is C++-only.
 #endif
 
-#include "detail/barrier842.h"
+#include <lib842/detail/barrier.h>
 
-#include <commonstream842.h>
-#include <common842.h>
+#include <lib842/stream/common.h>
+#include <lib842/common.h>
 
 #include <thread>
 #include <mutex>
@@ -91,4 +94,4 @@ private:
 
 } // namespace lib842
 
-#endif
+#endif // LIB842_STREAM_COMP_H

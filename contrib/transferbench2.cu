@@ -4,9 +4,9 @@
 #include <sys/time.h>
 
 #ifdef USEHW
-#include "hw842.h"
+#include <lib842/hw.h>
 #else
-#include "sw842.h"
+#include <lib842/sw.h>
 #endif
 
 #define CHUNK_SIZE ((size_t)32768)

@@ -1,5 +1,8 @@
-#ifndef __BARRIER842_H__
-#define __BARRIER842_H__
+#ifndef LIB842_DETAIL_BARRIER_H
+#define LIB842_DETAIL_BARRIER_H
+
+// A standalone implementation of a barrier for thread coordination,
+// similar to Boost's boost::barrier or C++20's std::barrier
 
 #ifndef __cplusplus
 #error This header is C++-only.
@@ -43,4 +46,4 @@ private:
 
 } // namespace lib842
 
-#endif // __BARRIER842_H__
+#endif // LIB842_DETAIL_BARRIER_H

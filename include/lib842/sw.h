@@ -1,5 +1,5 @@
-#ifndef __SW842_H__
-#define __SW842_H__
+#ifndef LIB842_SW_H
+#define LIB842_SW_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -24,4 +24,4 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 }
 #endif
 
-#endif
+#endif // LIB842_SW_H

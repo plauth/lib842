@@ -1,15 +1,14 @@
-
-#ifndef __842_INTERNAL_H__
-#define __842_INTERNAL_H__
+#ifndef LIB842_SRC_CUDA_842_INTERNAL_H
+#define LIB842_SRC_CUDA_842_INTERNAL_H
 
 #include "../common/842.h"
-#include "cuda842.h"
+#include <lib842/cuda.h>
 
-#ifndef CUDA842_STRICT
+#ifndef LIB842_CUDA_STRICT
 #undef I2_BITS
 #undef I4_BITS
 #undef I8_BITS
-#define STATIC_LOG2_ARG CUDA842_CHUNK_SIZE
+#define STATIC_LOG2_ARG LIB842_CUDA_CHUNK_SIZE
 #include "../common/static_log2.h"
 #define I2_BITS (STATIC_LOG2_VALUE - 1)
 #define I4_BITS (STATIC_LOG2_VALUE - 2)
@@ -24,4 +23,4 @@ struct sw842_param_decomp {
 	uint64_t buffer;
 };
 
-#endif
+#endif // LIB842_SRC_CUDA_842_INTERNAL_H

@@ -1,5 +1,5 @@
-#ifndef LIB842_TEST_DATA_H
-#define LIB842_TEST_DATA_H
+#ifndef LIB842_TEST_TEST_PATTERNS_H
+#define LIB842_TEST_TEST_PATTERNS_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -19,4 +19,4 @@ struct test842_pattern {
 
 const struct test842_pattern *test842_get_pattern_by_name(const char *name);
 
-#endif
+#endif // LIB842_TEST_TEST_PATTERNS_H

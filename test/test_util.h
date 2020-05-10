@@ -1,7 +1,7 @@
-#ifndef LIB842_TEST_UTIL_H
-#define LIB842_TEST_UTIL_H
+#ifndef LIB842_TEST_TEST_UTIL_H
+#define LIB842_TEST_TEST_UTIL_H
 
-#include "common842.h"
+#include <lib842/common.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -15,4 +15,4 @@ struct test842_impl {
 };
 const struct test842_impl *test842_get_impl_by_name(const char *name);
 
-#endif //LIB842_TEST_UTIL_H
+#endif // LIB842_TEST_TEST_UTIL_H

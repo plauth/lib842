@@ -1,5 +1,5 @@
-#ifndef _KERNELDEPS_H
-#define _KERNELDEPS_H
+#ifndef LIB842_SRC_SERIAL_KERNELDEPS_H
+#define LIB842_SRC_SERIAL_KERNELDEPS_H
 
 #include <stdint.h>
 
@@ -61,4 +61,4 @@ static inline void put_unaligned_le64(uint64_t val, void *p)
 	ptr->x = val;
 }
 
-#endif /* _KERNELDEPS_H */
+#endif // LIB842_SRC_SERIAL_KERNELDEPS_H
