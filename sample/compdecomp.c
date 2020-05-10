@@ -85,7 +85,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			{ is_first_failure = omp_success; omp_success &= false; }
 			if (is_first_failure) {
 				fprintf(stderr, "FAIL: Error during compression (%d): %s\n",
-				        -err, strerror(-err));
+					-err, strerror(-err));
 			}
 		}
 		compressed_chunk_sizes[chunk_num] = chunk_olen;
@@ -153,7 +153,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			{ is_first_failure = omp_success; omp_success &= false; }
 			if (is_first_failure) {
 				fprintf(stderr, "FAIL: Error during decompression (%d): %s\n",
-				        -err, strerror(-err));
+					-err, strerror(-err));
 			}
 		}
 		decompressed_chunk_sizes[chunk_num] = chunk_dlen;
@@ -204,14 +204,14 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 	err = lib842_compress(in, ilen, out, olen);
 	if (err != 0) {
 		fprintf(stderr, "Error during compression (%d): %s\n",
-		        -err, strerror(-err));
+			-err, strerror(-err));
 		return false;
 	}
 
 	err = lib842_decompress(out, *olen, decompressed, dlen);
 	if (err != 0) {
 		fprintf(stderr, "Error during decompression (%d): %s\n",
-		        -err, strerror(-err));
+			-err, strerror(-err));
 		return false;
 	}
 

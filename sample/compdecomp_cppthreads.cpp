@@ -201,7 +201,7 @@ public:
 			int err = worker_func(chunk_num);
 			if (err != 0 && !thread_error.exchange(true)) {
 				fprintf(stderr, "FAIL: Error during %s (%d): %s\n",
-				        thread_kind, err, strerror(err));
+					thread_kind, err, strerror(err));
 			}
 		}
 	}
@@ -335,14 +335,14 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 	err = lib842_compress(in, ilen, out, olen);
 	if (err != 0) {
 		fprintf(stderr, "Error during compression (%d): %s\n",
-		        -err, strerror(-err));
+			-err, strerror(-err));
 		return false;
 	}
 
 	err = lib842_decompress(out, *olen, decompressed, dlen);
 	if (err != 0) {
 		fprintf(stderr, "Error during decompression (%d): %s\n",
-		        -err, strerror(-err));
+			-err, strerror(-err));
 		return false;
 	}
 
