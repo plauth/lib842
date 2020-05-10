@@ -104,7 +104,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 			// "Leader" thread clears the queue
 			if (thread_id == 0) {
 				lock.lock();
-				_queue = {};
+				_queue = std::queue<decompress_block>();
 				_state = decompress_state::processing;
 				_report_error = _state == decompress_state::handling_error;
 				lock.unlock();
