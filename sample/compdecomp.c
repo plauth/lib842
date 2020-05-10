@@ -82,7 +82,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		if (err != 0) {
 			bool is_first_failure;
 #pragma omp atomic capture
-			{ is_first_failure = omp_success; omp_success = false; }
+			{ is_first_failure = omp_success; omp_success &= false; }
 			if (is_first_failure) {
 				fprintf(stderr, "FAIL: Error during compression (%d): %s\n",
 				        -err, strerror(-err));
@@ -150,7 +150,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		if (err != 0) {
 			bool is_first_failure;
 #pragma omp atomic capture
-			{ is_first_failure = omp_success; omp_success = false; }
+			{ is_first_failure = omp_success; omp_success &= false; }
 			if (is_first_failure) {
 				fprintf(stderr, "FAIL: Error during decompression (%d): %s\n",
 				        -err, strerror(-err));
