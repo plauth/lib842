@@ -74,7 +74,8 @@ endif()
 
 # Streams
 set(SRCFILES ${SRCFILES} src/stream/DataCompressionStream.cpp
-                         src/stream/DataDecompressionStream.cpp)
+                         src/stream/DataDecompressionStream.cpp
+                         src/stream/numa_spread.cpp)
 
 # OpenCL implementation
 if (OpenCL_FOUND)
@@ -100,7 +101,6 @@ if (CUDA_FOUND)
 endif()
 
 configure_file(include/lib842/config.h.in include/lib842/config.h @ONLY)
-
 if (CUDA_FOUND)
     # NB: This is necessary for the CUDA build to work on CMake 3.5.1,
     #     as it appears that (target_)include_directories is not respected there
@@ -115,6 +115,10 @@ target_include_directories(842 PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${C
 if (OpenCL_FOUND)
     target_include_directories(842 PRIVATE ${OpenCL_INCLUDE_DIRS})
     target_link_libraries(842 ${OpenCL_LIBRARIES})
+endif()
+if (CMAKE_USE_PTHREADS_INIT AND NUMA_FOUND)
+    target_compile_definitions(842 PRIVATE "LIB842_HAVE_NUMA")
+    target_link_libraries(842 NUMA::NUMA)
 endif()
 if(CRYPTODEV_LINUX_COMP_FOUND)
     target_link_libraries(842 Threads::Threads)
@@ -137,13 +141,9 @@ if(STANDALONE_BUILD)
         target_link_libraries(test_serial_optimized OpenMP::OpenMP_C)
     endif()
 
-    add_executable(test_serial_optimized_cppthreads sample/compdecomp_cppthreads.cpp sample/compdecomp_driver.c)
-    target_compile_definitions(test_serial_optimized_cppthreads PRIVATE "USEOPTSW")
-    target_link_libraries(test_serial_optimized_cppthreads 842 Threads::Threads)
-    if (CMAKE_USE_PTHREADS_INIT AND NUMA_FOUND)
-        target_compile_definitions(test_serial_optimized_cppthreads PRIVATE "SPREAD_THREADS_AMONG_NUMA_NODES")
-        target_link_libraries(test_serial_optimized_cppthreads NUMA::NUMA)
-    endif()
+    add_executable(test_serial_optimized_streams sample/compdecomp_streams.cpp sample/compdecomp_driver.c)
+    target_compile_definitions(test_serial_optimized_streams PRIVATE "USEOPTSW")
+    target_link_libraries(test_serial_optimized_streams 842 Threads::Threads)
 
     if (CRYPTODEV_LINUX_COMP_FOUND)
         add_executable(test_cryptodev sample/compdecomp.c sample/compdecomp_driver.c)
@@ -153,13 +153,9 @@ if(STANDALONE_BUILD)
             target_link_libraries(test_cryptodev OpenMP::OpenMP_C)
         endif()
 
-        add_executable(test_cryptodev_cppthreads sample/compdecomp_cppthreads.cpp sample/compdecomp_driver.c)
-        target_compile_definitions(test_cryptodev_cppthreads PRIVATE "USEHW")
-        target_link_libraries(test_cryptodev_cppthreads 842 Threads::Threads)
-        if (CMAKE_USE_PTHREADS_INIT AND NUMA_FOUND)
-            target_compile_definitions(test_cryptodev_cppthreads PRIVATE "SPREAD_THREADS_AMONG_NUMA_NODES")
-            target_link_libraries(test_cryptodev_cppthreads NUMA::NUMA)
-        endif()
+        add_executable(test_cryptodev_streams sample/compdecomp_streams.cpp sample/compdecomp_driver.c)
+        target_compile_definitions(test_cryptodev_streams PRIVATE "USEHW")
+        target_link_libraries(test_cryptodev_streams 842 Threads::Threads)
     endif()
 
     if (AIX_HWCOMPRESSION_FOUND)

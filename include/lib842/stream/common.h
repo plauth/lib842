@@ -20,6 +20,11 @@ static constexpr size_t COMPR842_CHUNK_SIZE = 65536;
 static constexpr size_t NETWORK_BLOCK_SIZE = NUM_CHUNKS_PER_NETWORK_BLOCK * COMPR842_CHUNK_SIZE;
 static constexpr size_t COMPRESSIBLE_THRESHOLD = ((COMPR842_CHUNK_SIZE - sizeof(LIB842_COMPRESSED_CHUNK_MARKER) - sizeof(uint64_t)));
 
+enum class thread_policy {
+	use_defaults,
+	spread_threads_among_numa_nodes
+};
+
 } // namespace stream
 
 } // namespace lib842

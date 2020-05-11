@@ -9,6 +9,7 @@
 #endif
 
 #include <lib842/detail/barrier.h>
+#include <lib842/detail/latch.h>
 
 #include <lib842/stream/common.h>
 #include <lib842/common.h>
@@ -46,9 +47,15 @@ public:
 
 	DataCompressionStream(lib842_compress_func compress842_func,
 			      unsigned int num_threads,
+			      thread_policy thread_policy,
 			      std::function<std::ostream&(void)> error_logger,
 			      std::function<std::ostream&(void)> debug_logger);
 	~DataCompressionStream();
+
+	/* Blocks until the stream is ready to actually start processing data
+	   (the underlying threads have been spawned).
+	   This isn't only for debugging and benchmarking */
+	void wait_until_ready();
 
 	void start(const void *ptr, size_t size, bool skip_compress_step,
 		   std::function<void(compress_block &&)> block_available_callback);
@@ -63,6 +70,7 @@ private:
 
 	// Instance of the compression thread
 	std::vector<std::thread> _threads;
+	detail::latch _threads_ready;
 	// Mutex for protecting concurrent accesses to
 	// (_trigger, _quit)
 	std::mutex _trigger_mutex;
@@ -84,10 +92,10 @@ private:
 	std::atomic<bool> _error;
 	// Barrier for starting compression, necessary for ensuring that all compression
 	// threads have seen the trigger to start compressing before unsetting it
-	barrier _start_barrier;
+	detail::barrier _start_barrier;
 	// Barrier for finishing compression, necessary for ensuring that resources
 	// are not released until all threads have finished
-	barrier _finish_barrier;
+	detail::barrier _finish_barrier;
 };
 
 } // namespace stream

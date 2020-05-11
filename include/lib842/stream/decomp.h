@@ -9,6 +9,7 @@
 #endif
 
 #include <lib842/detail/barrier.h>
+#include <lib842/detail/latch.h>
 
 #include <lib842/stream/common.h>
 #include <lib842/common.h>
@@ -58,9 +59,16 @@ public:
 
 	DataDecompressionStream(lib842_decompress_func decompress842_func,
 				unsigned int num_threads,
+				thread_policy thread_policy,
 				std::function<std::ostream&(void)> error_logger,
 				std::function<std::ostream&(void)> debug_logger);
 	~DataDecompressionStream();
+
+	/* Blocks until the stream is ready to actually start processing data
+	   (the underlying threads have been spawned).
+	   This isn't only for debugging and benchmarking */
+	void wait_until_ready();
+
 	/* Starts a new decompression operation. */
 	void start();
 	/* Enqueues a new to be decompressed */
@@ -98,6 +106,7 @@ private:
 
 	// Instance of the decompression threads
 	std::vector<std::thread> _threads;
+	detail::latch _threads_ready;
 	// Mutex for protecting concurrent accesses to
 	// (_state, _queue, _report_error, _working_thread_count)
 	std::mutex _queue_mutex;
@@ -115,7 +124,7 @@ private:
 	std::condition_variable _queue_available;
 	// Barrier for finishing decompression, necessary for ensuring that resources
 	// are not released until all threads have finished
-	barrier _finish_barrier;
+	detail::barrier _finish_barrier;
 };
 
 } // namespace stream

@@ -1,4 +1,4 @@
-// TODOXXX: Should add the code to spread the threads among NUMA zones for HW? (From lib842 sample)
+#include "numa_spread.h"
 
 #include <lib842/stream/decomp.h>
 
@@ -14,11 +14,13 @@ namespace stream {
 DataDecompressionStream::DataDecompressionStream(
 	lib842_decompress_func decompress842_func,
 	unsigned int num_threads,
+	thread_policy thread_policy,
 	std::function<std::ostream&(void)> error_logger,
 	std::function<std::ostream&(void)> debug_logger) :
 	_decompress842_func(decompress842_func),
 	_error_logger(std::move(error_logger)),
 	_debug_logger(std::move(debug_logger)),
+	_threads_ready(num_threads),
 	_state(decompress_state::processing),
 	_working_thread_count(0),
 	_finish_barrier(num_threads),
@@ -26,6 +28,8 @@ DataDecompressionStream::DataDecompressionStream(
 	_threads.reserve(num_threads);
 	for (size_t i = 0; i < num_threads; i++)
 		_threads.emplace_back(&DataDecompressionStream::loop_decompress_thread, this, i);
+	if (thread_policy == thread_policy::spread_threads_among_numa_nodes)
+		spread_threads_among_numa_nodes(_threads);
 }
 
 DataDecompressionStream::~DataDecompressionStream() {
@@ -36,6 +40,10 @@ DataDecompressionStream::~DataDecompressionStream() {
 	}
 	for (auto &t : _threads)
 		t.join();
+}
+
+void DataDecompressionStream::wait_until_ready() {
+	_threads_ready.wait();
 }
 
 void DataDecompressionStream::start() {
@@ -89,6 +97,8 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 	size_t stat_handled_blocks = 0;
 #endif
 
+	_threads_ready.count_down();
+
 	while (true) {
 		// (Blocking) pop from the chunk queue
 		std::unique_lock<std::mutex> lock(_queue_mutex);
@@ -99,7 +109,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 			lock.unlock();
 
 			// Wait until all threads have got the "error" message
-			_finish_barrier.wait();
+			_finish_barrier.arrive_and_wait();
 
 			// "Leader" thread clears the queue
 			if (thread_id == 0) {
@@ -111,12 +121,12 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 			}
 
 			// Once write is finalized, wait again
-			_finish_barrier.wait();
+			_finish_barrier.arrive_and_wait();
 		} else if (_state == decompress_state::finalizing && _queue.empty()) {
 			lock.unlock();
 
 			// Wait until all threads have got the "finalize" message
-			_finish_barrier.wait();
+			_finish_barrier.arrive_and_wait();
 
 			// "Leader" thread finalizes the write
 			if (thread_id == 0) {
@@ -129,7 +139,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 			}
 
 			// Once write is finalized, wait again
-			_finish_barrier.wait();
+			_finish_barrier.arrive_and_wait();
 		} else if (_state == decompress_state::quitting) {
 			break;
 		} else {

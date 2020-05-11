@@ -1,4 +1,4 @@
-// TODOXXX: Should add the code to spread the threads among NUMA zones for HW? (From lib842 sample)
+#include "numa_spread.h"
 
 #include <lib842/stream/comp.h>
 
@@ -12,11 +12,13 @@ namespace stream {
 DataCompressionStream::DataCompressionStream(
 	lib842_compress_func compress842_func,
 	unsigned int num_threads,
+	thread_policy thread_policy,
 	std::function<std::ostream&(void)> error_logger,
 	std::function<std::ostream&(void)> debug_logger) :
 	_compress842_func(compress842_func),
 	_error_logger(std::move(error_logger)),
 	_debug_logger(std::move(debug_logger)),
+	_threads_ready(num_threads),
 	_trigger(false), _quit(false),
 	_ptr(nullptr), _size(0), _skip_compress_step(false),
 	_current_offset(0),
@@ -26,6 +28,8 @@ DataCompressionStream::DataCompressionStream(
 	_threads.reserve(num_threads);
 	for (size_t i = 0; i < num_threads; i++)
 		_threads.emplace_back(&DataCompressionStream::loop_compress_thread, this, i);
+	if (thread_policy == thread_policy::spread_threads_among_numa_nodes)
+		spread_threads_among_numa_nodes(_threads);
 }
 
 DataCompressionStream::~DataCompressionStream() {
@@ -37,6 +41,10 @@ DataCompressionStream::~DataCompressionStream() {
 	}
 	for (auto &t : _threads)
 		t.join();
+}
+
+void DataCompressionStream::wait_until_ready() {
+	_threads_ready.wait();
 }
 
 void DataCompressionStream::start(
@@ -57,7 +65,7 @@ void DataCompressionStream::finish(bool cancel) {
 	if (cancel) {
 		_error = true;
 	}
-	_finish_barrier.wait();
+	_finish_barrier.arrive_and_wait();
 }
 
 void DataCompressionStream::loop_compress_thread(size_t thread_id) {
@@ -70,6 +78,9 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 		<< std::endl;
 	size_t stat_handled_blocks = 0;
 #endif
+
+	_threads_ready.count_down();
+
 	while (true) {
 		if (thread_id == 0 && _error) {
 			_error = false;
@@ -82,7 +93,7 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 				break;
 		}
 
-		_start_barrier.wait();
+		_start_barrier.arrive_and_wait();
 		if (thread_id == 0) {
 			std::lock_guard<std::mutex> lock(_trigger_mutex);
 			_trigger = false;
@@ -160,7 +171,7 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 			}
 		}
 
-		_finish_barrier.wait();
+		_finish_barrier.arrive_and_wait();
 	}
 
 #ifdef INDEPTH_TRACE
