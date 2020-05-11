@@ -59,7 +59,7 @@ public:
 
 	DataDecompressionStream(lib842_decompress_func decompress842_func,
 				unsigned int num_threads,
-				thread_policy thread_policy,
+				thread_policy thread_policy_,
 				std::function<std::ostream&(void)> error_logger,
 				std::function<std::ostream&(void)> debug_logger);
 	~DataDecompressionStream();

@@ -47,7 +47,7 @@ public:
 
 	DataCompressionStream(lib842_compress_func compress842_func,
 			      unsigned int num_threads,
-			      thread_policy thread_policy,
+			      thread_policy thread_policy_,
 			      std::function<std::ostream&(void)> error_logger,
 			      std::function<std::ostream&(void)> debug_logger);
 	~DataCompressionStream();

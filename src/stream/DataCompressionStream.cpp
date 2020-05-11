@@ -12,7 +12,7 @@ namespace stream {
 DataCompressionStream::DataCompressionStream(
 	lib842_compress_func compress842_func,
 	unsigned int num_threads,
-	thread_policy thread_policy,
+	thread_policy thread_policy_,
 	std::function<std::ostream&(void)> error_logger,
 	std::function<std::ostream&(void)> debug_logger) :
 	_compress842_func(compress842_func),
@@ -28,7 +28,7 @@ DataCompressionStream::DataCompressionStream(
 	_threads.reserve(num_threads);
 	for (size_t i = 0; i < num_threads; i++)
 		_threads.emplace_back(&DataCompressionStream::loop_compress_thread, this, i);
-	if (thread_policy == thread_policy::spread_threads_among_numa_nodes)
+	if (thread_policy_ == thread_policy::spread_threads_among_numa_nodes)
 		spread_threads_among_numa_nodes(_threads);
 }
 

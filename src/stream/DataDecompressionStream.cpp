@@ -14,7 +14,7 @@ namespace stream {
 DataDecompressionStream::DataDecompressionStream(
 	lib842_decompress_func decompress842_func,
 	unsigned int num_threads,
-	thread_policy thread_policy,
+	thread_policy thread_policy_,
 	std::function<std::ostream&(void)> error_logger,
 	std::function<std::ostream&(void)> debug_logger) :
 	_decompress842_func(decompress842_func),
@@ -28,7 +28,7 @@ DataDecompressionStream::DataDecompressionStream(
 	_threads.reserve(num_threads);
 	for (size_t i = 0; i < num_threads; i++)
 		_threads.emplace_back(&DataDecompressionStream::loop_decompress_thread, this, i);
-	if (thread_policy == thread_policy::spread_threads_among_numa_nodes)
+	if (thread_policy_ == thread_policy::spread_threads_among_numa_nodes)
 		spread_threads_among_numa_nodes(_threads);
 }
 
