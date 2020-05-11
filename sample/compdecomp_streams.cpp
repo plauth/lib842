@@ -144,8 +144,8 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	for (const auto &cblock : comp_blocks) {
 		lib842::stream::DataDecompressionStream::decompress_block dblock;
 		bool any_compressed = false;
-		for (size_t i = 0; i < lib842::stream::NUM_CHUNKS_PER_NETWORK_BLOCK; i++) {
-			auto dest = decompressed + cblock.source_offset + i * lib842::stream::COMPR842_CHUNK_SIZE;
+		for (size_t i = 0; i < lib842::stream::NUM_CHUNKS_PER_BLOCK; i++) {
+			auto dest = decompressed + cblock.source_offset + i * lib842::stream::CHUNK_SIZE;
 			if (cblock.sizes[i] <= lib842::stream::COMPRESSIBLE_THRESHOLD) {
 				dblock.chunks[i] = lib842::stream::DataDecompressionStream::decompress_chunk(
 					cblock.datas[i],
@@ -157,7 +157,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 				// TODOXXX: Should this be done multi thread???
 				//          Or maybe done separately and not even included in the
 				//          timing, since that's usually handled by the network? 
-				memcpy(dest, cblock.datas[i], lib842::stream::COMPR842_CHUNK_SIZE);
+				memcpy(dest, cblock.datas[i], lib842::stream::CHUNK_SIZE);
 			}
 		}
 
@@ -179,7 +179,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 	*time_decomp = timestamp() - timestart_decomp;
 
-	*dlen = comp_blocks.size() * lib842::stream::NETWORK_BLOCK_SIZE;
+	*dlen = comp_blocks.size() * lib842::stream::BLOCK_SIZE;
 
 	// ----------
 	// VALIDATION
@@ -219,5 +219,5 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 int main(int argc, const char *argv[])
 {
 	return compdecomp(argc > 1 ? argv[1] : NULL,
-		lib842::stream::NETWORK_BLOCK_SIZE, ALIGNMENT);
+		lib842::stream::BLOCK_SIZE, ALIGNMENT);
 }

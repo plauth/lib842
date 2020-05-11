@@ -151,7 +151,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 #ifdef INDEPTH_TRACE
 			stat_handled_blocks++;
 #endif
-			for (size_t i = 0; i < NUM_CHUNKS_PER_NETWORK_BLOCK; i++) {
+			for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 				const auto &chunk = block.chunks[i];
 				if (chunk.compressed_data == nullptr && chunk.compressed_length == 0 &&
 					chunk.destination == nullptr) {
@@ -165,7 +165,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 				assert(chunk.compressed_length > 0 &&
 					   chunk.compressed_length <= COMPRESSIBLE_THRESHOLD);
 
-				size_t uncompressed_size = COMPR842_CHUNK_SIZE;
+				size_t uncompressed_size = CHUNK_SIZE;
 				int ret = _decompress842_func(chunk.compressed_data,
 											  chunk.compressed_length,
 											  destination, &uncompressed_size);
@@ -181,7 +181,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 					break;
 				}
 
-				assert(uncompressed_size == COMPR842_CHUNK_SIZE);
+				assert(uncompressed_size == CHUNK_SIZE);
 			}
 
 			lock.lock();

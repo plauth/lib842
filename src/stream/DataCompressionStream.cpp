@@ -69,8 +69,6 @@ void DataCompressionStream::finish(bool cancel) {
 }
 
 void DataCompressionStream::loop_compress_thread(size_t thread_id) {
-	static constexpr size_t CHUNK_SIZE = COMPR842_CHUNK_SIZE;
-
 #ifdef INDEPTH_TRACE
 	_debug_logger()
 		<< "(DataStream to " << _remote_endpoint << ") "
@@ -99,10 +97,10 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 			_trigger = false;
 		}
 
-		auto last_valid_offset = _size & ~(NETWORK_BLOCK_SIZE-1);
+		auto last_valid_offset = _size & ~(BLOCK_SIZE-1);
 
 		while (true) {
-			size_t offset = _current_offset.fetch_add(NETWORK_BLOCK_SIZE);
+			size_t offset = _current_offset.fetch_add(BLOCK_SIZE);
 			if (offset >= last_valid_offset) {
 				break;
 			}
@@ -114,7 +112,7 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 			compress_block block;
 			block.source_offset = offset;
 			if (_skip_compress_step) {
-				for (size_t i = 0; i < NUM_CHUNKS_PER_NETWORK_BLOCK; i++) {
+				for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 					auto source = static_cast<const uint8_t *>(_ptr) + offset + i * CHUNK_SIZE;
 
 					auto is_compressed = std::equal(source,source + sizeof(LIB842_COMPRESSED_CHUNK_MARKER), LIB842_COMPRESSED_CHUNK_MARKER);
@@ -134,10 +132,10 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 				// as long as the lib842 compressor respects the destination buffer size
 				static constexpr size_t CHUNK_PADDING = 2 * CHUNK_SIZE;
 				block.compress_buffer.reset(
-					new uint8_t[CHUNK_PADDING * NUM_CHUNKS_PER_NETWORK_BLOCK]);
+					new uint8_t[CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK]);
 
 				bool any_compressible = false;
-				for (size_t i = 0; i < NUM_CHUNKS_PER_NETWORK_BLOCK; i++) {
+				for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 					auto source = static_cast<const uint8_t *>(_ptr) + offset + i * CHUNK_SIZE;
 					auto compressed_destination = block.compress_buffer.get() + i * CHUNK_PADDING;
 

@@ -37,9 +37,9 @@ public:
 		// Offset into the source buffer where the data associated with the block comes from
 		size_t source_offset;
 		// Data for each (possibly compressed) chunk in the block
-		std::array<const uint8_t *, NUM_CHUNKS_PER_NETWORK_BLOCK> datas;
+		std::array<const uint8_t *, NUM_CHUNKS_PER_BLOCK> datas;
 		// Size for each (possibly compressed) chunk in the block
-		std::array<size_t, NUM_CHUNKS_PER_NETWORK_BLOCK> sizes;
+		std::array<size_t, NUM_CHUNKS_PER_BLOCK> sizes;
 
 		// Buffer that owns the pointers used in 'datas'. Used internally.
 		std::unique_ptr<uint8_t[]> compress_buffer;

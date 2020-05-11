@@ -51,7 +51,7 @@ public:
 	};
 
 	struct decompress_block {
-		std::array<decompress_chunk, NUM_CHUNKS_PER_NETWORK_BLOCK> chunks;
+		std::array<decompress_chunk, NUM_CHUNKS_PER_BLOCK> chunks;
 
 		// Buffer that owns the pointers used in 'compressed_data'. Used internally.
 		std::unique_ptr<const uint8_t[]> compress_buffer;
