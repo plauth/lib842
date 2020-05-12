@@ -142,39 +142,18 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 #ifdef INDEPTH_TRACE
 			stat_handled_blocks++;
 #endif
-			for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
-				const auto &chunk = block.chunks[i];
-				if (chunk.compressed_data == nullptr && chunk.compressed_length == 0 &&
-					chunk.destination == nullptr) {
-					// Chunk was transferred uncompressed, nothing to do
-					continue;
+			if (!handle_block(block)) {
+				lock.lock();
+				bool first_error = !_error;
+				_error = true;
+				_queue = std::queue<decompress_block>();
+				lock.unlock();
+
+				if (first_error) {
+					_error_logger()
+						<< "Data decompression failed, aborting operation"
+						<< std::endl;
 				}
-
-				auto destination = static_cast<uint8_t *>(chunk.destination);
-
-				assert(chunk.compressed_length > 0 &&
-				       chunk.compressed_length <= COMPRESSIBLE_THRESHOLD);
-
-				size_t uncompressed_size = CHUNK_SIZE;
-				int ret = _decompress842_func(chunk.compressed_data,
-							      chunk.compressed_length,
-							      destination, &uncompressed_size);
-				if (ret != 0) {
-					lock.lock();
-					bool first_error = !_error;
-					_error = true;
-					_queue = std::queue<decompress_block>();
-					lock.unlock();
-
-					if (first_error) {
-						_error_logger()
-							<< "Data decompression failed, aborting operation"
-							<< std::endl;
-					}
-					break;
-				}
-
-				assert(uncompressed_size == CHUNK_SIZE);
 			}
 		}
 
@@ -216,6 +195,33 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 		<< "End decompression thread with id " << thread_id << " (stat_handled_blocks=" << stat_handled_blocks << ")"
 		<< std::endl;
 #endif
+}
+
+bool DataDecompressionStream::handle_block(const decompress_block &block) {
+	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
+		const auto &chunk = block.chunks[i];
+		if (chunk.compressed_data == nullptr && chunk.compressed_length == 0 &&
+		    chunk.destination == nullptr) {
+			// Chunk was transferred uncompressed, nothing to do
+			continue;
+		}
+
+		auto destination = static_cast<uint8_t *>(chunk.destination);
+
+		assert(chunk.compressed_length > 0 &&
+		       chunk.compressed_length <= COMPRESSIBLE_THRESHOLD);
+
+		size_t uncompressed_size = CHUNK_SIZE;
+		int ret = _decompress842_func(chunk.compressed_data,
+					      chunk.compressed_length,
+					      destination, &uncompressed_size);
+		if (ret != 0)
+			return false;
+
+		assert(uncompressed_size == CHUNK_SIZE);
+	}
+
+	return true;
 }
 
 } // namespace stream

@@ -81,6 +81,8 @@ public:
 	 * The parameter of the callback specifies a success (true) / error (false) status. */
 	void finalize(bool cancel, std::function<void(bool)> finalize_callback);
 
+	bool handle_block(const decompress_block &block);
+
 private:
 	void loop_decompress_thread(size_t thread_id);
 
