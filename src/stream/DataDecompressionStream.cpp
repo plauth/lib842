@@ -23,8 +23,7 @@ DataDecompressionStream::DataDecompressionStream(
 	_threads_ready(num_threads),
 	_trigger(0),
 	_error(false),
-	_finalizing(false),
-	_finalize_barrier(num_threads),
+	_finalizing(false), _finalize_barrier(num_threads),
 	_quit(false) {
 	_threads.reserve(num_threads);
 	for (size_t i = 0; i < num_threads; i++)
@@ -77,10 +76,10 @@ bool DataDecompressionStream::push_block(DataDecompressionStream::decompress_blo
 
 void DataDecompressionStream::finalize(bool cancel, std::function<void(bool)> finalize_callback) {
 	std::lock_guard<std::mutex> lock(_mutex);
-	if (cancel)
-		_queue = std::queue<decompress_block>();
 	_finalizing = true;
 	_finalize_callback = std::move(finalize_callback);
+	if (cancel)
+		_queue = std::queue<decompress_block>();
 	_queue_available.notify_all();
 }
 
@@ -113,27 +112,32 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 		// -------------------
 		while (true) {
 			// (Blocking) pop from the chunk queue
-			std::unique_lock<std::mutex> lock(_mutex);
-			_queue_available.wait(lock, [this] {
-				return !_queue.empty() || _finalizing || _quit;
-			});
-			if ((_finalizing && _queue.empty()) || _quit) {
-				break;
+			decompress_block block;
+
+			{
+				std::unique_lock<std::mutex> lock(_mutex);
+				_queue_available.wait(lock, [this] {
+					return !_queue.empty() || _finalizing || _quit;
+				});
+				if ((_finalizing && _queue.empty()) || _quit) {
+					break;
+				}
+
+				block = std::move(_queue.front());
+				_queue.pop();
 			}
 
-			auto block = std::move(_queue.front());
-			_queue.pop();
-
-			lock.unlock();
 #ifdef INDEPTH_TRACE
 			stat_handled_blocks++;
 #endif
 			if (!handle_block(block)) {
-				lock.lock();
-				bool first_error = !_error;
-				_error = true;
-				_queue = std::queue<decompress_block>();
-				lock.unlock();
+				bool first_error;
+				{
+					std::lock_guard<std::mutex> lock(_mutex);
+					first_error = !_error;
+					_error = true;
+					_queue = std::queue<decompress_block>();
+				}
 
 				if (first_error) {
 					_error_logger()
@@ -160,9 +164,9 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 				// an interrupted barrier, the error flag does not get unset
 				quit = _quit;
 				if (!quit) {
-					_finalizing = false;
 					error = _error;
 					_error = false;
+					_finalizing = false;
 					finalize_callback = std::move(_finalize_callback);
 					_finalize_callback = std::function<void(bool)>();
 				}
@@ -175,7 +179,8 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 #ifdef INDEPTH_TRACE
 	_debug_logger()
 		<< "(DataStream to " << _remote_endpoint << ") "
-		<< "End decompression thread with id " << thread_id << " (stat_handled_blocks=" << stat_handled_blocks << ")"
+		<< "End decompression thread with id " << thread_id
+		<< " (stat_handled_blocks=" << stat_handled_blocks << ")"
 		<< std::endl;
 #endif
 }

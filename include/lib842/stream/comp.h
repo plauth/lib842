@@ -59,7 +59,9 @@ public:
 
 	void start(const void *ptr, size_t size, bool skip_compress_step,
 		   std::function<void(compress_block &&)> block_available_callback);
-	void finish(bool cancel);
+	void finalize(bool cancel, std::function<void(bool)> finalize_callback);
+
+	compress_block handle_block(size_t offset);
 
 private:
 	void loop_compress_thread(size_t thread_id);
@@ -68,34 +70,38 @@ private:
 	std::function<std::ostream&(void)> _error_logger;
 	std::function<std::ostream&(void)> _debug_logger;
 
-	// Instance of the compression thread
+	// Instance of the compression threads
 	std::vector<std::thread> _threads;
+	// Latch that is signaled once all threads have actually been spawned
 	detail::latch _threads_ready;
 	// Mutex for protecting concurrent accesses to
-	// (_trigger, _quit)
-	std::mutex _trigger_mutex;
-	// true if a new operation must be started in the compression thread
-	bool _trigger;
-	// Wakes up the compression thread when a new operation must be started
+	// (_trigger, _error, _finalizing, _finalize_callback, _quit)
+	std::mutex _mutex;
+	// Number that increases if a new operation must be started in the compression threads
+	unsigned _trigger;
+	// Wakes up the compression threads when a new operation must be started
 	std::condition_variable _trigger_changed;
-	// If set to true, causes the compression to quit (for cleanup)
-	bool _quit;
-	// Necessary data for triggering an asynchronous I/O write operation from the compression thread
-	std::function<void(compress_block &&)> _block_available_callback;
+
 	// Parameters for the compression operation in course
 	const void *_ptr;
 	size_t _size;
 	bool _skip_compress_step;
+	std::function<void(compress_block &&)> _block_available_callback;
 	// Stores the offset of the next block to be compressed
-	std::atomic<std::size_t> _current_offset;
-	// true if an error has happened and the compression operation should be cancelled, false otherwise
-	std::atomic<bool> _error;
-	// Barrier for starting compression, necessary for ensuring that all compression
-	// threads have seen the trigger to start compressing before unsetting it
-	detail::barrier _start_barrier;
-	// Barrier for finishing compression, necessary for ensuring that resources
-	// are not released until all threads have finished
-	detail::barrier _finish_barrier;
+	std::atomic<size_t> _current_offset;
+	// Set to true if an error happens during 842 compression
+	bool _error;
+
+	// Set to true when the user wants to be notified when the queue is empty
+	bool _finalizing;
+	// Callback to be called after finalizing is done
+	std::function<void(bool)> _finalize_callback;
+	// Barrier for finalizing a compression operation, necessary for
+	// ensuring all pending blocks are processed before notifying the user
+	detail::barrier _finalize_barrier;
+
+	// If set to true, causes the compression threads to quit (for cleanup)
+	bool _quit;
 };
 
 } // namespace stream

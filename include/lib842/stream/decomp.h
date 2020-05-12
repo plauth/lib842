@@ -105,6 +105,8 @@ private:
 
 	// Stores blocks pending to be decompressed
 	std::queue<decompress_block> _queue;
+	// Wakes up the decompression threads when new operations have been added to the queue
+	std::condition_variable _queue_available;
 	// Set to true if an error happens during 842 decompression
 	bool _error;
 
@@ -113,12 +115,11 @@ private:
 	// Callback to be called after finalizing is done
 	std::function<void(bool)> _finalize_callback;
 	// Barrier for finalizing a decompression operation, necessary for
-	// ensuring finalization is done before all threads start a new operation
+	// ensuring all pending blocks are processed before notifying the user
 	detail::barrier _finalize_barrier;
-	// If set to true, causes the compression to quit (for cleanup)
+
+	// If set to true, causes the decompression threads to quit (for cleanup)
 	bool _quit;
-	// Wakes up the decompression threads when new operations have been added to the queue
-	std::condition_variable _queue_available;
 };
 
 } // namespace stream
