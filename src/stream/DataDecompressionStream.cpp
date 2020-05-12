@@ -21,8 +21,7 @@ DataDecompressionStream::DataDecompressionStream(
 	_error_logger(std::move(error_logger)),
 	_debug_logger(std::move(debug_logger)),
 	_threads_ready(num_threads),
-	_trigger(false),
-	_trigger_barrier(num_threads),
+	_trigger(0),
 	_error(false),
 	_finalizing(false),
 	_finalize_barrier(num_threads),
@@ -44,7 +43,6 @@ DataDecompressionStream::~DataDecompressionStream() {
 		// The barriers *must* be interrupted, since otherwise if any
 		// thread quits while another is waiting on the barrier, the
 		// waiting thrread would wait forever and never quit
-		_trigger_barrier.interrupt();
 		_finalize_barrier.interrupt();
 	}
 
@@ -58,8 +56,7 @@ void DataDecompressionStream::wait_until_ready() {
 
 void DataDecompressionStream::start() {
 	std::lock_guard<std::mutex> lock(_mutex);
-	assert(!_trigger);
-	_trigger = true;
+	_trigger++;
 	_trigger_changed.notify_all();
 }
 
@@ -67,12 +64,9 @@ bool DataDecompressionStream::push_block(DataDecompressionStream::decompress_blo
 	std::lock_guard<std::mutex> lock(_mutex);
 	assert(!_finalizing);
 	if (_error) {
-		// If an error happened, report the error to the user,
-		// and the operation is considered immediately finalized
-		// (the user must not finalize the operation itself)
-		_finalizing = true;
-		_finalize_callback = [](bool){};
-		_queue_available.notify_all();
+		// If an error happened, report the error to the user
+		// (but the user must still finalize the operation itself,
+		//  to make sure no threads are still working on the blocks)
 		return false;
 	}
 
@@ -101,26 +95,18 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 
 	_threads_ready.count_down();
 
+	unsigned last_trigger = 0;
 	while (!_quit) {
 		// -------------
 		// TRIGGER PHASE
 		// -------------
 		{
 			std::unique_lock<std::mutex> lock(_mutex);
-			_trigger_changed.wait(lock, [this] { return _trigger || _quit; });
+			_trigger_changed.wait(lock, [this, &last_trigger] {
+				return _trigger != last_trigger || _quit;
+			});
+			last_trigger = _trigger;
 		}
-
-		_trigger_barrier.arrive_and_wait();
-		if (thread_id == 0) { // Only a single 'leader' thread goes in
-			std::lock_guard<std::mutex> lock(_mutex);
-			// Unset the trigger once all threads have been modified
-			// Note that the trigger *must* be unset early, not at the end.
-			// Otherwise, since the user can immediately call
-			// start() after push_block() reports an error,
-			// a trigger for a further operation can be missed
-			_trigger = false;
-		}
-		_trigger_barrier.arrive_and_wait();
 
 		// -------------------
 		// DECOMPRESSION PHASE
@@ -161,7 +147,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 		// FINALIZATION PHASE
 		// ------------------
 
-		// Wait until all threads have got the "finalize" message
+		// Wait until all threads have finished any decompression operations
 		_finalize_barrier.arrive_and_wait();
 
 		if (thread_id == 0) { // Only a single 'leader' thread goes in
@@ -174,8 +160,8 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 				// an interrupted barrier, the error flag does not get unset
 				quit = _quit;
 				if (!quit) {
-					error = _error;
 					_finalizing = false;
+					error = _error;
 					_error = false;
 					finalize_callback = std::move(_finalize_callback);
 					_finalize_callback = std::function<void(bool)>();
@@ -184,9 +170,6 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 			if (!quit)
 				finalize_callback(!error);
 		}
-
-		// Once write is finalized, wait again
-		_finalize_barrier.arrive_and_wait();
 	}
 
 #ifdef INDEPTH_TRACE

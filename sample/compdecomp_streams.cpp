@@ -162,7 +162,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		}
 
 		if (any_compressed && !dstream.push_block(std::move(dblock)))
-			return false;
+			break;
 	}
 
 	lib842::detail::latch decomp_finished(1);

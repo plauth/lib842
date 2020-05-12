@@ -98,13 +98,10 @@ private:
 	// (_trigger, _queue, _error, _finalizing, _finalize_callback, _quit)
 	std::mutex _mutex;
 
-	// true if a new operation must be started in the decompression threads
-	bool _trigger;
+	// Number that increases if a new operation must be started in the decompression threads
+	unsigned _trigger;
 	// Wakes up the decompression threads when a new operation must be started
 	std::condition_variable _trigger_changed;
-	// Barrier for starting a decompression operation, necessary for
-	// ensuring all threads have seen the trigger before unsetting it
-	detail::barrier _trigger_barrier;
 
 	// Stores blocks pending to be decompressed
 	std::queue<decompress_block> _queue;
