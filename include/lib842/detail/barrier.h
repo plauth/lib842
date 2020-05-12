@@ -21,7 +21,8 @@ public:
 	explicit barrier(std::ptrdiff_t num_threads) :
 		_num_threads(num_threads),
 		_count(0),
-		_generation(0)
+		_generation(0),
+		_interrupted(false)
 	{}
 
 
@@ -34,9 +35,17 @@ public:
 		} else {
 			auto current_generation = _generation;
 			_cv.wait(lock, [this, current_generation] {
-				return _generation != current_generation;
+				return _generation != current_generation || _interrupted;
 			});
 		}
+	}
+
+	// Releases all waiting threads and converts the barrier in a no-op
+	// This is useful for making sure no thread gets 'stuck' when terminating
+	void interrupt() {
+		std::lock_guard<std::mutex> lock(_mutex);
+		_interrupted = true;
+		_cv.notify_all();
 	}
 
 private:
@@ -45,6 +54,7 @@ private:
 	std::ptrdiff_t _num_threads;
 	std::ptrdiff_t _count;
 	unsigned int _generation;
+	bool _interrupted;
 };
 
 } // namespace detail

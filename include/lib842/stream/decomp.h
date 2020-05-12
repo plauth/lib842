@@ -79,26 +79,10 @@ public:
 	 * If cancel = true, the decompression operation will be finished as soon as possible,
 	 *                   possibly dropping most or all of the decompression queue.
 	 * The parameter of the callback specifies a success (true) / error (false) status. */
-	void finalize(bool cancel, const std::function<void(bool)> &finalize_callback);
+	void finalize(bool cancel, std::function<void(bool)> finalize_callback);
 
 private:
 	void loop_decompress_thread(size_t thread_id);
-
-	enum class decompress_state {
-		// The decompressor is working (or waiting for new blocks)
-		processing,
-		// The decompressor is working, but the user of this class is waiting for the
-		// remaining decompression blocks to be processed.
-		finalizing,
-		// The decompressor is working, but the user of this class has ordered that the
-		// current decompression process should be cancelled.
-		cancelling,
-		// The decompressor has found an error during decompression and the current
-		// decompression process is being cancelled
-		handling_error,
-		// The thread pool is being destroyed
-		quitting
-	};
 
 	lib842_decompress_func _decompress842_func;
 	std::function<std::ostream&(void)> _error_logger;
@@ -106,25 +90,36 @@ private:
 
 	// Instance of the decompression threads
 	std::vector<std::thread> _threads;
+	// Latch that is signaled once all threads have actually been spawned
 	detail::latch _threads_ready;
 	// Mutex for protecting concurrent accesses to
-	// (_state, _queue, _report_error, _working_thread_count)
-	std::mutex _queue_mutex;
-	// Stores the current action being performed by the threads
-	decompress_state _state;
-	// Stores pending decompression operations
+	// (_trigger, _queue, _error, _finalizing, _finalize_callback, _quit)
+	std::mutex _mutex;
+
+	// true if a new operation must be started in the decompression threads
+	bool _trigger;
+	// Wakes up the decompression threads when a new operation must be started
+	std::condition_variable _trigger_changed;
+	// Barrier for starting a decompression operation, necessary for
+	// ensuring all threads have seen the trigger before unsetting it
+	detail::barrier _trigger_barrier;
+
+	// Stores blocks pending to be decompressed
 	std::queue<decompress_block> _queue;
-	// Indicates that a decompression error happened and the user of this class should be notified
-	bool _report_error;
-	// Number of threads currently running decompression operations
-	unsigned int _working_thread_count;
-	// Callback to be called after finalizing or cancelling is done
+	// Set to true if an error happens during 842 decompression
+	bool _error;
+
+	// Set to true when the user wants to be notified when the queue is empty
+	bool _finalizing;
+	// Callback to be called after finalizing is done
 	std::function<void(bool)> _finalize_callback;
+	// Barrier for finalizing a decompression operation, necessary for
+	// ensuring finalization is done before all threads start a new operation
+	detail::barrier _finalize_barrier;
+	// If set to true, causes the compression to quit (for cleanup)
+	bool _quit;
 	// Wakes up the decompression threads when new operations have been added to the queue
 	std::condition_variable _queue_available;
-	// Barrier for finishing decompression, necessary for ensuring that resources
-	// are not released until all threads have finished
-	detail::barrier _finish_barrier;
 };
 
 } // namespace stream

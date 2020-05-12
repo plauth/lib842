@@ -168,7 +168,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	lib842::detail::latch decomp_finished(1);
 	bool decomp_error = false;
 	dstream.finalize(false, [&decomp_finished,
-							 &decomp_error](bool success) {
+				 &decomp_error](bool success) {
 		decomp_error = !success;
 		decomp_finished.count_down();
 	});
