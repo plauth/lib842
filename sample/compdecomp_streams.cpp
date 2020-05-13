@@ -71,10 +71,6 @@ static lib842::stream::thread_policy determine_thread_policy() {
 		: lib842::stream::thread_policy::spread_threads_among_numa_nodes;
 }
 
-static int fail842(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen) {
-	return -1;
-}
-
 bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			     uint8_t *out, size_t *olen,
 			     uint8_t *decompressed, size_t *dlen,
@@ -98,7 +94,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 	/* for (int i = 0; i < 2; i++) */ {
 	lib842::stream::DataCompressionStream cstream(
-		fail842, num_threads, thread_policy,
+		lib842_compress, num_threads, thread_policy,
 		[]() -> std::ostream& { return std::cerr; },
 		[]() -> std::ostream& { return std::cout; });
 	cstream.wait_until_ready();
