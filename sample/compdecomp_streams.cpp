@@ -149,7 +149,6 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 	long long timestart_decomp = timestamp();
 
-	dstream.start();
 	for (const auto &cblock : comp_blocks) {
 		lib842::stream::DataDecompressionStream::decompress_block dblock;
 		bool any_compressed = false;

@@ -21,7 +21,6 @@ DataDecompressionStream::DataDecompressionStream(
 	_error_logger(std::move(error_logger)),
 	_debug_logger(std::move(debug_logger)),
 	_threads_ready(num_threads),
-	_trigger(0),
 	_error(false),
 	_finalizing(false), _finalize_barrier(num_threads),
 	_quit(false) {
@@ -37,7 +36,6 @@ DataDecompressionStream::~DataDecompressionStream() {
 		std::lock_guard<std::mutex> lock(_mutex);
 		_quit = true;
 		// Wake up everybody so they see the quick signal
-		_trigger_changed.notify_all();
 		_queue_available.notify_all();
 		// The barriers *must* be interrupted, since otherwise if any
 		// thread quits while another is waiting on the barrier, the
@@ -51,12 +49,6 @@ DataDecompressionStream::~DataDecompressionStream() {
 
 void DataDecompressionStream::wait_until_ready() {
 	_threads_ready.wait();
-}
-
-void DataDecompressionStream::start() {
-	std::lock_guard<std::mutex> lock(_mutex);
-	_trigger++;
-	_trigger_changed.notify_all();
 }
 
 bool DataDecompressionStream::push_block(DataDecompressionStream::decompress_block &&dm) {
@@ -94,19 +86,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 
 	_threads_ready.count_down();
 
-	unsigned last_trigger = 0;
 	while (!_quit) {
-		// -------------
-		// TRIGGER PHASE
-		// -------------
-		{
-			std::unique_lock<std::mutex> lock(_mutex);
-			_trigger_changed.wait(lock, [this, &last_trigger] {
-				return _trigger != last_trigger || _quit;
-			});
-			last_trigger = _trigger;
-		}
-
 		// -------------------
 		// DECOMPRESSION PHASE
 		// -------------------
