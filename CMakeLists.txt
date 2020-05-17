@@ -115,6 +115,10 @@ target_include_directories(842 PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${C
 if (OpenCL_FOUND)
     target_include_directories(842 PRIVATE ${OpenCL_INCLUDE_DIRS})
     target_link_libraries(842 ${OpenCL_LIBRARIES})
+    target_compile_definitions(842 PRIVATE CL_TARGET_OPENCL_VERSION=120
+                                           CL_HPP_MINIMUM_OPENCL_VERSION=120
+                                           CL_HPP_TARGET_OPENCL_VERSION=120
+                                           CL_HPP_ENABLE_EXCEPTIONS)
 endif()
 if (CMAKE_USE_PTHREADS_INIT AND NUMA_FOUND)
     target_compile_definitions(842 PRIVATE "LIB842_HAVE_NUMA")
@@ -184,6 +188,10 @@ if(STANDALONE_BUILD)
         add_executable(test_ocl sample/compdecomp_cl.cpp)
         target_link_libraries(test_ocl 842 ${OpenCL_LIBRARIES})
         target_include_directories(test_ocl PRIVATE ${OpenCL_INCLUDE_DIRS})
+        target_compile_definitions(test_ocl PRIVATE CL_TARGET_OPENCL_VERSION=120
+                                                    CL_HPP_MINIMUM_OPENCL_VERSION=120
+                                                    CL_HPP_TARGET_OPENCL_VERSION=120
+                                                    CL_HPP_ENABLE_EXCEPTIONS)
         if (OpenMP_FOUND)
             target_link_libraries(test_ocl OpenMP::OpenMP_CXX)
         endif()
@@ -192,6 +200,10 @@ if(STANDALONE_BUILD)
         target_compile_definitions(test_ocl_inplace PRIVATE "USE_INPLACE_COMPRESSED_CHUNKS")
         target_link_libraries(test_ocl_inplace 842 ${OpenCL_LIBRARIES})
         target_include_directories(test_ocl_inplace PRIVATE ${OpenCL_INCLUDE_DIRS})
+        target_compile_definitions(test_ocl_inplace PRIVATE CL_TARGET_OPENCL_VERSION=120
+                                                            CL_HPP_MINIMUM_OPENCL_VERSION=120
+                                                            CL_HPP_TARGET_OPENCL_VERSION=120
+                                                            CL_HPP_ENABLE_EXCEPTIONS)
         if (OpenMP_FOUND)
             target_link_libraries(test_ocl_inplace OpenMP::OpenMP_CXX)
         endif()
@@ -200,6 +212,10 @@ if(STANDALONE_BUILD)
         target_compile_definitions(test_ocl_maybe PRIVATE "USE_MAYBE_COMPRESSED_CHUNKS")
         target_link_libraries(test_ocl_maybe 842 ${OpenCL_LIBRARIES})
         target_include_directories(test_ocl_maybe PRIVATE ${OpenCL_INCLUDE_DIRS})
+        target_compile_definitions(test_ocl_maybe PRIVATE CL_TARGET_OPENCL_VERSION=120
+                                                          CL_HPP_MINIMUM_OPENCL_VERSION=120
+                                                          CL_HPP_TARGET_OPENCL_VERSION=120
+                                                          CL_HPP_ENABLE_EXCEPTIONS)
         if (OpenMP_FOUND)
             target_link_libraries(test_ocl_maybe OpenMP::OpenMP_CXX)
         endif()

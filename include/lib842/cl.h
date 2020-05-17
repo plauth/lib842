@@ -7,9 +7,6 @@
 
 #ifdef __cplusplus
 
-#define CL_HPP_MINIMUM_OPENCL_VERSION 120
-#define CL_HPP_TARGET_OPENCL_VERSION 120
-#define CL_HPP_ENABLE_EXCEPTIONS
 #ifdef __APPLE__
 #include <OpenCL/cl2.hpp>
 #else
