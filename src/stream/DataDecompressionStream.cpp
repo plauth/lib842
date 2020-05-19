@@ -78,7 +78,6 @@ void DataDecompressionStream::finalize(bool cancel, std::function<void(bool)> fi
 void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 #ifdef INDEPTH_TRACE
 	_debug_logger()
-		<< "(DataStream to " << _remote_endpoint << ") "
 		<< "Start decompression thread with id " << thread_id
 		<< std::endl;
 	size_t stat_handled_blocks = 0;
@@ -158,7 +157,6 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 
 #ifdef INDEPTH_TRACE
 	_debug_logger()
-		<< "(DataStream to " << _remote_endpoint << ") "
 		<< "End decompression thread with id " << thread_id
 		<< " (stat_handled_blocks=" << stat_handled_blocks << ")"
 		<< std::endl;

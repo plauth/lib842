@@ -92,7 +92,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	std::mutex comp_blocks_mutex;
 	bool comp_error = false;
 
-	/* for (int i = 0; i < 2; i++) */ {
+//	for (int i = 0; i < 2; i++) { comp_blocks.clear();
 	lib842::stream::DataCompressionStream cstream(
 		lib842_compress, num_threads, thread_policy,
 		[]() -> std::ostream& { return std::cerr; },
@@ -110,10 +110,10 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	});
 
 	lib842::detail::latch comp_finished(1);
-	bool comp_error = false;
+	comp_error = false;
 	cstream.finalize(false, [&comp_finished,
 				 &comp_error](bool success) {
-		comp_error = !success;
+		comp_error |= !success;
 		comp_finished.count_down();
 	});
 
@@ -129,8 +129,8 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			*olen += size;
 	}
 
-	// printf("TIME COMP%i: %lli\n", i, *time_comp);
-	}
+//	printf("TIME COMP%i: %lli\n", i, *time_comp);
+//	}
 
 	// ------------
 	// CONDENSATION

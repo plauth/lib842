@@ -78,7 +78,6 @@ void DataCompressionStream::finalize(bool cancel, std::function<void(bool)> fina
 void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 #ifdef INDEPTH_TRACE
 	_debug_logger()
-		<< "(DataStream to " << _remote_endpoint << ") "
 		<< "Start compression thread with id " << thread_id
 		<< std::endl;
 	size_t stat_handled_blocks = 0;
@@ -176,7 +175,6 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 
 #ifdef INDEPTH_TRACE
 	_debug_logger()
-		<< "(DataStream to " << _remote_endpoint << ") "
 		<< "End compression thread with id " << thread_id
 		<< " (stat_handled_blocks=" << stat_handled_blocks << ")"
 		<< std::endl;
