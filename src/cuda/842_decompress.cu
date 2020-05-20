@@ -1,5 +1,13 @@
 #include "842-internal.h"
 
+struct sw842_param_decomp {
+	uint64_t *out;
+	const uint64_t *ostart;
+	const uint64_t *in;
+	uint32_t bits;
+	uint64_t buffer;
+};
+
 /* number of bits in a buffered word */
 #define WSIZE 64 //sizeof(uint64_t)
 
@@ -12,10 +20,11 @@
 #define __round_mask(x, y) ((__typeof__(x))((y)-1))
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
-__constant__ uint16_t fifo_sizes[9] = { 0, 0, I2_FIFO_SIZE, 0, I4_FIFO_SIZE, 0, 0, 0, I8_FIFO_SIZE };
+__constant__ static const uint16_t fifo_sizes[9] = { 0, 0, I2_FIFO_SIZE, 0, I4_FIFO_SIZE, 0,
+						     0, 0, I8_FIFO_SIZE };
 #endif
 
-__constant__ uint8_t dec_templates[26][4][2] = {
+__constant__ static const uint8_t dec_templates[26][4][2] = {
 	// params size in bits
 	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
 	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
@@ -51,7 +60,7 @@ __constant__ uint8_t dec_templates[26][4][2] = {
 	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
 
-__device__ inline uint64_t bswap(uint64_t value)
+__device__ static inline uint64_t bswap(uint64_t value)
 {
 	asm("{\n\t"
 	    "		.reg .b32 %li,%lo,%hi,%ho;\n\t"
@@ -64,7 +73,7 @@ __device__ inline uint64_t bswap(uint64_t value)
 	return value;
 }
 
-__device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
+__device__ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 {
 	uint64_t value = p->buffer >> (WSIZE - n);
 	//value = 0; if (n <= 0)
@@ -92,8 +101,9 @@ __device__ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 }
 
 #ifdef LIB842_CUDA_STRICT
-__device__ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
-				     uint64_t index, uint64_t fsize)
+__device__ static inline uint64_t get_index(const struct sw842_param_decomp *p,
+					    uint8_t size,
+					    uint64_t index, uint64_t fsize)
 {
 	uint64_t offset;
 	uint64_t total = round_down(

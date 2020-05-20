@@ -24,9 +24,37 @@
 #include "../common/crc32.h"
 
 #include <cstdio>
+#include <cstdint>
 #include <cerrno>
 #include <algorithm>
 #include <iterator>
+
+#define DICT16_BITS (10)
+#define DICT32_BITS (11)
+#define DICT64_BITS (10)
+
+struct sw842_param {
+	struct bitstream *stream;
+
+	const uint8_t *in;
+	const uint8_t *instart;
+	uint64_t ilen;
+	uint64_t olen;
+
+	// 0-6: data; 7-13: indices; 14: 0
+	uint64_t dataAndIndices[16];
+	uint64_t hashes[7];
+	uint16_t validity[7];
+	uint16_t templateKeys[7];
+
+	// L1D cache consumption: ~12.5 KiB
+	int16_t hashTable16[1 << DICT16_BITS]; // 1024 * 2 bytes =   2 KiB
+	int16_t hashTable32[1 << DICT32_BITS]; // 2048 * 2 bytes =   4 KiB
+	int16_t hashTable64[1 << DICT64_BITS]; // 1024 * 2 bytes =   2 KiB
+	uint16_t rollingFifo16[1 << I2_BITS]; // 256  * 2 bytes = 0.5 KiB
+	uint32_t rollingFifo32[1 << I4_BITS]; // 512  * 4 bytes =   2 KiB
+	uint64_t rollingFifo64[1 << I8_BITS]; // 256  * 8 bytes =   2 KiB
+};
 
 #define PRIME64 (11400714785074694791ULL)
 
@@ -114,7 +142,7 @@ static inline uint16_t max(uint16_t a, uint16_t b)
 	return (a > b) ? a : b;
 }
 
-static inline uint8_t get_template(struct sw842_param *p)
+static inline uint8_t get_template(const struct sw842_param *p)
 {
 	uint16_t former = max(p->templateKeys[4],
 			      p->templateKeys[0] + p->templateKeys[1]);
@@ -128,7 +156,7 @@ static inline uint8_t get_template(struct sw842_param *p)
 }
 
 template <uint8_t TEMPLATE_KEY>
-static inline void add_template(struct sw842_param *p)
+static inline void add_template(const struct sw842_param *p)
 {
 	uint64_t out = 0;
 
@@ -546,8 +574,8 @@ static inline void process_next(struct sw842_param *p)
  * will contain the number of output bytes written on success, or
  * 0 on error.
  */
-int optsw842_compress(const uint8_t *in, size_t ilen, uint8_t *out,
-		      size_t *olen)
+int optsw842_compress(const uint8_t *in, size_t ilen,
+		      uint8_t *out, size_t *olen)
 {
 	/* if using strict mode, we can only compress a multiple of 8 */
 	if (ilen % 8) {

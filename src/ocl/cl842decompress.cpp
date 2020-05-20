@@ -1,10 +1,12 @@
 #include <lib842/cl.h>
+#include <lib842/common.h>
 
 #include <iostream>
 #include <sstream>
 #include <vector>
 #include <chrono>
 #include <algorithm>
+#include <iterator>
 
 #define LIB842_CLDECOMPRESS_USE_PROGRAM_CACHE
 
@@ -236,6 +238,13 @@ void CLDeviceDecompressor::buildProgram(
 	options << " -D CL842_CHUNK_STRIDE=" << m_inputChunkStride;
 	options << " -D EINVAL=" << EINVAL;
 	options << " -D ENOSPC=" << ENOSPC;
+	if (m_inputFormat == CLDecompressorInputFormat::MAYBE_COMPRESSED_CHUNKS) {
+		options << " -D LIB842_COMPRESSED_CHUNK_MARKER_DEF={";
+		std::copy(std::begin(LIB842_COMPRESSED_CHUNK_MARKER),
+			  std::end(LIB842_COMPRESSED_CHUNK_MARKER),
+			  std::ostream_iterator<double>(options, ","));
+		options << "}";
+	}
 	if (m_inputFormat == CLDecompressorInputFormat::MAYBE_COMPRESSED_CHUNKS)
 		options << " -D USE_MAYBE_COMPRESSED_CHUNKS=1";
 	else if (m_inputFormat == CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS)

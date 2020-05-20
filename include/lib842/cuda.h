@@ -10,7 +10,8 @@
 #define LIB842_CUDA_CHUNK_SIZE 1024
 #define LIB842_CUDA_STRICT
 
-__global__ void cuda842_decompress(const uint64_t *in, uint64_t *out);
+__global__ void cuda842_decompress(__restrict__ const uint64_t *in,
+				   __restrict__ uint64_t *out);
 
 #endif
 

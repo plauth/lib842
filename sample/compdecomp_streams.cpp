@@ -201,7 +201,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			} else {
 				// TODOXXX: Should this be done multi thread???
 				//          Or maybe done separately and not even included in the
-				//          timing, since that's usually handled by the network? 
+				//          timing, since that's usually handled by the network?
 				memcpy(dest, cblock.datas[i], lib842::stream::CHUNK_SIZE);
 			}
 		}

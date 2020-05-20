@@ -15,12 +15,4 @@
 #define I8_BITS (STATIC_LOG2_VALUE - 3)
 #endif
 
-struct sw842_param_decomp {
-	uint64_t *out;
-	const uint64_t *ostart;
-	const uint64_t *in;
-	uint32_t bits;
-	uint64_t buffer;
-};
-
 #endif // LIB842_SRC_CUDA_842_INTERNAL_H

@@ -23,8 +23,23 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
 #include <cinttypes>
 #include <cerrno>
+
+struct sw842_param_decomp {
+	uint8_t *out;
+	const uint8_t *ostart;
+	const uint64_t *in;
+#ifdef ENABLE_ERROR_HANDLING
+	const uint64_t *istart;
+	size_t ilen;
+	size_t olen;
+	int errorcode;
+#endif
+	uint8_t bits;
+	uint64_t buffer;
+};
 
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE (2 * (1 << I2_BITS))
@@ -38,10 +53,10 @@
 #define WSIZE 64 //sizeof(uint64_t)
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
-static uint16_t fifo_sizes[9] = { 0, 0, I2_FIFO_SIZE, 0, I4_FIFO_SIZE, 0,
-				  0, 0, I8_FIFO_SIZE };
+static const uint16_t fifo_sizes[9] = { 0, 0, I2_FIFO_SIZE, 0, I4_FIFO_SIZE, 0,
+				        0, 0, I8_FIFO_SIZE };
 
-static uint8_t dec_templates[26][4][2] = {
+static const uint8_t dec_templates[26][4][2] = {
 	// params size in bits
 	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
 	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
@@ -186,8 +201,8 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size,
 #endif
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
-static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
-				 uint64_t index, uint64_t fsize)
+static inline uint64_t get_index(const struct sw842_param_decomp *p,
+				 uint8_t size, uint64_t index, uint64_t fsize)
 {
 	uint64_t offset, total = round_down(p->out - p->ostart, 8);
 
@@ -228,8 +243,8 @@ static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
  * will contain the number of output bytes written on success, or
  * 0 on error.
  */
-int optsw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out,
-			size_t *olen)
+int optsw842_decompress(const uint8_t *in, size_t ilen,
+			uint8_t *out, size_t *olen)
 {
 	struct sw842_param_decomp p;
 	p.out = out;

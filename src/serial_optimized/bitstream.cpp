@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <cstdint>
 
+#include "bitstream.h"
 #include "842-internal.h"
 #include "../common/endianness.h"
 

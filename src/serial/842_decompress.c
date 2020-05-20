@@ -23,8 +23,19 @@
 #include <lib842/sw.h>
 
 #include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 #include <limits.h>
 #include <errno.h>
+
+struct sw842_param_decomp {
+	const uint8_t *in;
+	uint8_t bit;
+	uint64_t ilen;
+	uint8_t *out;
+	const uint8_t *ostart;
+	uint64_t olen;
+};
 
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE	(2 * (1 << I2_BITS))
@@ -59,8 +70,6 @@ static uint8_t decomp_ops[OPS_MAX][4] = {
 	{ I4, I4, N0, N0 },
 	{ I8, N0, N0, N0 }
 };
-
-
 
 #define beN_to_cpu(d, s)					\
 	((s) == 2 ? swap_be_to_native16(get_unaligned16((const __be16 *)d)) :	\

@@ -15,6 +15,17 @@ typedef ulong uint64_t;
 #define NULL 0L
 #endif
 
+#if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
+__constant static const uint8_t LIB842_COMPRESSED_CHUNK_MARKER[] =
+	LIB842_COMPRESSED_CHUNK_MARKER_DEF; // Defined at build time
+#endif
+
+#ifndef USE_INPLACE_COMPRESSED_CHUNKS
+#define RESTRICT_UNLESS_INLINE restrict
+#else
+#define RESTRICT_UNLESS_INLINE
+#endif
+
 #define ENABLE_ERROR_HANDLING
 
 struct sw842_param_decomp {
@@ -46,9 +57,9 @@ struct sw842_param_decomp {
 #define __round_mask(x, y) ((y)-1)
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
-__constant uint16_t fifo_sizes[3] = { I2_FIFO_SIZE, I4_FIFO_SIZE, I8_FIFO_SIZE };
-__constant uint64_t masks[3] = { 0x000000000000FFFF, 0x00000000FFFFFFFF, 0xFFFFFFFFFFFFFFFF };
-__constant uint8_t dec_templates[26][4][2] = {
+__constant static const uint16_t fifo_sizes[3] = { I2_FIFO_SIZE, I4_FIFO_SIZE, I8_FIFO_SIZE };
+__constant static const uint64_t masks[3] = { 0x000000000000FFFF, 0x00000000FFFFFFFF, 0xFFFFFFFFFFFFFFFF };
+__constant static const uint8_t dec_templates[26][4][2] = {
 	// params size in bits
 	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
 	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
@@ -84,7 +95,7 @@ __constant uint8_t dec_templates[26][4][2] = {
 	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
 
-inline uint64_t bswap(uint64_t value)
+static inline uint64_t bswap(uint64_t value)
 {
 	return (uint64_t)((value & (uint64_t)0x00000000000000ff) << 56) |
 	       (uint64_t)((value & (uint64_t)0x000000000000ff00) << 40) |
@@ -96,7 +107,7 @@ inline uint64_t bswap(uint64_t value)
 	       (uint64_t)((value & (uint64_t)0xff00000000000000) >> 56);
 }
 
-inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
+static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 {
 	uint64_t value = p->buffer >> (WSIZE - n);
 	if (n == 0)
@@ -134,8 +145,8 @@ inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 	return value;
 }
 
-inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
-			  uint64_t index, uint64_t fsize)
+static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
+				 uint64_t index, uint64_t fsize)
 {
 	uint64_t offset;
 	uint64_t total =
@@ -164,8 +175,8 @@ inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 	return offset;
 }
 
-inline int decompress_core(__global const uint64_t *in, size_t ilen,
-			   __global uint64_t *out, size_t *olen)
+static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INLINE in, size_t ilen,
+				  __global uint64_t *RESTRICT_UNLESS_INLINE out, size_t *olen)
 {
 	struct sw842_param_decomp p;
 	p.ostart = p.out = out;
@@ -308,8 +319,10 @@ inline int decompress_core(__global const uint64_t *in, size_t ilen,
 	return 0;
 }
 
-__kernel void decompress(__global const uint64_t *in, ulong inOffset, __global const ulong *ilen,
-			 __global uint64_t *out, ulong outOffset, __global ulong *olen,
+__kernel void decompress(__global const uint64_t *RESTRICT_UNLESS_INLINE in,
+			 ulong inOffset, __global const ulong *ilen,
+			 __global uint64_t *RESTRICT_UNLESS_INLINE out,
+			 ulong outOffset, __global ulong *olen,
 			 ulong numChunks, __global int *returnValues)
 {
 	size_t chunk_num = get_global_id(0);
@@ -320,9 +333,10 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset, __global c
 	__global const uint64_t *my_in = in + (inOffset / 8) + ((CL842_CHUNK_STRIDE / 8) * chunk_num);
 
 #if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
-	if (my_in[0] != 0xd72de597bf465abe ||
-	    my_in[1] != 0x7670d6ee1a947cb2) { // = LIB842_COMPRESSED_CHUNK_MARKER
+	if (my_in[0] != ((__constant const uint64_t *)LIB842_COMPRESSED_CHUNK_MARKER)[0] ||
+	    my_in[1] != ((__constant const uint64_t *)LIB842_COMPRESSED_CHUNK_MARKER)[1]) {
 #ifdef USE_MAYBE_COMPRESSED_CHUNKS
+		// Copy uncompressed chunk from temporary input buffer to output buffer
 		for (size_t i = 0; i < CL842_CHUNK_SIZE; i++) {
 			my_out[i] = my_in[i];
 		}
@@ -333,6 +347,9 @@ __kernel void decompress(__global const uint64_t *in, ulong inOffset, __global c
 			returnValues[chunk_num] = 0;
 		return;
 	}
+
+	// Read compressed chunk size and skip to the beginning of the chunk
+	// (the end of the chunk matches the end of the input chunk buffer)
 	my_in += (CL842_CHUNK_SIZE - my_in[2]) / 8;
 #endif
 
