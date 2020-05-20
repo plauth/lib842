@@ -13,6 +13,7 @@
 #include <condition_variable>
 #include <functional>
 #include <iostream>
+#include <sstream>
 
 #if defined(USEAIX)
 #include <sys/types.h>
@@ -44,6 +45,35 @@ static int lib842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t 
 #include <lib842/stream/comp.h>
 #include <lib842/stream/decomp.h>
 #include <lib842/detail/latch.h>
+
+// Wraps an std::ostream and gathers multiple individual writes into an
+// individual, thread-safe atomic write, to avoid interleaving of output
+// between multiple threads. Similar to C++20's std::ostreambuf.
+// (This class itself not thread safe. Do not share instances between threads)
+class osyncstream : public std::ostream {
+public:
+	explicit osyncstream(std::ostream &stream)
+		: std::ostream(&_buffer), _buffer(stream) { }
+private:
+	class osyncstreambuf: public std::stringbuf {
+	public:
+		explicit osyncstreambuf(std::ostream &stream) : _stream(stream) { }
+
+		int sync() override {
+			std::lock_guard<std::mutex> lock(_mutex);
+			_stream << str();
+			str("");
+			return 0;
+		}
+	private:
+		std::ostream &_stream;
+		static std::mutex _mutex;
+	};
+
+	osyncstreambuf _buffer;
+};
+
+std::mutex osyncstream::osyncstreambuf::_mutex;
 
 static unsigned int determine_num_threads()
 {
@@ -83,6 +113,15 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	auto num_threads = determine_num_threads();
 	auto thread_policy = determine_thread_policy();
 
+	auto get_log_debug = []() -> std::ostream& {
+		static thread_local osyncstream log_debug(std::cout);
+		return log_debug;
+	};
+	auto get_log_error = []() -> std::ostream& {
+		static thread_local osyncstream log_error(std::cerr);
+		return log_error;
+	};
+
 	// -----------
 	// COMPRESSION
 	// -----------
@@ -95,8 +134,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 //	for (int i = 0; i < 2; i++) { comp_blocks.clear();
 	lib842::stream::DataCompressionStream cstream(
 		lib842_compress, num_threads, thread_policy,
-		[]() -> std::ostream& { return std::cerr; },
-		[]() -> std::ostream& { return std::cout; });
+		get_log_error, get_log_debug);
 	cstream.wait_until_ready();
 
 	long long timestart_comp = timestamp();
@@ -142,8 +180,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// -------------
 	lib842::stream::DataDecompressionStream dstream(
 		lib842_decompress, num_threads, thread_policy,
-		[]() -> std::ostream& { return std::cerr; },
-		[]() -> std::ostream& { return std::cout; });
+		get_log_error, get_log_debug);
 
 	dstream.wait_until_ready();
 
