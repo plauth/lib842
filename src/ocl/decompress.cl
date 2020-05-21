@@ -21,9 +21,9 @@ __constant static const uint8_t LIB842_COMPRESSED_CHUNK_MARKER[] =
 #endif
 
 #ifndef USE_INPLACE_COMPRESSED_CHUNKS
-#define RESTRICT_UNLESS_INLINE restrict
+#define RESTRICT_UNLESS_INPLACE restrict
 #else
-#define RESTRICT_UNLESS_INLINE
+#define RESTRICT_UNLESS_INPLACE
 #endif
 
 #define ENABLE_ERROR_HANDLING
@@ -186,8 +186,8 @@ static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 	return offset;
 }
 
-static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INLINE in, size_t ilen,
-				  __global uint64_t *RESTRICT_UNLESS_INLINE out, size_t *olen)
+static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLACE in, size_t ilen,
+				  __global uint64_t *RESTRICT_UNLESS_INPLACE out, size_t *olen)
 {
 	struct sw842_param_decomp p;
 	p.ostart = p.out = out;
@@ -338,9 +338,9 @@ static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INLIN
 	return 0;
 }
 
-__kernel void decompress(__global const uint64_t *RESTRICT_UNLESS_INLINE in,
+__kernel void decompress(__global const uint64_t *RESTRICT_UNLESS_INPLACE in,
 			 ulong inOffset, __global const ulong *ilen,
-			 __global uint64_t *RESTRICT_UNLESS_INLINE out,
+			 __global uint64_t *RESTRICT_UNLESS_INPLACE out,
 			 ulong outOffset, __global ulong *olen,
 			 ulong numChunks, __global int *returnValues)
 {
