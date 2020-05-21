@@ -172,6 +172,17 @@ static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 		offset += section;
 	}
 
+#ifdef ENABLE_ERROR_HANDLING
+	if (offset + size > total) {
+		if (p->errorcode == 0) {
+			printf("index%x %lx points past end %lx\n", size,
+			       (unsigned long)offset, (unsigned long)total);
+			p->errorcode = -EINVAL;
+		}
+		return 0;
+	}
+#endif
+
 	return offset;
 }
 
@@ -249,6 +260,10 @@ static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INLIN
 		case OP_END:
 			break;
 		default:
+#ifdef ENABLE_ERROR_HANDLING
+			if (op >= OPS_MAX)
+				return -EINVAL;
+#endif
 			for (int i = 0; i < 4; i++) {
 				uint64_t value;
 
@@ -267,6 +282,10 @@ static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INLIN
 					uint64_t offset = get_index(
 						&p, dst_size, value,
 						fifo_sizes[dst_size >> 2]);
+#ifdef ENABLE_ERROR_HANDLING
+					if (p.errorcode != 0)
+						return p.errorcode;
+#endif
 					offset >>= 1;
 					__global uint16_t *ostart16 =
 						(__global uint16_t *)p.ostart;

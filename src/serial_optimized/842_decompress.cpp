@@ -201,7 +201,7 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size,
 #endif
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
-static inline uint64_t get_index(const struct sw842_param_decomp *p,
+static inline uint64_t get_index(struct sw842_param_decomp *p,
 				 uint8_t size, uint64_t index, uint64_t fsize)
 {
 	uint64_t offset, total = round_down(p->out - p->ostart, 8);
@@ -223,6 +223,17 @@ static inline uint64_t get_index(const struct sw842_param_decomp *p,
 
 		offset += section;
 	}
+
+#ifdef ENABLE_ERROR_HANDLING
+	if (offset + size > total) {
+		if (p->errorcode == 0) {
+			fprintf(stderr, "index%x %lx points past end %lx\n", size,
+				(unsigned long)offset, (unsigned long)total);
+			p->errorcode = -EINVAL;
+		}
+		return 0;
+	}
+#endif
 
 	return offset;
 }
@@ -455,6 +466,10 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 		case OP_END:
 			break;
 		default:
+#ifdef ENABLE_ERROR_HANDLING
+			if (op >= OPS_MAX)
+				return -EINVAL;
+#endif
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
 			for (int i = 0; i < 4; i++) {
 				// 0-initialize all values-fields
@@ -475,12 +490,19 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 					return p.errorcode;
 #endif
 
+#ifdef ENABLE_ERROR_HANDLING
+
 				uint64_t offset =
-					get_index(&p, dst_size,
-						  values[4 + i],
-						  fifo_sizes[dst_size]);
+					is_index ? get_index(&p, dst_size,
+					values[4 + i], fifo_sizes[dst_size]) : 0;
+				if (p.errorcode != 0)
+					return p.errorcode;
+#else
+				uint64_t offset = get_index(&p, dst_size,
+					values[4 + i], fifo_sizes[dst_size]);
+#endif
 				memcpy(&values[4 + i],
-				       &p.ostart[offset], dst_size);
+				       &p.ostart[offset * is_index], dst_size * is_index);
 				values[4 + i] = swap_be_to_native64(
 					values[4 + i]
 					<< (WSIZE - (dst_size << 3)));
