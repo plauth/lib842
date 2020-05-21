@@ -18,6 +18,7 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
+	assert(pattern->uncompressed_len > 1);
 	uint8_t out[pattern->uncompressed_len - 1];
 	size_t olen = pattern->uncompressed_len - 1;
 	if (impl->decompress(pattern->compressed, pattern->compressed_len, out,

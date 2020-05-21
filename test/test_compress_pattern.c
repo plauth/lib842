@@ -23,7 +23,9 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	alignas(8) uint8_t in[pattern->uncompressed_len],
+	alignas(8) uint8_t
+		// Avoid zero-length VLA (forbidden by standard C)
+		in[pattern->uncompressed_len > 0 ? pattern->uncompressed_len : 1],
 		out[pattern->uncompressed_len * 2 + 8];
 	memcpy(in, pattern->uncompressed, pattern->uncompressed_len);
 	size_t olen = pattern->uncompressed_len * 2 + 8;
