@@ -53,7 +53,7 @@ DataCompressionStream::~DataCompressionStream() {
 
 void DataCompressionStream::set_offset_sync_epoch_multiple(size_t offset_sync_epoch_multiple) {
 	assert(offset_sync_epoch_multiple % BLOCK_SIZE == 0 &&
-	       offset_sync_epoch_multiple & (offset_sync_epoch_multiple - 1) == 0);
+	       (offset_sync_epoch_multiple & (offset_sync_epoch_multiple - 1)) == 0);
 
 	_offset_sync_epoch_multiple_log2 = UINT_MAX;
 	while (offset_sync_epoch_multiple > 0) {
@@ -123,8 +123,8 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 			// If (last_offset / _offset_sync_epoch_multiple) and (offset / _offset_sync_epoch_multiple)
 			// are different, stop compressing until all threads are on the same level
 			if (_offset_sync_epoch_multiple_log2 != UINT_MAX) {
-				size_t num_epochs = std::min(offset, _size) >> _offset_sync_epoch_multiple_log2 -
-						    last_offset >> _offset_sync_epoch_multiple_log2;
+				size_t num_epochs = (std::min(offset, _size) >> _offset_sync_epoch_multiple_log2) -
+						    (last_offset >> _offset_sync_epoch_multiple_log2);
 				for (size_t i = 0; i < num_epochs; i++)
 					_finalize_barrier.arrive_and_wait();
 			}
