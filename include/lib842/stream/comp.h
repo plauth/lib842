@@ -52,6 +52,19 @@ public:
 			      std::function<std::ostream&(void)> debug_logger);
 	~DataCompressionStream();
 
+	/* Allows restricting the order at which blocks are emited by the stream
+	   by defining a size (which must be a multiple of the block size,
+	   and also a power of two), such that all blocks before a multiple of
+	   that size will be sent before any later blocks are sent
+	   (i.e. defines a 'epoch' or 'barrier' at each multiple of that size)
+
+	   For example, if the block size is 1MB and this value is set to 16MB,
+	   the stream will not send the block at offset=16MB or any later block
+	   until all blocks at offset=0,1,2,...,15MB have been sent,
+	   and also will not send the block at offset=32MB or any later block
+	   until all blocks at offset=0,1,2,...,31MB have been sent */
+	void set_offset_sync_epoch_multiple(size_t offset_sync_epoch_multiple);
+
 	/* Blocks until the stream is ready to actually start processing data
 	   (the underlying threads have been spawned).
 	   This isn't only for debugging and benchmarking */
@@ -102,6 +115,8 @@ private:
 
 	// If set to true, causes the compression threads to quit (for cleanup)
 	bool _quit;
+
+	unsigned _offset_sync_epoch_multiple_log2;
 };
 
 } // namespace stream

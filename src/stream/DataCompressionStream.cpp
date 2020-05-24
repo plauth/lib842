@@ -1,4 +1,6 @@
 #include "numa_spread.h"
+#include <algorithm>
+#include <climits>
 
 #include <lib842/stream/comp.h>
 
@@ -27,7 +29,7 @@ DataCompressionStream::DataCompressionStream(
 	_ptr(nullptr), _size(0), _skip_compress_step(false),
 	_current_offset(0), _error(false),
 	_finalizing(false), _finalize_barrier(num_threads),
-	_quit(false) {
+	_quit(false), _offset_sync_epoch_multiple_log2(UINT_MAX) {
 	_threads.reserve(num_threads);
 	for (size_t i = 0; i < num_threads; i++)
 		_threads.emplace_back(&DataCompressionStream::loop_compress_thread, this, i);
@@ -47,6 +49,17 @@ DataCompressionStream::~DataCompressionStream() {
 
 	for (auto &t : _threads)
 		t.join();
+}
+
+void DataCompressionStream::set_offset_sync_epoch_multiple(size_t offset_sync_epoch_multiple) {
+	assert(offset_sync_epoch_multiple % BLOCK_SIZE == 0 &&
+	       offset_sync_epoch_multiple & (offset_sync_epoch_multiple - 1) == 0);
+
+	_offset_sync_epoch_multiple_log2 = UINT_MAX;
+	while (offset_sync_epoch_multiple > 0) {
+		_offset_sync_epoch_multiple_log2++;
+		offset_sync_epoch_multiple >>= 1;
+	}
 }
 
 void DataCompressionStream::wait_until_ready() {
@@ -98,12 +111,25 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 			last_trigger = _trigger;
 		}
 
-		// -------------------
-		// DECOMPRESSION PHASE
-		// -------------------
+		// -----------------
+		// COMPRESSION PHASE
+		// -----------------
+		size_t last_offset = 0;
+
 		auto last_valid_offset = _size & ~(BLOCK_SIZE-1);
 		while (true) {
 			size_t offset = _current_offset.fetch_add(BLOCK_SIZE);
+
+			// If (last_offset / _offset_sync_epoch_multiple) and (offset / _offset_sync_epoch_multiple)
+			// are different, stop compressing until all threads are on the same level
+			if (_offset_sync_epoch_multiple_log2 != UINT_MAX) {
+				size_t num_epochs = std::min(offset, _size) >> _offset_sync_epoch_multiple_log2 -
+						    last_offset >> _offset_sync_epoch_multiple_log2;
+				for (size_t i = 0; i < num_epochs; i++)
+					_finalize_barrier.arrive_and_wait();
+			}
+			last_offset = offset;
+
 			if (offset >= last_valid_offset)
 				break;
 
