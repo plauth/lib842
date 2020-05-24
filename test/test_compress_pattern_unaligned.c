@@ -5,9 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdalign.h>
+#include <signal.h>
 #include <errno.h>
 #include "test_patterns.h"
 #include "test_util.h"
+
+void pass_on_sigbus(int signo) {
+	printf("Got SIGBUS (likely platform does not support unaligned pointers)\n");
+	exit(EXIT_SUCCESS);
+}
 
 int main(int argc, char *argv[])
 {
@@ -18,6 +24,11 @@ int main(int argc, char *argv[])
 		printf("test_compress_pattern_unaligned IMPL PATTERN\n");
 		return EXIT_FAILURE;
 	}
+
+	// The optimized software implementation relies on unaligned pointer
+	// access being supported by the platform, so don't fail if it doesn't
+	if (strcmp(argv[1], "optsw") == 0)
+		signal(SIGBUS, pass_on_sigbus);
 
 	alignas(8) uint8_t inb[pattern->uncompressed_len + 3],
 		outb[(pattern->uncompressed_len * 2 + 8) + 3];
