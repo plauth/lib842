@@ -32,9 +32,20 @@ enum class CLDecompressorInputFormat {
 	// from the input to the output buffer
 	MAYBE_COMPRESSED_CHUNKS,
 	// In this format, the input and the output buffer are the same and data is
-	// uncompressed in-place in the same buffer. However, this fails with some
-	// data where the output pointer "catches up" with the input pointer
-	// (TODOXXX: Fix or delete this mode)
+	// uncompressed in-place in the same buffer.
+	//
+	// TODOXXX: This mode is broken for some kinds of 'unfortunate' input data.
+	// The problem arises in that the output pointer can "catch up" with the
+	// input pointer, resulting in corruption or infinite loops.
+	// This happens when a chunk contains a lot of redudant data in the beginning
+	// (which is encoded as OP_ZEROS/OP_REPEAT/index references in the bitstream)
+	// and a lot of uncompressible data at the end (which is encoded as data
+	// literals in the bitstream), which causes a bitstreram that requires an
+	// 'unbounded' amount of lookahead.
+	// So far, no workaround has been found or implemented for this problem.
+	// The main alternative is to use the MAYBE_COMPRESSED_CHUNKS mode,
+	// which has similar performance but requires additional memory usage
+	// and a more complex setup for managing additional temporary buffers
 	INPLACE_COMPRESSED_CHUNKS,
 };
 

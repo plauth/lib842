@@ -229,6 +229,10 @@ DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t
 	} else {
 		// TODOXXX: This can be reduced to e.g. COMPRESSIBLE_THRESHOLD or CHUNK_SIZE,
 		// as long as the lib842 compressor respects the destination buffer size
+		// (input value of the olen parameter to the compression function)
+		// However, currently the serial_optimized lib842 implementation does not
+		// respect olen when compiled without ENABLE_ERROR_HANDLING (for performance),
+		// so this is necessary to handle this case
 		static constexpr size_t CHUNK_PADDING = 2 * CHUNK_SIZE;
 		block.compress_buffer.reset(
 			new uint8_t[CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK]);

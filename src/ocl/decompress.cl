@@ -8,9 +8,10 @@ typedef short int16_t;
 typedef uint uint32_t;
 typedef ulong uint64_t;
 
-// WORKAROUND: At least on pocl 1.1 on Ubuntu 18.04, NULL is not defined
-// (the error message is: "use of undeclared identifier 'NULL'"), but it
-// should according to the OpenCL C standard. But do it ourselves if not
+// Define NULL, since it is not required by the OpenCL C 1.2 standard
+// Most common vendor implementations define it anyway (Intel, NVIDIA),
+// but pocl adheres strictly to the standard and doesn't
+// See also: https://github.com/pocl/pocl/issues/831
 #ifndef NULL
 #define NULL 0L
 #endif
@@ -41,7 +42,10 @@ struct sw842_param_decomp {
 	uint32_t bits;
 	uint64_t buffer;
 #ifdef USE_INPLACE_COMPRESSED_CHUNKS
-	// FIXME: Determined experimentally. Is this enough for the worst possible case?
+	// TODOXXX: This amount of lookahead is insufficient, and can be overflowed
+	// on certain 'unfortunate' cases of input data.
+	// This causes this mode to be currently 'broken' for the general case
+	// See the notes in the comments on cl.h for more details
 	uint64_t lookAheadBuffer[6];
 #endif
 };
