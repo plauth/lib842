@@ -4,6 +4,10 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "842-internal.h"
+#include <cstddef>
+#include <cstdint>
+
 // NOTE: To my best knowledge, this file is based on a bitstream implementation
 // from the zpf library (e.g. src/inline/bitstream.c on zpf-0.5.5)
 // See: https://computing.llnl.gov/projects/floating-point-compression
@@ -12,7 +16,9 @@
 
 struct bitstream *stream_open(void *buffer, size_t bytes);
 void stream_close(struct bitstream *s);
+#ifdef ENABLE_ERROR_HANDLING
 bool stream_is_overfull(const struct bitstream *s);
+#endif
 size_t stream_size(const struct bitstream *s);
 void stream_write_bits(struct bitstream *s, uint64_t value, uint8_t n);
 void stream_flush(struct bitstream *s);

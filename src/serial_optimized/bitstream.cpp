@@ -43,10 +43,12 @@ static void stream_write_word(struct bitstream *s, uint64_t value)
 
 /* public functions -------------------------------------------------------- */
 
+#ifdef ENABLE_ERROR_HANDLING
 bool stream_is_overfull(const struct bitstream *s)
 {
 	return s->overfull;
 }
+#endif
 
 /* current byte size of stream (if flushed) */
 size_t stream_size(const struct bitstream *s)
