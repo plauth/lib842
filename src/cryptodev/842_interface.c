@@ -259,6 +259,11 @@ static int get_thread_cryptodev_ctx(struct cryptodev_ctx **rctx)
 	return 0;
 }
 
+int hw842_available() {
+	// TODO: A self-test trying to decompress a known bitstream would be better here
+	return access("/dev/crypto", F_OK) == 0;
+}
+
 int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 {
 	struct cryptodev_ctx *thread_ctx;

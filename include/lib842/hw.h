@@ -12,6 +12,8 @@
 extern "C" {
 #endif
 
+int hw842_available();
+
 int hw842_compress(const uint8_t *in, size_t ilen,
 		   uint8_t *out, size_t *olen);
 
