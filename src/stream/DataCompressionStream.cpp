@@ -1,6 +1,7 @@
 #include "numa_spread.h"
 #include <algorithm>
 #include <climits>
+#include <cerrno>
 
 #include <lib842/stream/comp.h>
 
@@ -246,13 +247,13 @@ DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t
 			size_t compressed_size = CHUNK_PADDING;
 
 			int ret = _compress842_func(source, CHUNK_SIZE, compressed_destination, &compressed_size);
-			if (ret != 0) {
+			if (ret != 0 && ret != -ENOSPC) {
 				block.source_offset = SIZE_MAX; // Indicates error to the user
 				break;
 			}
 
 			// Push into the chunk queue
-			auto compressible = compressed_size <= COMPRESSIBLE_THRESHOLD;
+			auto compressible = ret == 0 && compressed_size <= COMPRESSIBLE_THRESHOLD;
 
 			block.datas[i] = compressible ? compressed_destination : source;
 			block.sizes[i] = compressible ? compressed_size : CHUNK_SIZE;
