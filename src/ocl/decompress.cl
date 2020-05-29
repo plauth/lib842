@@ -190,6 +190,64 @@ static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 	return offset;
 }
 
+static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
+{
+#ifdef ENABLE_ERROR_HANDLING
+	if (op >= OPS_MAX) {
+		p->errorcode = -EINVAL;
+		return;
+	}
+#endif
+
+	uint64_t output_word = 0;
+	uint32_t bits = 0;
+
+	for (int i = 0; i < 4; i++) {
+		uint64_t value;
+
+		uint32_t dec_template = dec_templates[op][i][0];
+		//printf("op is %x\n", dec_template & 0x7F);
+		uint32_t is_index = (dec_template >> 7);
+		uint32_t dst_size = dec_templates[op][i][1];
+
+		value = read_bits(p, dec_template & 0x7F);
+#ifdef ENABLE_ERROR_HANDLING
+		if (p->errorcode != 0)
+			return;
+#endif
+
+		if (is_index) {
+			uint64_t offset = get_index(
+				p, dst_size, value,
+				fifo_sizes[dst_size >> 2]);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p->errorcode != 0)
+				return;
+#endif
+			offset >>= 1;
+			__global uint16_t *ostart16 =
+				(__global uint16_t *)p->ostart;
+			value = (((uint64_t)ostart16[offset])) |
+				(((uint64_t)ostart16[offset + 1]) << 16) |
+				(((uint64_t)ostart16[offset + 2]) << 32) |
+				(((uint64_t)ostart16[offset + 3]) << 48);
+			value &= masks[dst_size >> 2];
+			value <<= (WSIZE - (dst_size << 3));
+			value = bswap(value);
+		}
+		output_word |= value
+			       << (64 - (dst_size << 3) - bits);
+		bits += dst_size << 3;
+	}
+#ifdef ENABLE_ERROR_HANDLING
+	if ((p->out - p->ostart) * sizeof(uint64_t) + 8 > p->olen) {
+		p->errorcode = -ENOSPC;
+		return;
+	}
+#endif
+	*p->out++ = bswap(output_word);
+}
+
 static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLACE in, size_t ilen,
 				  __global uint64_t *RESTRICT_UNLESS_INPLACE out, size_t *olen)
 {
@@ -218,17 +276,12 @@ static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLA
 
 	uint64_t op;
 
-	uint64_t output_word;
-	uint32_t bits;
-
 	do {
 		op = read_bits(&p, OP_BITS);
 #ifdef ENABLE_ERROR_HANDLING
 		if (p.errorcode != 0)
 			return p.errorcode;
 #endif
-		output_word = 0;
-		bits = 0;
 
 		switch (op) {
 		case OP_REPEAT:
@@ -264,55 +317,11 @@ static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLA
 		case OP_END:
 			break;
 		default:
+			do_op(&p, op);
 #ifdef ENABLE_ERROR_HANDLING
-			if (op >= OPS_MAX)
-				return -EINVAL;
+			if (p.errorcode != 0)
+				return p.errorcode;
 #endif
-			for (int i = 0; i < 4; i++) {
-				uint64_t value;
-
-				uint32_t dec_template = dec_templates[op][i][0];
-				//printf("op is %x\n", dec_template & 0x7F);
-				uint32_t is_index = (dec_template >> 7);
-				uint32_t dst_size = dec_templates[op][i][1];
-
-				value = read_bits(&p, dec_template & 0x7F);
-#ifdef ENABLE_ERROR_HANDLING
-				if (p.errorcode != 0)
-					return p.errorcode;
-#endif
-
-				if (is_index) {
-					uint64_t offset = get_index(
-						&p, dst_size, value,
-						fifo_sizes[dst_size >> 2]);
-#ifdef ENABLE_ERROR_HANDLING
-					if (p.errorcode != 0)
-						return p.errorcode;
-#endif
-					offset >>= 1;
-					__global uint16_t *ostart16 =
-						(__global uint16_t *)p.ostart;
-					value = (((uint64_t)ostart16[offset])) |
-						(((uint64_t)ostart16[offset + 1])
-						 << 16) |
-						(((uint64_t)ostart16[offset + 2])
-						 << 32) |
-						(((uint64_t)ostart16[offset + 3])
-						 << 48);
-					value &= masks[dst_size >> 2];
-					value <<= (WSIZE - (dst_size << 3));
-					value = bswap(value);
-				}
-				output_word |= value
-					       << (64 - (dst_size << 3) - bits);
-				bits += dst_size << 3;
-			}
-#ifdef ENABLE_ERROR_HANDLING
-			if ((p.out - p.ostart) * sizeof(uint64_t) + 8 > p.olen)
-				return -ENOSPC;
-#endif
-			*p.out++ = bswap(output_word);
 		}
 	} while (op != OP_END);
 
