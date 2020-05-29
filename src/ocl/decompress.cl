@@ -360,7 +360,7 @@ __kernel void decompress(__global const uint64_t *RESTRICT_UNLESS_INPLACE in,
 	    my_in[1] != ((__constant const uint64_t *)LIB842_COMPRESSED_CHUNK_MARKER)[1]) {
 #ifdef USE_MAYBE_COMPRESSED_CHUNKS
 		// Copy uncompressed chunk from temporary input buffer to output buffer
-		for (size_t i = 0; i < CL842_CHUNK_SIZE; i++) {
+		for (size_t i = 0; i < CL842_CHUNK_SIZE / 8; i++) {
 			my_out[i] = my_in[i];
 		}
 #endif
