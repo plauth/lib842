@@ -20,11 +20,11 @@ namespace lib842 {
 
 enum class CLDecompressorInputFormat {
 	// This is the simplest format, in which the input buffer contains blocks
-	// of size (inputChunkSize*2), which are always compressed
+	// of size (chunkSize*2), which are always compressed
 	// This format is typically not useful for realistic scenarios, due to
 	// being suboptimal when dealing with uncompressible (e.g. random) data
 	ALWAYS_COMPRESSED_CHUNKS,
-	// In this format, the input buffer contains blocks of size inputChunkSize
+	// In this format, the input buffer contains blocks of size chunkSize
 	// Inside this buffer, uncompressible data is stored as-is and compressible
 	// data is stored with a "marker" header (see LIB842_COMPRESSED_CHUNK_MARKER et al.)
 	// This format allows mixing compressed and uncompressed chunks, which minimizes
@@ -56,31 +56,82 @@ enum class CLDecompressorInputFormat {
  */
 class CLDeviceDecompressor
 {
-	public:
-		CLDeviceDecompressor(const cl::Context& context,
-					const cl::vector<cl::Device>& devices,
-					size_t inputChunkSize,
-					size_t inputChunkStride,
-					CLDecompressorInputFormat inputFormat,
-					bool verbose = false);
-		void decompress(const cl::CommandQueue& commandQueue,
-				const cl::Buffer& inputBuffer, size_t inputOffset,
-				size_t inputSize, const cl::Buffer &inputSizes,
-				const cl::Buffer& outputBuffer, size_t outputOffset,
-				size_t outputSize, const cl::Buffer &outputSizes,
-				const cl::Buffer &returnValues,
-				const cl::Buffer &chunkShuffleMap,
-				const cl::vector<cl::Event>* events = nullptr,
-				cl::Event* event = nullptr) const;
+public:
+	/**
+	 * Creates an OpenCL-based decompressor.
+	 * Parameters:
+	 * - context: OpenCL context over which the decompressor should be usable.
+	 * - devices: OpenCL devices over which the decompressor should be usable.
+	 * - chunkSize: When decompressing multiple chunks, determines the
+	                size in bytes of each chunk of decompressed data.
+	 * - chunkStride: When decompressing multiple chunks, determines the
+	 *                size in bytes between each chunk of compressed data.
+	 * - inputFormat: Determines in which format the input data is passed in.
+	 *                See the enumeration for more details.
+	 * - verbose: true to print addditional information / benchmark the decompressor.
+	 */
+	CLDeviceDecompressor(const cl::Context &context,
+			     const cl::vector<cl::Device> &devices,
+			     size_t chunkSize,
+			     size_t chunkStride,
+			     CLDecompressorInputFormat inputFormat,
+			     bool verbose = false);
+	/**
+	* Decompress a buffer containing multiple chunks of 842-compressed data.
+	* Parameters:
+	* - commandQueue: Command queue on which to enqueue the OpenCL operations.
+	* - inputBuffer: Buffer containing the input data.
+	* - inputOffset: Offset in the input buffer at which the compressed data starts.
+	*                Must be a multiple of 8.
+	* - inputBufferSize: Total size of the buffer containing the input data.
+	* - inputChunkSizes: Specifies the compressed size of each chunk to be decompressed.
+	*                    This is only for error-checking, and is optional (can be null).
+	* - outputBuffer: Buffer where the output data should be written.
+	* - outputOffset: Offset in the output buffer at which the decompressed data should start.
+	*                Must be a multiple of 8.
+	* - outputBufferSize: Total size of the buffer to write the output data to.
+	* - outputChunkSizes: Specifies the maximum size to be written for each chunk.
+	*                     This is only for error-checking, and is optional (can be null).
+	* - returnValues: The error code (C errno) is written here for each chunk.
+	*                 This is only for error-checking, and is optional (can be null).
+	* - chunkShuffleMap: Determines the order in which the chunks are processed
+	*                    by the OpenCL kernel, which can influence performance
+	*                    The reason simply shuffling the order in which chunks are
+	*                    processed can help performance is to reduce branch divergence.
+	*                    In particular, in the USE_INPLACE_COMPRESSED_CHUNKS
+	*                    and USE_MAYBE_COMPRESSED_CHUNKS modes, the decompression kernel
+	*                    takes completely different paths for compressible and
+	*                    uncompressible chunks. Therefore, shuffling the order in which
+	*                    chunks are processed so that all compressible (and respectively
+	*                    uncompressible) chunks are processed together can improve
+	*                    performance in those cases.
+	* - events:          Event wait list before starting decompression
+	*                    (like any clEnqueueXXX OpenCL API).
+	* - event:           OpenCL event triggered after decompression finishing.
+	*                    (like any clEnqueueXXX OpenCL API).
+	*/
+	void decompress(const cl::CommandQueue &commandQueue,
+			const cl::Buffer &inputBuffer,
+			size_t inputOffset,
+			size_t inputBufferSize,
+			const cl::Buffer &inputChunkSizes,
+			const cl::Buffer &outputBuffer,
+			size_t outputOffset,
+			size_t outputBufferSizes,
+			const cl::Buffer &outputChunkSizes,
+			const cl::Buffer &returnValues,
+			const cl::Buffer &chunkShuffleMap,
+			const cl::vector<cl::Event> *events = nullptr,
+			cl::Event *event = nullptr) const;
 
-	private:
-		size_t m_inputChunkSize;
-		size_t m_inputChunkStride;
-		CLDecompressorInputFormat m_inputFormat;
-		bool m_verbose;
-		cl::Program m_program;
+private:
+	size_t m_chunkSize;
+	size_t m_chunkStride;
+	CLDecompressorInputFormat m_inputFormat;
+	bool m_verbose;
+	cl::Program m_program;
 
-		void buildProgram(const cl::Context& context, const cl::vector<cl::Device>& devices);
+	void buildProgram(const cl::Context &context, const cl::vector<cl::Device> &devices);
 };
 
 /**
@@ -90,27 +141,30 @@ class CLDeviceDecompressor
  */
 class CLHostDecompressor
 {
-	public:
-		CLHostDecompressor(size_t inputChunkSize,
-				   size_t inputChunkStride,
-				   CLDecompressorInputFormat inputFormat,
-				   bool verbose = false);
-		void decompress(const uint8_t* input, size_t inputSize,
-				const size_t *inputSizes,
-				uint8_t* output, size_t outputSize,
-				size_t *outputSizes,
-				size_t *chunkShuffleMap, int *returnValues) const;
+public:
+	CLHostDecompressor(size_t chunkSize,
+			   size_t chunkStride,
+			   CLDecompressorInputFormat inputFormat,
+			   bool verbose = false);
+	void decompress(const uint8_t *input,
+			size_t inputBufferSize,
+			const size_t *inputChunkSizes,
+			uint8_t *output,
+			size_t outputBufferSizes,
+			size_t *outputChunkSizes,
+			size_t *chunkShuffleMap,
+			int *returnValues) const;
 
-	private:
-		size_t m_inputChunkStride;
-		CLDecompressorInputFormat m_inputFormat;
-		bool m_verbose;
-		cl::vector<cl::Device> m_devices;
-		cl::Context m_context;
-		cl::CommandQueue m_queue;
-		CLDeviceDecompressor m_deviceCompressor;
+private:
+	size_t m_chunkStride;
+	CLDecompressorInputFormat m_inputFormat;
+	bool m_verbose;
+	cl::vector<cl::Device> m_devices;
+	cl::Context m_context;
+	cl::CommandQueue m_queue;
+	CLDeviceDecompressor m_deviceCompressor;
 
-		cl::vector<cl::Device> findDevices() const;
+	cl::vector<cl::Device> findDevices() const;
 };
 
 } // namespace lib842

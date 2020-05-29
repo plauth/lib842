@@ -1,13 +1,4 @@
-// If enabled, tries to shuffle up the order in which the chunks are processed
-// by the OpenCL kernel, so that decompression is faster.
-// The reason simply shuffling the order in which chunks are processed is due
-// to branch divergence. In particular, in the USE_INPLACE_COMPRESSED_CHUNKS
-// and the USE_MAYBE_COMPRESSED_CHUNKS modes, the decompression kernel
-// takes completely different paths for compressible and uncompressible chunks.
-// Therefore, shuffling the order in which chunks are processed so that all
-// compressible (and respectively uncompressible) chunks are processed together
-// can improve performance in most cases under those circumstances
-#define USE_CHUNK_SHUFFLE_MAP
+//#define USE_CHUNK_SHUFFLE_MAP
 
 #include <iostream>
 #include <fstream>
@@ -102,33 +93,33 @@ int main(int argc, char *argv[])
 	std::vector<size_t> chunk_olens(num_chunks);
 #if defined(USE_INPLACE_COMPRESSED_CHUNKS) || defined(USE_MAYBE_COMPRESSED_CHUNKS)
 	/** The objective of (MAYBE|INPLACE)_COMPRESSED_CHUNKS is to define a format that allows
-        easy network transmission of compressed data without excessive copying,
-        buffer overallocation, etc..
-        As part of this, as the name mentions, chunks are decompressed in-place.
+	    easy network transmission of compressed data without excessive copying,
+	    buffer overallocation, etc..
+	    As part of this, as the name mentions, chunks are decompressed in-place.
 
-        A file is compressed as follows: It is first chunked into chunks of size
-        CHUNK_SIZE, and each chunk is compressed with 842. Chunks are
-        classified as compressible if the compressed size is
-        <= CHUNK_SIZE - sizeof(LIB842_COMPRESSED_CHUNK_MARKER) - sizeof(uint64_t),
-        otherwise they are considered incompressible.
+	    A file is compressed as follows: It is first chunked into chunks of size
+	    CHUNK_SIZE, and each chunk is compressed with 842. Chunks are
+	    classified as compressible if the compressed size is
+	    <= CHUNK_SIZE - sizeof(LIB842_COMPRESSED_CHUNK_MARKER) - sizeof(uint64_t),
+	    otherwise they are considered incompressible.
 
-        The chunks are placed into the decompression buffer as follows:
-        * For incompressible chunks, the compressed version is thrown away
-          and the uncompressed data is written directly to the buffer.
-        * For compressible chunks, the following is written to the buffer:
-          LIB842_COMPRESSED_CHUNK_MARKER: A sequence of bytes (similar to a UUID) that allows
-                                        recognizing that this is a compressed chunk.
-          Size (64-bit): The size of the data after compression.
-          *BLANK*: All unused space in the chunk is placed here.
-          Compressed data: All compressed data is placed at the end of the buffer.
+	    The chunks are placed into the decompression buffer as follows:
+	    * For incompressible chunks, the compressed version is thrown away
+	      and the uncompressed data is written directly to the buffer.
+	    * For compressible chunks, the following is written to the buffer:
+	      LIB842_COMPRESSED_CHUNK_MARKER: A sequence of bytes (similar to a UUID)
+	      that allows recognizing that this is a compressed chunk.
+	    Size (64-bit): The size of the data after compression.
+	    *BLANK*: All unused space in the chunk is placed here.
+	    Compressed data: All compressed data is placed at the end of the buffer.
 
-        The (MAYBE|INPLACE)_COMPRESSED_CHUNKS flag is propagated to the OpenCL decompression kernel,
-        which recognizes this format and does a little more work to handle it.
-        Mostly, it ignores uncompressed/incompressible chunks
-        (because it sees that LIB842_COMPRESSED_CHUNK_MARKER is not present),
-        and decompresses compressed chunks in-place, using some lookahead
-        bytes to ensure that the output pointer doesn't 'catch up' the input pointer.
-    */
+	    The (MAYBE|INPLACE)_COMPRESSED_CHUNKS flag is propagated to the OpenCL decompression
+	    kernel, which recognizes this format and does a little more work to handle it.
+	    Mostly, it ignores uncompressed/incompressible chunks
+	    (because it sees that LIB842_COMPRESSED_CHUNK_MARKER is not present),
+	    and decompresses compressed chunks in-place, using some lookahead
+	    bytes to ensure that the output pointer doesn't 'catch up' the input pointer.
+	*/
 
 #pragma omp parallel
 	{
