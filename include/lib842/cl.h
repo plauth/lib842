@@ -15,6 +15,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <iostream>
 
 namespace lib842 {
 
@@ -68,6 +69,7 @@ public:
 	 *                size in bytes between each chunk of compressed data.
 	 * - inputFormat: Determines in which format the input data is passed in.
 	 *                See the enumeration for more details.
+	 * - logger: Stream where additional errors, warnings and information can be logged.
 	 * - verbose: true to print addditional information / benchmark the decompressor.
 	 */
 	CLDeviceDecompressor(const cl::Context &context,
@@ -75,6 +77,7 @@ public:
 			     size_t chunkSize,
 			     size_t chunkStride,
 			     CLDecompressorInputFormat inputFormat,
+			     std::ostream &logger,
 			     bool verbose = false);
 	/**
 	* Decompress a buffer containing multiple chunks of 842-compressed data.
@@ -130,6 +133,7 @@ private:
 	CLDecompressorInputFormat m_inputFormat;
 	bool m_verbose;
 	cl::Program m_program;
+	std::ostream &m_logger;
 
 	void buildProgram(const cl::Context &context, const cl::vector<cl::Device> &devices);
 };

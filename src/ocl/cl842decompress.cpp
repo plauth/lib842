@@ -30,10 +30,12 @@ CLDeviceDecompressor::CLDeviceDecompressor(const cl::Context &context,
 					   size_t chunkSize,
 					   size_t chunkStride,
 					   CLDecompressorInputFormat inputFormat,
+					   std::ostream &logger,
 					   bool verbose)
 	: m_chunkSize(chunkSize),
 	  m_chunkStride(chunkStride),
 	  m_inputFormat(inputFormat),
+	  m_logger(logger),
 	  m_verbose(verbose)
 {
 	buildProgram(context, devices);
@@ -77,9 +79,9 @@ void CLDeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 	cl::NDRange localSize(LOCAL_SIZE);
 
 	if (numChunks > 1 && m_verbose) {
-		std::cerr << "Using " << numChunks << " chunks of "
-			  << m_chunkSize << " bytes, " << LOCAL_SIZE
-			  << " threads per workgroup" << std::endl;
+		m_logger << "Using " << numChunks << " chunks of "
+			 << m_chunkSize << " bytes, " << LOCAL_SIZE
+			 << " threads per workgroup" << std::endl;
 	}
 
 	std::chrono::steady_clock::time_point t1;
@@ -100,7 +102,7 @@ void CLDeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 			std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
 				.count();
 
-		std::cerr
+		m_logger
 			<< "Decompression performance: " << duration << "ms"
 			<< " / "
 			<< (static_cast<float>(outputBufferSize) / 1024 / 1024) / (static_cast<float>(duration) / 1000)
@@ -132,29 +134,20 @@ struct program_cache
 	cl::vector<cl::string> deviceNames;
 
 	cl::Program::Binaries find() const {
-		try {
-			std::ifstream in(CACHE_PATH, std::ifstream::in | std::ifstream::binary);
-			in.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+		std::ifstream in(CACHE_PATH, std::ifstream::in | std::ifstream::binary);
+		in.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 
-			program_cache disk_cache;
-			disk_cache.readMetadata(in);
-			if (chunkSize != disk_cache.chunkSize ||
-			    chunkStride != disk_cache.chunkStride ||
-			    inputFormat != disk_cache.inputFormat ||
-			    sourceHash != disk_cache.sourceHash ||
-			    deviceNames != disk_cache.deviceNames) {
-				return {};
-			}
-
-			return readBinaries(in, deviceNames.size());
-		}
-		catch (const std::ifstream::failure &)
-		{
-			std::cerr
-				<< "WARNING: Could not read lib842's OpenCL program cache"
-				<< std::endl;
+		program_cache disk_cache;
+		disk_cache.readMetadata(in);
+		if (chunkSize != disk_cache.chunkSize ||
+		    chunkStride != disk_cache.chunkStride ||
+		    inputFormat != disk_cache.inputFormat ||
+		    sourceHash != disk_cache.sourceHash ||
+		    deviceNames != disk_cache.deviceNames) {
 			return {};
 		}
+
+		return readBinaries(in, deviceNames.size());
 	}
 
 	void set(const cl::Program::Binaries &binaries) const {
@@ -262,14 +255,21 @@ void CLDeviceDecompressor::buildProgram(
 	for (const auto &d : devices)
 		cache.deviceNames.push_back(d.getInfo<CL_DEVICE_NAME>());
 
-	auto binaries = cache.find();
+	cl::Program::Binaries binaries;
+	try {
+		binaries = cache.find();
+	} catch (const std::ifstream::failure &) {
+		m_logger
+			<< "WARNING: Could not read lib842's OpenCL program cache"
+			<< std::endl;
+	}
 	if (!binaries.empty()) {
 		try {
 			m_program = cl::Program(context, devices, binaries);
 			m_program.build(devices, options.str().c_str());
 			return;
 		} catch (const cl::Error &ex) {
-			std::cerr
+			m_logger
 				<< "WARNING: Building the lib842's OpenCL program"
 				<< " from cache failed, rebuilding from source"
 				<< std::endl;
@@ -282,7 +282,7 @@ void CLDeviceDecompressor::buildProgram(
 		m_program.build(devices, options.str().c_str());
 	} catch (const cl::Error &ex) {
 		if (ex.err() == CL_BUILD_PROGRAM_FAILURE && m_verbose) {
-			std::cerr
+			m_logger
 				<< "Build Log: "
 				<< m_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(
 					   devices[0], nullptr)
@@ -305,7 +305,7 @@ CLHostDecompressor::CLHostDecompressor(size_t chunkSize,
 	  m_devices(findDevices()), m_context(m_devices),
 	  m_queue(m_context, m_devices[0]),
 	  m_deviceCompressor(m_context, m_devices, chunkSize,
-			     chunkStride, inputFormat, verbose)
+			     chunkStride, inputFormat, std::cerr, verbose)
 {
 }
 
