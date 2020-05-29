@@ -355,11 +355,15 @@ __kernel void decompress(__global const uint64_t *RESTRICT_UNLESS_INPLACE in,
 			 ulong inOffset, __global const ulong *ilen,
 			 __global uint64_t *RESTRICT_UNLESS_INPLACE out,
 			 ulong outOffset, __global ulong *olen,
-			 ulong numChunks, __global int *returnValues)
+			 ulong numChunks, __global const ulong *chunkShuffleMap,
+			 __global int *returnValues)
 {
 	size_t chunk_num = get_global_id(0);
 	if (chunk_num >= numChunks)
 		return;
+
+	if (chunkShuffleMap != NULL)
+		chunk_num = chunkShuffleMap[chunk_num];
 
 	__global uint64_t *my_out = out + (outOffset / 8) + ((CL842_CHUNK_SIZE / 8) * chunk_num);
 	__global const uint64_t *my_in = in + (inOffset / 8) + ((CL842_CHUNK_STRIDE / 8) * chunk_num);

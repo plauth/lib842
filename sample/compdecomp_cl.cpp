@@ -1,6 +1,21 @@
+// If enabled, tries to shuffle up the order in which the chunks are processed
+// by the OpenCL kernel, so that decompression is faster.
+// The reason simply shuffling the order in which chunks are processed is due
+// to branch divergence. In particular, in the USE_INPLACE_COMPRESSED_CHUNKS
+// and the USE_MAYBE_COMPRESSED_CHUNKS modes, the decompression kernel
+// takes completely different paths for compressible and uncompressible chunks.
+// Therefore, shuffling the order in which chunks are processed so that all
+// compressible (and respectively uncompressible) chunks are processed together
+// can improve performance in most cases under those circumstances
+#define USE_CHUNK_SHUFFLE_MAP
+
 #include <iostream>
 #include <fstream>
 #include <stdint.h>
+#ifdef USE_CHUNK_SHUFFLE_MAP
+#include <algorithm>
+#include <numeric>
+#endif
 
 #include <lib842/sw.h>
 #include <lib842/cl.h>
@@ -84,6 +99,7 @@ int main(int argc, char *argv[])
 
 	printf("Using %zu chunks of %zu bytes\n", num_chunks, CHUNK_SIZE);
 
+	std::vector<size_t> chunk_olens(num_chunks);
 #if defined(USE_INPLACE_COMPRESSED_CHUNKS) || defined(USE_MAYBE_COMPRESSED_CHUNKS)
 	/** The objective of (MAYBE|INPLACE)_COMPRESSED_CHUNKS is to define a format that allows
         easy network transmission of compressed data without excessive copying,
@@ -121,15 +137,15 @@ int main(int argc, char *argv[])
 #pragma omp for
 		for (size_t chunk_num = 0; chunk_num < num_chunks;
 		     chunk_num++) {
-			size_t chunk_olen = CHUNK_SIZE * 2;
+			chunk_olens[chunk_num] = CHUNK_SIZE * 2;
 			uint8_t *chunk_in =
 				compressIn + (CHUNK_SIZE * chunk_num);
 			uint8_t *chunk_out =
 				compressOut + (CHUNK_SIZE * chunk_num);
 
 			optsw842_compress(chunk_in, CHUNK_SIZE,
-					  &temp_buffer[0], &chunk_olen);
-			if (chunk_olen <=
+					  &temp_buffer[0], &chunk_olens[chunk_num]);
+			if (chunk_olens[chunk_num] <=
 			    CHUNK_SIZE -
 				    sizeof(LIB842_COMPRESSED_CHUNK_MARKER) -
 				    sizeof(uint64_t)) {
@@ -138,9 +154,9 @@ int main(int argc, char *argv[])
 				*reinterpret_cast<uint64_t *>(
 					chunk_out +
 					sizeof(LIB842_COMPRESSED_CHUNK_MARKER)) =
-					chunk_olen;
-				memcpy(&chunk_out[CHUNK_SIZE - chunk_olen],
-				       &temp_buffer[0], chunk_olen);
+					chunk_olens[chunk_num];
+				memcpy(&chunk_out[CHUNK_SIZE - chunk_olens[chunk_num]],
+				       &temp_buffer[0], chunk_olens[chunk_num]);
 			} else {
 				memcpy(&chunk_out[0], &chunk_in[0],
 				       CHUNK_SIZE);
@@ -150,37 +166,52 @@ int main(int argc, char *argv[])
 #else
 #pragma omp parallel for
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-		size_t chunk_olen = CHUNK_SIZE * 2;
+		chunk_olens[chunk_num] = CHUNK_SIZE * 2;
 		uint8_t *chunk_in = compressIn + (CHUNK_SIZE * chunk_num);
 		uint8_t *chunk_out =
 			compressOut + ((CHUNK_SIZE * 2) * chunk_num);
 
 		optsw842_compress(chunk_in, CHUNK_SIZE, chunk_out,
-				  &chunk_olen);
+				  &chunk_olens[chunk_num]);
 	}
 #endif
 
 	memcpy(decompressIn, compressOut, olen);
+
+#ifdef USE_CHUNK_SHUFFLE_MAP
+	std::vector<size_t> chunkShuffleMap(num_chunks);
+	std::iota(chunkShuffleMap.begin(), chunkShuffleMap.end(), 0);
+	std::stable_sort(chunkShuffleMap.begin(), chunkShuffleMap.end(),
+		[&chunk_olens](size_t i1, size_t i2) {
+		bool uncompressible1 = chunk_olens[i1] >= CHUNK_SIZE;
+		bool uncompressible2 = chunk_olens[i2] >= CHUNK_SIZE;
+		return uncompressible1 < uncompressible2;
+	});
+	size_t *chunkShuffleMapPtr = chunkShuffleMap.data();
+#else
+	size_t *chunkShuffleMapPtr = nullptr;
+#endif
 
 	try {
 #if defined(USE_INPLACE_COMPRESSED_CHUNKS)
 		lib842::CLHostDecompressor clDecompress(
 			CHUNK_SIZE, CHUNK_SIZE,
 			lib842::CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS, true);
-		clDecompress.decompress(decompressIn, olen, nullptr, decompressIn, dlen, nullptr, nullptr);
+		clDecompress.decompress(decompressIn, olen, nullptr, decompressIn,
+					dlen, nullptr, chunkShuffleMapPtr, nullptr);
 		memcpy(decompressOut, decompressIn, olen);
 #elif defined(USE_MAYBE_COMPRESSED_CHUNKS)
 		lib842::CLHostDecompressor clDecompress(
 			CHUNK_SIZE, CHUNK_SIZE,
 			lib842::CLDecompressorInputFormat::MAYBE_COMPRESSED_CHUNKS, true);
 		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
-					dlen, nullptr, nullptr);
+					dlen, nullptr, chunkShuffleMapPtr, nullptr);
 #else
 		lib842::CLHostDecompressor clDecompress(
 			CHUNK_SIZE, CHUNK_SIZE * 2,
 			lib842::CLDecompressorInputFormat::ALWAYS_COMPRESSED_CHUNKS, true);
 		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
-					dlen, nullptr, nullptr);
+					dlen, nullptr, chunkShuffleMapPtr, nullptr);
 #endif
 	} catch (const cl::Error &ex) {
 		std::cerr << "ERROR: " << ex.what() << " (" << ex.err() << ")"

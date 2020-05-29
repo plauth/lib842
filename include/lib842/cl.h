@@ -69,7 +69,9 @@ class CLDeviceDecompressor
 				const cl::Buffer& outputBuffer, size_t outputOffset,
 				size_t outputSize, const cl::Buffer &outputSizes,
 				const cl::Buffer &returnValues,
-				const cl::vector<cl::Event>* events = nullptr, cl::Event* event = nullptr) const;
+				const cl::Buffer &chunkShuffleMap,
+				const cl::vector<cl::Event>* events = nullptr,
+				cl::Event* event = nullptr) const;
 
 	private:
 		size_t m_inputChunkSize;
@@ -96,7 +98,8 @@ class CLHostDecompressor
 		void decompress(const uint8_t* input, size_t inputSize,
 				const size_t *inputSizes,
 				uint8_t* output, size_t outputSize,
-				size_t *outputSizes, int *returnValues) const;
+				size_t *outputSizes,
+				size_t *chunkShuffleMap, int *returnValues) const;
 
 	private:
 		size_t m_inputChunkStride;

@@ -46,6 +46,7 @@ void CLDeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 				      const cl::Buffer &outputBuffer,
 				      size_t outputOffset, size_t outputSize,
 				      const cl::Buffer &outputSizes,
+				      const cl::Buffer &chunkShuffleMap,
 				      const cl::Buffer &returnValues,
 				      const cl::vector<cl::Event> *events,
 				      cl::Event *event) const
@@ -68,7 +69,8 @@ void CLDeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 	decompressKernel.setArg(4, static_cast<cl_ulong>(outputOffset));
 	decompressKernel.setArg(5, outputSizes);
 	decompressKernel.setArg(6, static_cast<cl_ulong>(numChunks));
-	decompressKernel.setArg(7, returnValues);
+	decompressKernel.setArg(7, chunkShuffleMap);
+	decompressKernel.setArg(8, returnValues);
 
 	cl::NDRange globalSize((numChunks + (LOCAL_SIZE - 1)) &
 			       ~(LOCAL_SIZE - 1));
@@ -374,6 +376,7 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 				    const size_t *inputSizes,
 				    uint8_t *output, size_t outputSize,
 				    size_t *outputSizes,
+				    size_t *chunkShuffleMap,
 				    int *returnValues) const
 {
 	size_t numChunks =
@@ -399,6 +402,16 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 					   outputSizesCl.data());
 	}
 
+	cl::Buffer chunkShuffleMapBuffer;
+	if (chunkShuffleMap != nullptr) {
+		std::vector<cl_ulong> chunkShuffleMapCl(chunkShuffleMap, chunkShuffleMap + numChunks);
+		chunkShuffleMapBuffer = cl::Buffer(m_context, CL_MEM_READ_ONLY,
+			numChunks * sizeof(cl_ulong));
+		m_queue.enqueueWriteBuffer(chunkShuffleMapBuffer, CL_TRUE, 0,
+					   numChunks * sizeof(cl_ulong),
+					   chunkShuffleMapCl.data());
+	}
+
 	cl::Buffer returnValuesBuffer;
 	if (returnValues != nullptr) {
 		returnValuesBuffer = cl::Buffer(m_context, CL_MEM_WRITE_ONLY,
@@ -419,7 +432,7 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 					      inputSize, inputSizesBuffer,
 					      buffer, 0,
 					      outputSize, outputSizesBuffer,
-					      returnValuesBuffer);
+					      chunkShuffleMapBuffer, returnValuesBuffer);
 		m_queue.enqueueReadBuffer(buffer, CL_TRUE, 0, outputSize,
 					  output);
 	} else {
@@ -447,7 +460,7 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputSize,
 					      inputSize, inputSizesBuffer,
 					      outputBuffer, 0,
 					      outputSize, outputSizesBuffer,
-					      returnValuesBuffer);
+					      chunkShuffleMapBuffer, returnValuesBuffer);
 		m_queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, outputSize,
 					  output);
 	}
@@ -480,7 +493,7 @@ int cl842_decompress(const uint8_t *in, size_t ilen,
 			lib842::CLDecompressorInputFormat::ALWAYS_COMPRESSED_CHUNKS,
 			true);
 		int ret;
-		decompressor.decompress(in, ilen, &ilen, out, *olen, olen, &ret);
+		decompressor.decompress(in, ilen, &ilen, out, *olen, olen, nullptr, &ret);
 
 		return ret;
 	} catch (const cl::Error &) {
