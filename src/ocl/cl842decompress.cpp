@@ -281,9 +281,10 @@ void CLDeviceDecompressor::buildProgram(
 	try {
 		m_program.build(devices, options.str().c_str());
 	} catch (const cl::Error &ex) {
-		if (ex.err() == CL_BUILD_PROGRAM_FAILURE && m_verbose) {
+		if (ex.err() == CL_BUILD_PROGRAM_FAILURE) {
 			m_logger
-				<< "Build Log: "
+				<< "ERROR Building the lib842's OpenCL program"
+				<< " from source failed, build log is:\n"
 				<< m_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(
 					   devices[0], nullptr)
 				<< std::endl;
