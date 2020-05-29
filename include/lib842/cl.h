@@ -70,15 +70,13 @@ public:
 	 * - inputFormat: Determines in which format the input data is passed in.
 	 *                See the enumeration for more details.
 	 * - logger: Stream where additional errors, warnings and information can be logged.
-	 * - verbose: true to print addditional information / benchmark the decompressor.
 	 */
 	CLDeviceDecompressor(const cl::Context &context,
 			     const cl::vector<cl::Device> &devices,
 			     size_t chunkSize,
 			     size_t chunkStride,
 			     CLDecompressorInputFormat inputFormat,
-			     std::ostream &logger,
-			     bool verbose = false);
+			     std::ostream &logger);
 	/**
 	* Decompress a buffer containing multiple chunks of 842-compressed data.
 	* Parameters:
@@ -160,6 +158,7 @@ public:
 			int *returnValues) const;
 
 private:
+	size_t m_chunkSize;
 	size_t m_chunkStride;
 	CLDecompressorInputFormat m_inputFormat;
 	bool m_verbose;

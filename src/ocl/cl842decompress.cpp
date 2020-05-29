@@ -4,7 +4,6 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
-#include <chrono>
 #include <algorithm>
 #include <iterator>
 
@@ -30,13 +29,11 @@ CLDeviceDecompressor::CLDeviceDecompressor(const cl::Context &context,
 					   size_t chunkSize,
 					   size_t chunkStride,
 					   CLDecompressorInputFormat inputFormat,
-					   std::ostream &logger,
-					   bool verbose)
+					   std::ostream &logger)
 	: m_chunkSize(chunkSize),
 	  m_chunkStride(chunkStride),
 	  m_inputFormat(inputFormat),
-	  m_logger(logger),
-	  m_verbose(verbose)
+	  m_logger(logger)
 {
 	buildProgram(context, devices);
 }
@@ -78,36 +75,8 @@ void CLDeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
 			       ~(LOCAL_SIZE - 1));
 	cl::NDRange localSize(LOCAL_SIZE);
 
-	if (numChunks > 1 && m_verbose) {
-		m_logger << "Using " << numChunks << " chunks of "
-			 << m_chunkSize << " bytes, " << LOCAL_SIZE
-			 << " threads per workgroup" << std::endl;
-	}
-
-	std::chrono::steady_clock::time_point t1;
-	if (m_verbose) {
-		t1 = std::chrono::steady_clock::now();
-	}
-
 	commandQueue.enqueueNDRangeKernel(decompressKernel, cl::NullRange,
 					  globalSize, localSize, events, event);
-
-	if (m_verbose) {
-		commandQueue.finish();
-
-		std::chrono::steady_clock::time_point t2 =
-			std::chrono::steady_clock::now();
-
-		auto duration =
-			std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1)
-				.count();
-
-		m_logger
-			<< "Decompression performance: " << duration << "ms"
-			<< " / "
-			<< (static_cast<float>(outputBufferSize) / 1024 / 1024) / (static_cast<float>(duration) / 1000)
-			<< "MiB/s" << std::endl;
-	}
 }
 
 #ifdef LIB842_CLDECOMPRESS_USE_PROGRAM_CACHE
@@ -300,13 +269,14 @@ CLHostDecompressor::CLHostDecompressor(size_t chunkSize,
 				       size_t chunkStride,
 				       CLDecompressorInputFormat inputFormat,
 				       bool verbose)
-	: m_chunkStride(chunkStride),
+	: m_chunkSize(chunkSize),
+	  m_chunkStride(chunkStride),
 	  m_inputFormat(inputFormat),
 	  m_verbose(verbose),
 	  m_devices(findDevices()), m_context(m_devices),
-	  m_queue(m_context, m_devices[0]),
+	  m_queue(m_context, m_devices[0], m_verbose ? CL_QUEUE_PROFILING_ENABLE : 0),
 	  m_deviceCompressor(m_context, m_devices, chunkSize,
-			     chunkStride, inputFormat, std::cerr, verbose)
+			     chunkStride, inputFormat, std::cerr)
 {
 }
 
@@ -418,6 +388,14 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 			numChunks * sizeof(cl_int));
 	}
 
+	if (numChunks > 1 && m_verbose) {
+		std::cerr << "Using " << numChunks << " chunks of "
+			  << m_chunkSize << " bytes, " << LOCAL_SIZE
+			  << " threads per workgroup" << std::endl;
+	}
+
+	cl::Event decompressEvent;
+
 	if (m_inputFormat == CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS) {
 		if (input != output || inputBufferSize != outputBufferSize) {
 			throw cl::Error(CL_INVALID_VALUE);
@@ -432,7 +410,10 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 					      inputBufferSize, inputSizesBuffer,
 					      buffer, 0,
 					      outputBufferSize, outputSizesBuffer,
-					      chunkShuffleMapBuffer, returnValuesBuffer);
+					      chunkShuffleMapBuffer, returnValuesBuffer,
+					      nullptr, &decompressEvent);
+		decompressEvent.wait();
+
 		m_queue.enqueueReadBuffer(buffer, CL_TRUE, 0, outputBufferSize,
 					  output);
 	} else {
@@ -456,13 +437,29 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 
 		m_queue.enqueueWriteBuffer(inputBuffer, CL_TRUE, 0, inputBufferSize,
 					   input);
+
 		m_deviceCompressor.decompress(m_queue, inputBuffer, 0,
 					      inputBufferSize, inputSizesBuffer,
 					      outputBuffer, 0,
 					      outputBufferSize, outputSizesBuffer,
-					      chunkShuffleMapBuffer, returnValuesBuffer);
+					      chunkShuffleMapBuffer, returnValuesBuffer,
+					      nullptr, &decompressEvent);
+		decompressEvent.wait();
+
 		m_queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, outputBufferSize,
 					  output);
+	}
+
+	if (m_verbose) {
+		auto timeStartNs = decompressEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>();
+		auto timeEndNs = decompressEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>();
+		auto durationMs = (timeEndNs - timeStartNs) / 1000000;
+
+		std::cerr
+		<< "Decompression performance: " << durationMs << "ms"
+		<< " / "
+		<< (static_cast<float>(outputBufferSize) / 1024 / 1024) / (static_cast<float>(durationMs) / 1000)
+		<< "MiB/s" << std::endl;
 	}
 
 	if (outputChunkSizes != nullptr) {
