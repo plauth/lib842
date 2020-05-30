@@ -176,11 +176,7 @@ int compdecomp(const char *file_name, size_t chunk_size, size_t alignment)
 	}
 	memset(out, 0, olen);
 
-#ifdef USEHW
-	size_t dlen = ilen * 2;
-#else
 	size_t dlen = ilen;
-#endif
 	uint8_t *decompressed = alloc_chunk(dlen, alignment);
 	if (decompressed == NULL) {
 		fprintf(stderr, "FAIL: decompressed = alloc_chunk(...) failed!\n");

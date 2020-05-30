@@ -54,11 +54,7 @@ int main(int argc, const char *argv[])
 	if (argc <= 1) {
 		ilen = 32;
 		olen = ilen * 2;
-#ifdef USEHW
-		dlen = ilen * 2;
-#else
 		dlen = ilen;
-#endif
 		in = (uint8_t *)malloc(ilen);
 		out = (uint8_t *)malloc(olen);
 		decompressed = (uint8_t *)malloc(dlen);
@@ -81,11 +77,7 @@ int main(int argc, const char *argv[])
 		ilen = nextMultipleOfChunkSize(ilen);
 		printf("original file length (padded): %d\n", ilen);
 		olen = ilen * 2;
-#ifdef USEHW
-		dlen = ilen * 2;
-#else
 		dlen = ilen;
-#endif
 		fseek(fp, 0, SEEK_SET);
 
 		in = (uint8_t *)malloc(ilen);
