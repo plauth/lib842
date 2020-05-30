@@ -14,7 +14,7 @@ long long timestamp()
 	return ms;
 }
 
-static void *alloc_chunk(size_t size, size_t alignment)
+void *allocate_aligned(size_t size, size_t alignment)
 {
 	if (alignment == 0)
 		return malloc(size);
@@ -55,7 +55,7 @@ static uint8_t *read_file(const char *file_name, size_t *ilen, size_t chunk_size
 
 	*ilen = nextMultipleOfChunkSize((size_t)flen, chunk_size);
 
-	uint8_t *file_data = alloc_chunk(*ilen, alignment);
+	uint8_t *file_data = allocate_aligned(*ilen, alignment);
 	if (file_data == NULL) {
 		fprintf(stderr, "FAIL: Could not allocate memory to read the file.\n");
 		goto fail_file;
@@ -89,7 +89,7 @@ static uint8_t *get_test_string(size_t *ilen, size_t alignment) {
 	}; //"0011223344556677889900AABBCCDDEE";
 
 	*ilen = sizeof(TEST_STRING);
-	uint8_t *test_string = alloc_chunk(*ilen, alignment);
+	uint8_t *test_string = allocate_aligned(*ilen, alignment);
 	if (test_string == NULL) {
 		fprintf(stderr, "FAIL: Could not allocate memory for the test string.\n");
 		return NULL;
@@ -99,11 +99,10 @@ static uint8_t *get_test_string(size_t *ilen, size_t alignment) {
 	return test_string;
 }
 
-static bool compress_benchmark(const uint8_t *in, size_t ilen,
-			       uint8_t *out, size_t olen,
-			       uint8_t *decompressed, size_t dlen) {
+static bool compress_benchmark(const uint8_t *in, size_t ilen) {
+	size_t olen, dlen;
 	long long time_comp, time_condense, time_decomp;
-	if (!compress_benchmark_core(in, ilen, out, &olen, decompressed, &dlen,
+	if (!compress_benchmark_core(in, ilen, &olen, &dlen,
 				     &time_comp, &time_condense, &time_decomp))
 		return false;
 
@@ -111,15 +110,18 @@ static bool compress_benchmark(const uint8_t *in, size_t ilen,
 	printf("Output: %zu bytes\n", olen);
 	printf("Compression factor: %f\n",
 	       (float)olen / (float)ilen);
-	printf("Compression performance: %lld ms / %f MiB/s\n",
-	       time_comp, (ilen / 1024 / 1024) / ((float)time_comp / 1000));
+	if (time_comp != -1) {
+		printf("Compression performance: %lld ms / %f MiB/s\n",
+		       time_comp, (ilen / 1024 / 1024) / ((float)time_comp / 1000));
+	}
 	if (time_condense != -1) {
 		printf("Condensation performance: %lld ms / %f MiB/s\n",
 		       time_condense, (olen / 1024 / 1024) / ((float)time_condense / 1000));
 	}
-	printf("Decompression performance: %lld ms / %f MiB/s\n",
-	       time_decomp, (dlen / 1024 / 1024) / ((float)time_decomp / 1000));
-
+	if (time_decomp != -1) {
+		printf("Decompression performance: %lld ms / %f MiB/s\n",
+		       time_decomp, (dlen / 1024 / 1024) / ((float)time_decomp / 1000));
+	}
 	printf("Compression- and decompression was successful!\n");
 	return true;
 }
@@ -168,38 +170,41 @@ int compdecomp(const char *file_name, size_t chunk_size, size_t alignment)
 	if (in == NULL)
 		return ret;
 
-	size_t olen = ilen * 2;
-	uint8_t *out = alloc_chunk(olen, alignment);
-	if (out == NULL) {
-		fprintf(stderr, "FAIL: out = alloc_chunk(...) failed!\n");
-		goto return_free_in;
-	}
-	memset(out, 0, olen);
-
-	size_t dlen = ilen;
-	uint8_t *decompressed = alloc_chunk(dlen, alignment);
-	if (decompressed == NULL) {
-		fprintf(stderr, "FAIL: decompressed = alloc_chunk(...) failed!\n");
-		goto return_free_out;
-	}
-	memset(decompressed, 0, dlen);
-
 	if (ilen > chunk_size) {
 		printf("Using chunks of %zu bytes\n", chunk_size);
-		if (!compress_benchmark(in, ilen, out, olen, decompressed, dlen))
-			goto return_free_decompressed;
+		if (!compress_benchmark(in, ilen))
+			goto return_free_in;
 	} else {
 		printf("Running simple test\n");
+
+		size_t olen = ilen * 2;
+		uint8_t *out = allocate_aligned(olen, alignment);
+		if (out == NULL) {
+			fprintf(stderr, "FAIL: out = allocate_aligned(...) failed!\n");
+			goto return_free_in;
+		}
+		memset(out, 0, olen);
+
+		size_t dlen = ilen;
+		uint8_t *decompressed = allocate_aligned(dlen, alignment);
+		if (decompressed == NULL) {
+			fprintf(stderr, "FAIL: decompressed = allocate_aligned(...) failed!\n");
+			goto return_free_out;
+		}
+		memset(decompressed, 0, dlen);
+
 		if (!simple_test(in, ilen, out, olen, decompressed, dlen))
 			goto return_free_decompressed;
+
+return_free_decompressed:
+		free(decompressed);
+return_free_out:
+		free(out);
+		goto return_free_in;
 	}
 
 	ret = EXIT_SUCCESS;
 
-return_free_decompressed:
-	free(decompressed);
-return_free_out:
-	free(out);
 return_free_in:
 	free(in);
 	return ret;

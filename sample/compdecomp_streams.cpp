@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cstdint>
 #include <vector>
+#include <memory>
 #include <thread>
 #include <mutex>
 #include <queue>
@@ -72,11 +73,16 @@ private:
 
 	osyncstreambuf _buffer;
 };
-
 std::mutex osyncstream::osyncstreambuf::_mutex;
 
-static unsigned int determine_num_threads()
-{
+// Helper for std::unique_ptr for releasing C pointers with std::free()
+struct free_ptr {
+	void operator()(uint8_t *p) const {
+		std::free(p);
+	}
+};
+
+static unsigned int determine_num_threads() {
 	// Configuration for the number of threads to use for compression or decompression
 	const char *env_value = std::getenv("COMPDECOMP_NUM_THREADS");
 	if (env_value != nullptr && std::atoi(env_value) > 0) {
@@ -102,11 +108,14 @@ static lib842::stream::thread_policy determine_thread_policy() {
 }
 
 bool compress_benchmark_core(const uint8_t *in, size_t ilen,
-			     uint8_t *out, size_t *olen,
-			     uint8_t *decompressed, size_t *dlen,
+			     size_t *olen, size_t *dlen,
 			     long long *time_comp,
 			     long long *time_condense,
 			     long long *time_decomp) {
+	std::unique_ptr<uint8_t, free_ptr> decompressed(
+		static_cast<uint8_t *>(allocate_aligned(ilen, ALIGNMENT)));
+	std::memset(decompressed.get(), 0, ilen);
+
 	// -----
 	// SETUP
 	// -----
@@ -127,6 +136,8 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// -----------
 	// TODOXXX: Why is the performance on the first run so horrible?
 	//          Is it due to NUMA effects? Why does it not happen with OpenMP?
+	//          It could also be because a lot of new memory needs to be paged in?
+	//          (In the OpenMP version, the memset will do this!)
 	std::vector<lib842::stream::DataCompressionStream::compress_block> comp_blocks;
 	{
 		//for (int i = 0; i < 2; i++) { comp_blocks.clear();
@@ -192,7 +203,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			lib842::stream::DataDecompressionStream::decompress_block dblock;
 			bool any_compressed = false;
 			for (size_t i = 0; i < lib842::stream::NUM_CHUNKS_PER_BLOCK; i++) {
-				auto dest = decompressed + cblock.source_offset + i * lib842::stream::CHUNK_SIZE;
+				auto dest = decompressed.get() + cblock.source_offset + i * lib842::stream::CHUNK_SIZE;
 				if (cblock.sizes[i] <= lib842::stream::COMPRESSIBLE_THRESHOLD) {
 					dblock.chunks[i] = lib842::stream::DataDecompressionStream::decompress_chunk(
 						cblock.datas[i],
@@ -232,7 +243,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// ----------
 	// VALIDATION
 	// ----------
-	if (ilen != *dlen || memcmp(in, decompressed, ilen) != 0) {
+	if (ilen != *dlen || memcmp(in, decompressed.get(), ilen) != 0) {
 		fprintf(stderr,
 			"FAIL: Decompressed data differs from the original input data.\n");
 		return false;

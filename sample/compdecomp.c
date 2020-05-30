@@ -37,8 +37,7 @@
 //#define CONDENSE
 
 bool compress_benchmark_core(const uint8_t *in, size_t ilen,
-			     uint8_t *out, size_t *olen,
-			     uint8_t *decompressed, size_t *dlen,
+			     size_t *olen, size_t *dlen,
 			     long long *time_comp,
 			     long long *time_condense,
 			     long long *time_decomp) {
@@ -48,12 +47,26 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	bool ret = false;
 	bool omp_success = true;
 
+	uint8_t *out = allocate_aligned(ilen * 2, ALIGNMENT);
+	if (out == NULL) {
+		fprintf(stderr, "FAIL: out = allocate_aligned(...) failed!\n");
+		return ret;
+	}
+	memset(out, 0, ilen * 2);
+
+	uint8_t *decompressed = allocate_aligned(ilen, ALIGNMENT);
+	if (decompressed == NULL) {
+		fprintf(stderr, "FAIL: decompressed = allocate_aligned(...) failed!\n");
+		goto exit_free_out;
+	}
+	memset(decompressed, 0, ilen);
+
 	size_t num_chunks = ilen / CHUNK_SIZE;
 #ifdef CONDENSE
 	size_t *compressed_chunk_positions = malloc(sizeof(size_t) * num_chunks);
 	if (compressed_chunk_positions == NULL) {
 		fprintf(stderr, "FAIL: Could not allocate memory for the compressed chunk positions.\n");
-		return ret;
+		goto exit_free_decompressed;
 	}
 #endif
 	size_t *compressed_chunk_sizes = malloc(sizeof(size_t) * num_chunks);
@@ -191,6 +204,10 @@ exit_free_compressed_chunk_positions:
 #ifdef CONDENSE
 	free(compressed_chunk_positions);
 #endif
+exit_free_decompressed:
+	free(decompressed);
+exit_free_out:
+	free(out);
 
 	return ret;
 }
