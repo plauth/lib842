@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 		       pattern->uncompressed_len);
 		test842_hexdump(pattern->uncompressed,
 				pattern->uncompressed_len);
-		printf("Actual output (%zu bytes):\n", olen);
+		printf("Actual output (%zu bytes):\n", recovered_ilen);
 		test842_hexdump(recovered_in, recovered_ilen);
 		return EXIT_FAILURE;
 	}
