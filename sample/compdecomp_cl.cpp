@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <fstream>
-#include <stdint.h>
+#include <cstdint>
 #ifdef USE_CHUNK_SHUFFLE_MAP
 #include <algorithm>
 #include <numeric>

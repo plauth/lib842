@@ -1,10 +1,10 @@
 // Compression - decompression benchmark for non-GPU implementations,
 // based on multithreading using standard C++ threads
 #include "compdecomp_driver.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cstdint>
 #include <vector>
 #include <thread>
 #include <mutex>

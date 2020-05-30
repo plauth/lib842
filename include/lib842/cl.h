@@ -13,8 +13,8 @@
 #include <CL/cl2.hpp>
 #endif
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
 
 namespace lib842 {
@@ -129,7 +129,6 @@ private:
 	size_t m_chunkSize;
 	size_t m_chunkStride;
 	CLDecompressorInputFormat m_inputFormat;
-	bool m_verbose;
 	cl::Program m_program;
 	std::ostream &m_logger;
 

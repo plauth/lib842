@@ -8,7 +8,7 @@
 #include <pthread.h>
 #include <numa.h>
 #include <sys/sysinfo.h>
-#include <stdio.h>
+#include <cstdio>
 #ifdef INDEPTH_TRACE
 #include <string>
 #include <sstream>

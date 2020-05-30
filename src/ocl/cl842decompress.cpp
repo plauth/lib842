@@ -350,36 +350,29 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 				    size_t *chunkShuffleMap,
 				    int *returnValues) const
 {
+	static constexpr bool CLBUF_READ_ONLY = true, CLBUF_READ_WRITE = false;
+
 	size_t numChunks = (inputBufferSize + m_chunkStride - 1) / m_chunkStride;
 
 	cl::Buffer inputSizesBuffer;
 	if (inputChunkSizes != nullptr) {
 		std::vector<cl_ulong> inputSizesCl(inputChunkSizes, inputChunkSizes + numChunks);
-		inputSizesBuffer = cl::Buffer(m_context, CL_MEM_READ_ONLY,
-					      numChunks * sizeof(cl_ulong));
-		m_queue.enqueueWriteBuffer(inputSizesBuffer, CL_TRUE, 0,
-					   numChunks * sizeof(cl_ulong),
-					   inputSizesCl.data());
+		inputSizesBuffer = cl::Buffer(m_queue,
+			inputSizesCl.begin(), inputSizesCl.end(), CLBUF_READ_ONLY);
 	}
 
 	cl::Buffer outputSizesBuffer;
 	if (outputChunkSizes != nullptr) {
 		std::vector<cl_ulong> outputSizesCl(outputChunkSizes, outputChunkSizes + numChunks);
-		outputSizesBuffer = cl::Buffer(m_context, CL_MEM_READ_WRITE,
-			numChunks * sizeof(cl_ulong));
-		m_queue.enqueueWriteBuffer(outputSizesBuffer, CL_TRUE, 0,
-					   numChunks * sizeof(cl_ulong),
-					   outputSizesCl.data());
+		outputSizesBuffer = cl::Buffer(m_queue,
+			outputSizesCl.begin(), outputSizesCl.end(), CLBUF_READ_WRITE);
 	}
 
 	cl::Buffer chunkShuffleMapBuffer;
 	if (chunkShuffleMap != nullptr) {
 		std::vector<cl_ulong> chunkShuffleMapCl(chunkShuffleMap, chunkShuffleMap + numChunks);
-		chunkShuffleMapBuffer = cl::Buffer(m_context, CL_MEM_READ_ONLY,
-			numChunks * sizeof(cl_ulong));
-		m_queue.enqueueWriteBuffer(chunkShuffleMapBuffer, CL_TRUE, 0,
-					   numChunks * sizeof(cl_ulong),
-					   chunkShuffleMapCl.data());
+		chunkShuffleMapBuffer = cl::Buffer(m_queue,
+			chunkShuffleMapCl.begin(), chunkShuffleMapCl.end(), CLBUF_READ_ONLY);
 	}
 
 	cl::Buffer returnValuesBuffer;
@@ -404,8 +397,7 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 		// Add some more bytes for potential excess lookahead
 		cl::Buffer buffer(m_context, CL_MEM_READ_WRITE, inputBufferSize + 64);
 
-		m_queue.enqueueWriteBuffer(buffer, CL_TRUE, 0, inputBufferSize,
-					   input);
+		cl::copy(m_queue, input, input + inputBufferSize, buffer);
 		m_deviceCompressor.decompress(m_queue, buffer, 0,
 					      inputBufferSize, inputSizesBuffer,
 					      buffer, 0,
@@ -413,9 +405,7 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 					      chunkShuffleMapBuffer, returnValuesBuffer,
 					      nullptr, &decompressEvent);
 		decompressEvent.wait();
-
-		m_queue.enqueueReadBuffer(buffer, CL_TRUE, 0, outputBufferSize,
-					  output);
+		cl::copy(m_queue, buffer, output, output + outputBufferSize);
 	} else {
 		// Input and output pointers shouldn't overlap (but can't check
 		// for that in standard C/C++). Check that they're not the same,
@@ -430,14 +420,11 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 		}
 
 		cl::Buffer inputBuffer(m_context, CL_MEM_READ_ONLY, inputBufferSize);
-
 		// Avoid a CL_INVALID_BUFFER_SIZE if outputBufferSize == 0
 		cl::Buffer outputBuffer(m_context, CL_MEM_READ_WRITE,
 					outputBufferSize != 0 ? outputBufferSize : 1);
 
-		m_queue.enqueueWriteBuffer(inputBuffer, CL_TRUE, 0, inputBufferSize,
-					   input);
-
+		cl::copy(m_queue, input, input + inputBufferSize, inputBuffer);
 		m_deviceCompressor.decompress(m_queue, inputBuffer, 0,
 					      inputBufferSize, inputSizesBuffer,
 					      outputBuffer, 0,
@@ -445,9 +432,7 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 					      chunkShuffleMapBuffer, returnValuesBuffer,
 					      nullptr, &decompressEvent);
 		decompressEvent.wait();
-
-		m_queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, outputBufferSize,
-					  output);
+		cl::copy(m_queue, outputBuffer, output, output + outputBufferSize);
 	}
 
 	if (m_verbose) {
@@ -464,18 +449,14 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 
 	if (outputChunkSizes != nullptr) {
 		std::vector<cl_ulong> outputSizesCl(outputChunkSizes, outputChunkSizes + numChunks);
-		m_queue.enqueueReadBuffer(outputSizesBuffer, CL_TRUE, 0,
-					  numChunks * sizeof(cl_ulong),
-					  outputSizesCl.data());
+		cl::copy(m_queue, outputSizesBuffer, outputSizesCl.begin(), outputSizesCl.end());
 		std::copy(outputSizesCl.begin(), outputSizesCl.end(), outputChunkSizes);
 	}
 
 	if (returnValues != nullptr) {
 		static_assert(sizeof(int) == sizeof(cl_int),
 			      "sizeof(int) == sizeof(cl_int)");
-		m_queue.enqueueReadBuffer(returnValuesBuffer, CL_TRUE, 0,
-					  numChunks * sizeof(int),
-					  returnValues);
+		cl::copy(m_queue, returnValuesBuffer, returnValues, returnValues + numChunks);
 	}
 }
 
