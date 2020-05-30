@@ -70,14 +70,16 @@ public:
 	 *                size in bytes between each chunk of compressed data.
 	 * - inputFormat: Determines in which format the input data is passed in.
 	 *                See the enumeration for more details.
-	 * - logger: Stream where additional errors, warnings and information can be logged.
+	 * - error_logger: Returns a stream where errors can be logged.
+	 * - debug_logger: Returns a stream where additional information can be logged.
 	 */
 	CLDeviceDecompressor(const cl::Context &context,
 			     const cl::vector<cl::Device> &devices,
 			     size_t chunkSize,
 			     size_t chunkStride,
 			     CLDecompressorInputFormat inputFormat,
-			     std::function<std::ostream&(void)> logger);
+			     std::function<std::ostream&(void)> error_logger,
+			     std::function<std::ostream&(void)> debug_logger);
 	/**
 	* Decompress a buffer containing multiple chunks of 842-compressed data.
 	* Parameters:
@@ -131,7 +133,8 @@ private:
 	size_t m_chunkStride;
 	CLDecompressorInputFormat m_inputFormat;
 	cl::Program m_program;
-	std::function<std::ostream&(void)> m_logger;
+	std::function<std::ostream&(void)> m_error_logger;
+	std::function<std::ostream&(void)> m_debug_logger;
 
 	void buildProgram(const cl::Context &context, const cl::vector<cl::Device> &devices);
 };

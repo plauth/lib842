@@ -29,11 +29,13 @@ CLDeviceDecompressor::CLDeviceDecompressor(const cl::Context &context,
 					   size_t chunkSize,
 					   size_t chunkStride,
 					   CLDecompressorInputFormat inputFormat,
-					   std::function<std::ostream&(void)> logger)
+					   std::function<std::ostream&(void)> error_logger,
+					   std::function<std::ostream&(void)> debug_logger)
 	: m_chunkSize(chunkSize),
 	  m_chunkStride(chunkStride),
 	  m_inputFormat(inputFormat),
-	  m_logger(std::move(logger))
+	  m_error_logger(std::move(error_logger)),
+	  m_debug_logger(std::move(debug_logger))
 {
 	buildProgram(context, devices);
 }
@@ -228,8 +230,8 @@ void CLDeviceDecompressor::buildProgram(
 	try {
 		binaries = cache.find();
 	} catch (const std::ifstream::failure &) {
-		m_logger()
-			<< "WARNING: Could not read lib842's OpenCL program cache"
+		m_debug_logger()
+			<< "Could not read lib842's OpenCL program cache, regenerating"
 			<< std::endl;
 	}
 	if (!binaries.empty()) {
@@ -238,8 +240,8 @@ void CLDeviceDecompressor::buildProgram(
 			m_program.build(devices, options.str().c_str());
 			return;
 		} catch (const cl::Error &ex) {
-			m_logger()
-				<< "WARNING: Building the lib842's OpenCL program"
+			m_debug_logger()
+				<< "Building the lib842's OpenCL program"
 				<< " from cache failed, rebuilding from source"
 				<< std::endl;
 		}
@@ -251,8 +253,8 @@ void CLDeviceDecompressor::buildProgram(
 		m_program.build(devices, options.str().c_str());
 	} catch (const cl::Error &ex) {
 		if (ex.err() == CL_BUILD_PROGRAM_FAILURE) {
-			m_logger()
-				<< "ERROR Building the lib842's OpenCL program"
+			m_error_logger()
+				<< "Building the lib842's OpenCL program"
 				<< " from source failed, build log is:\n"
 				<< m_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(
 					   devices[0], nullptr)
@@ -277,7 +279,8 @@ CLHostDecompressor::CLHostDecompressor(size_t chunkSize,
 	  m_queue(m_context, m_devices[0], m_verbose ? CL_QUEUE_PROFILING_ENABLE : 0),
 	  m_deviceCompressor(m_context, m_devices, chunkSize,
 			     chunkStride, inputFormat,
-			     []()  -> std::ostream& { return std::cerr; })
+			     []()  -> std::ostream& { return std::cerr; },
+			     []()  -> std::ostream& { return std::cout; })
 {
 }
 
@@ -293,7 +296,7 @@ cl::vector<cl::Device> CLHostDecompressor::findDevices() const
 		throw cl::Error(CL_DEVICE_NOT_FOUND);
 	}
 	if (m_verbose) {
-		std::cerr
+		std::cout
 			<< "Number of available platforms: " << platforms.size()
 			<< std::endl;
 	}
@@ -302,7 +305,7 @@ cl::vector<cl::Device> CLHostDecompressor::findDevices() const
 
 	for (auto &deviceType : {CL_DEVICE_TYPE_GPU, CL_DEVICE_TYPE_CPU}) {
 		if (m_verbose && deviceType == CL_DEVICE_TYPE_CPU) {
-			std::cerr << "WARNING: No OpenCL GPU devices available, "
+			std::cout << "WARNING: No OpenCL GPU devices available, "
 				  << "falling back to OpenCL CPU devices."
 				  << std::endl;
 		}
@@ -317,7 +320,7 @@ cl::vector<cl::Device> CLHostDecompressor::findDevices() const
 			}
 
 			if (m_verbose) {
-				std::cerr << "Platform: "
+				std::cout << "Platform: "
 				  << platform.getInfo<CL_PLATFORM_NAME>()
 				  << std::endl;
 			}
@@ -326,7 +329,7 @@ cl::vector<cl::Device> CLHostDecompressor::findDevices() const
 				if (!device.getInfo<CL_DEVICE_AVAILABLE>())
 					continue;
 				if (m_verbose) {
-					std::cerr << "Device: "
+					std::cout << "Device: "
 						  << device.getInfo<CL_DEVICE_NAME>()
 						  << std::endl;
 				}
@@ -383,7 +386,7 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 	}
 
 	if (numChunks > 1 && m_verbose) {
-		std::cerr << "Using " << numChunks << " chunks of "
+		std::cout << "Using " << numChunks << " chunks of "
 			  << m_chunkSize << " bytes, " << LOCAL_SIZE
 			  << " threads per workgroup" << std::endl;
 	}
@@ -441,7 +444,7 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 		auto timeEndNs = decompressEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>();
 		auto durationMs = (timeEndNs - timeStartNs) / 1000000;
 
-		std::cerr
+		std::cout
 		<< "Decompression performance: " << durationMs << "ms"
 		<< " / "
 		<< (static_cast<float>(outputBufferSize) / 1024 / 1024) / (static_cast<float>(durationMs) / 1000)
