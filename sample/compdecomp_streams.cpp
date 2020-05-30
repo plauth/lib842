@@ -108,7 +108,7 @@ static lib842::stream::thread_policy determine_thread_policy() {
 }
 
 bool compress_benchmark_core(const uint8_t *in, size_t ilen,
-			     size_t *olen, size_t *dlen,
+			     size_t *olen,
 			     long long *time_comp,
 			     long long *time_condense,
 			     long long *time_decomp) {
@@ -238,12 +238,11 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		*time_decomp = timestamp() - timestart_decomp;
 	}
 
-	*dlen = comp_blocks.size() * lib842::stream::BLOCK_SIZE;
-
 	// ----------
 	// VALIDATION
 	// ----------
-	if (ilen != *dlen || memcmp(in, decompressed.get(), ilen) != 0) {
+	if (ilen != comp_blocks.size() * lib842::stream::BLOCK_SIZE ||
+	    memcmp(in, decompressed.get(), ilen) != 0) {
 		fprintf(stderr,
 			"FAIL: Decompressed data differs from the original input data.\n");
 		return false;

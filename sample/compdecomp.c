@@ -37,7 +37,7 @@
 //#define CONDENSE
 
 bool compress_benchmark_core(const uint8_t *in, size_t ilen,
-			     size_t *olen, size_t *dlen,
+			     size_t *olen,
 			     long long *time_comp,
 			     long long *time_condense,
 			     long long *time_decomp) {
@@ -177,14 +177,14 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 	*time_decomp = timestamp() - timestart_decomp;
 
-	*dlen = 0;
+	size_t dlen = 0;
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++)
-		*dlen += decompressed_chunk_sizes[chunk_num];
+		dlen += decompressed_chunk_sizes[chunk_num];
 
 	// ----------
 	// VALIDATION
 	// ----------
-	if (ilen != *dlen || memcmp(in, decompressed, ilen) != 0) {
+	if (ilen != dlen || memcmp(in, decompressed, ilen) != 0) {
 		fprintf(stderr,
 			"FAIL: Decompressed data differs from the original input data.\n");
 		goto exit_free_out_condensed;

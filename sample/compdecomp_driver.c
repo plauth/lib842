@@ -100,9 +100,9 @@ static uint8_t *get_test_string(size_t *ilen, size_t alignment) {
 }
 
 static bool compress_benchmark(const uint8_t *in, size_t ilen) {
-	size_t olen, dlen;
+	size_t olen;
 	long long time_comp, time_condense, time_decomp;
-	if (!compress_benchmark_core(in, ilen, &olen, &dlen,
+	if (!compress_benchmark_core(in, ilen, &olen,
 				     &time_comp, &time_condense, &time_decomp))
 		return false;
 
@@ -120,7 +120,7 @@ static bool compress_benchmark(const uint8_t *in, size_t ilen) {
 	}
 	if (time_decomp != -1) {
 		printf("Decompression performance: %lld ms / %f MiB/s\n",
-		       time_decomp, (dlen / 1024 / 1024) / ((float)time_decomp / 1000));
+		       time_decomp, (ilen / 1024 / 1024) / ((float)time_decomp / 1000));
 	}
 	printf("Compression- and decompression was successful!\n");
 	return true;

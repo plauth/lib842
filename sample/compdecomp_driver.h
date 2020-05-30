@@ -30,7 +30,7 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 		      uint8_t *decompressed, size_t *dlen);
 
 bool compress_benchmark_core(const uint8_t *in, size_t ilen,
-			     size_t *olen, size_t *dlen,
+			     size_t *olen,
 			     long long *time_comp,
 			     long long *time_condense,
 			     long long *time_decomp);

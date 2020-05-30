@@ -17,7 +17,7 @@
 #define CHUNK_SIZE ((size_t)65536)
 
 bool compress_benchmark_core(const uint8_t *in, size_t ilen,
-			     size_t *olen, size_t *dlen,
+			     size_t *olen,
 			     long long *time_comp,
 			     long long *time_condense,
 			     long long *time_decomp) {
@@ -166,7 +166,6 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		exit(EXIT_FAILURE);
 	}
 
-	*dlen = ilen; // XXX
 	return memcmp(in, decompressed, ilen) == 0;
 }
 
