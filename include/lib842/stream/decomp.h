@@ -69,6 +69,8 @@ public:
 	   This isn't only for debugging and benchmarking */
 	void wait_until_ready();
 
+	/* Starts a new decompression operation. */
+	void start();
 	/* Enqueues a new to be decompressed */
 	bool push_block(DataDecompressionStream::decompress_block &&dm);
 	/* Wait for the decompression queue to be cleared up and then call the specified callback.
@@ -95,6 +97,11 @@ private:
 	// Mutex for protecting concurrent accesses to
 	// (_trigger, _queue, _error, _finalizing, _finalize_callback, _quit)
 	std::mutex _mutex;
+
+	// Number that increases if a new operation must be started in the decompression threads
+	unsigned _trigger;
+	// Wakes up the decompression threads when a new operation must be started
+	std::condition_variable _trigger_changed;
 
 	// Stores blocks pending to be decompressed
 	std::queue<decompress_block> _queue;
