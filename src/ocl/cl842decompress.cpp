@@ -267,13 +267,13 @@ void CLDeviceDecompressor::buildProgram(
 CLHostDecompressor::CLHostDecompressor(size_t chunkSize,
 				       size_t chunkStride,
 				       CLDecompressorInputFormat inputFormat,
-				       bool verbose)
+				       bool verbose, bool profile)
 	: m_chunkSize(chunkSize),
 	  m_chunkStride(chunkStride),
 	  m_inputFormat(inputFormat),
-	  m_verbose(verbose),
+	  m_verbose(verbose), m_profile(profile),
 	  m_devices(findDevices()), m_context(m_devices),
-	  m_queue(m_context, m_devices[0], m_verbose ? CL_QUEUE_PROFILING_ENABLE : 0),
+	  m_queue(m_context, m_devices[0], profile ? CL_QUEUE_PROFILING_ENABLE : 0),
 	  m_deviceCompressor(m_context, m_devices, chunkSize,
 			     chunkStride, inputFormat,
 			     []()  -> std::ostream& { return std::cerr; },
@@ -349,7 +349,8 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 				    uint8_t *output, size_t outputBufferSize,
 				    size_t *outputChunkSizes,
 				    size_t *chunkShuffleMap,
-				    int *returnValues) const
+				    int *returnValues,
+				    long long *time) const
 {
 	static constexpr bool CLBUF_READ_ONLY = true, CLBUF_READ_WRITE = false;
 
@@ -434,16 +435,12 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 		cl::copy(m_queue, outputBuffer, output, output + outputBufferSize);
 	}
 
-	if (m_verbose) {
+	if (m_profile && time != nullptr) {
 		auto timeStartNs = decompressEvent.getProfilingInfo<CL_PROFILING_COMMAND_START>();
 		auto timeEndNs = decompressEvent.getProfilingInfo<CL_PROFILING_COMMAND_END>();
-		auto durationMs = (timeEndNs - timeStartNs) / 1000000;
-
-		std::cout
-		<< "Decompression performance: " << durationMs << "ms"
-		<< " / "
-		<< (static_cast<float>(outputBufferSize) / 1024 / 1024) / (static_cast<float>(durationMs) / 1000)
-		<< "MiB/s" << std::endl;
+		*time = static_cast<long long>((timeEndNs - timeStartNs) / 1000000);
+	} else if (time != nullptr) {
+		*time = -1;
 	}
 
 	if (outputChunkSizes != nullptr) {
@@ -468,10 +465,9 @@ int cl842_decompress(const uint8_t *in, size_t ilen,
 		static lib842::CLHostDecompressor decompressor(
 			65536, 99999 /* Doesn't matter */,
 			lib842::CLDecompressorInputFormat::ALWAYS_COMPRESSED_CHUNKS,
-			true);
+			true, false);
 		int ret;
-		decompressor.decompress(in, ilen, &ilen, out, *olen, olen, nullptr, &ret);
-
+		decompressor.decompress(in, ilen, &ilen, out, *olen, olen, nullptr, &ret, nullptr);
 		return ret;
 	} catch (const cl::Error &) {
 		// Not a great error value, but we shouldn't let C++ exceptions

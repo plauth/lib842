@@ -3,93 +3,40 @@
 #include <iostream>
 #include <fstream>
 #include <cstdint>
+#include <numeric>
 #ifdef USE_CHUNK_SHUFFLE_MAP
 #include <algorithm>
-#include <numeric>
 #endif
 
 #include <lib842/sw.h>
 #include <lib842/cl.h>
 #include <lib842/common.h>
 
-using namespace std;
-
-#define STRLEN 32
+#include "compdecomp_driver.h"
 
 #define CHUNK_SIZE ((size_t)65536)
 
-size_t nextMultipleOfChunkSize(size_t input)
-{
-	return (input + (CHUNK_SIZE - 1)) & ~(CHUNK_SIZE - 1);
-}
-
-int main(int argc, char *argv[])
-{
-	uint8_t *compressIn, *compressOut, *decompressIn, *decompressOut;
-	size_t flen, ilen, olen, dlen;
-
-	flen = ilen = olen = dlen = 0;
-
-	size_t num_chunks = 0;
-
-	if (argc <= 1) {
-		ilen = nextMultipleOfChunkSize(STRLEN);
-	} else if (argc == 2) {
-		std::ifstream is(argv[1], std::ifstream::binary);
-		if (!is)
-			exit(-1);
-		is.seekg(0, is.end);
-		flen = (size_t)is.tellg();
-		is.seekg(0, is.beg);
-		is.close();
-
-		ilen = nextMultipleOfChunkSize(flen);
-
-		printf("original file length: %zu\n", flen);
-		printf("original file length (padded): %zu\n", ilen);
-	}
-
+bool compress_benchmark_core(const uint8_t *in, size_t ilen,
+			     size_t *olen, size_t *dlen,
+			     long long *time_comp,
+			     long long *time_condense,
+			     long long *time_decomp) {
 #if defined(USE_INPLACE_COMPRESSED_CHUNKS) || defined(USE_MAYBE_COMPRESSED_CHUNKS)
-	olen = ilen;
+	size_t outBufferSize = ilen;
 #else
-	olen = ilen * 2;
+	size_t outBufferSize = ilen * 2;
 #endif
-	dlen = ilen;
+	size_t decompressedBufferSize = ilen;
 
-	compressIn = (uint8_t *)calloc(ilen, sizeof(uint8_t));
-	compressOut = (uint8_t *)calloc(olen, sizeof(uint8_t));
-	decompressIn = (uint8_t *)calloc(olen, sizeof(uint8_t));
-	decompressOut = (uint8_t *)calloc(dlen, sizeof(uint8_t));
+	uint8_t *out = (uint8_t *)calloc(outBufferSize, sizeof(uint8_t));
+	uint8_t *decompressed = (uint8_t *)calloc(decompressedBufferSize, sizeof(uint8_t));
 
-	if (argc <= 1) {
-		num_chunks = 1;
-		uint8_t tmp[] = {
-			0x30, 0x30, 0x31, 0x31, 0x32, 0x32, 0x33, 0x33,
-			0x34, 0x34, 0x35, 0x35, 0x36, 0x36, 0x37, 0x37,
-			0x38, 0x38, 0x39, 0x39, 0x40, 0x40, 0x41, 0x41,
-			0x42, 0x42, 0x43, 0x43, 0x44, 0x44, 0x45, 0x45
-		}; //"0011223344556677889900AABBCCDDEE";
-		memcpy(compressIn, tmp, STRLEN);
-	} else if (argc == 2) {
-		num_chunks = ilen / CHUNK_SIZE;
-
-		std::ifstream is(argv[1], std::ifstream::binary);
-		if (!is)
-			exit(-1);
-		is.seekg(0, is.beg);
-		is.read(reinterpret_cast<char *>(compressIn), flen);
-
-		if (is)
-			std::cerr << "successfully read all " << flen
-				  << " bytes." << std::endl;
-		else
-			std::cerr << "error: only " << is.gcount()
-				  << "bytes could be read" << std::endl;
-		is.close();
-	}
-
+	size_t num_chunks = ilen / CHUNK_SIZE;
 	printf("Using %zu chunks of %zu bytes\n", num_chunks, CHUNK_SIZE);
 
+	// -----------
+	// COMPRESSION
+	// -----------
 	std::vector<size_t> chunk_olens(num_chunks);
 #if defined(USE_INPLACE_COMPRESSED_CHUNKS) || defined(USE_MAYBE_COMPRESSED_CHUNKS)
 	/** The objective of (MAYBE|INPLACE)_COMPRESSED_CHUNKS is to define a format that allows
@@ -128,14 +75,12 @@ int main(int argc, char *argv[])
 #pragma omp for
 		for (size_t chunk_num = 0; chunk_num < num_chunks;
 		     chunk_num++) {
-			chunk_olens[chunk_num] = CHUNK_SIZE * 2;
-			uint8_t *chunk_in =
-				compressIn + (CHUNK_SIZE * chunk_num);
-			uint8_t *chunk_out =
-				compressOut + (CHUNK_SIZE * chunk_num);
+			const uint8_t *chunk_in = in + (CHUNK_SIZE * chunk_num);
+			uint8_t *chunk_out = out + (CHUNK_SIZE * chunk_num);
 
+			chunk_olens[chunk_num] = CHUNK_SIZE * 2;
 			optsw842_compress(chunk_in, CHUNK_SIZE,
-					  &temp_buffer[0], &chunk_olens[chunk_num]);
+					  temp_buffer.data(), &chunk_olens[chunk_num]);
 			if (chunk_olens[chunk_num] <=
 			    CHUNK_SIZE -
 				    sizeof(LIB842_COMPRESSED_CHUNK_MARKER) -
@@ -157,18 +102,26 @@ int main(int argc, char *argv[])
 #else
 #pragma omp parallel for
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-		chunk_olens[chunk_num] = CHUNK_SIZE * 2;
-		uint8_t *chunk_in = compressIn + (CHUNK_SIZE * chunk_num);
-		uint8_t *chunk_out =
-			compressOut + ((CHUNK_SIZE * 2) * chunk_num);
+		const uint8_t *chunk_in = in + (CHUNK_SIZE * chunk_num);
+		uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 
+		chunk_olens[chunk_num] = CHUNK_SIZE * 2;
 		optsw842_compress(chunk_in, CHUNK_SIZE, chunk_out,
 				  &chunk_olens[chunk_num]);
 	}
 #endif
 
-	memcpy(decompressIn, compressOut, olen);
+	*olen = std::accumulate(chunk_olens.begin(), chunk_olens.end(), 0);
+	*time_comp = -1; // Don't benchmark since compression is not OpenCL-based
 
+	// ------------
+	// CONDENSATION
+	// ------------
+	*time_condense = -1;
+
+	// -------------
+	// DECOMPRESSION
+	// -------------
 #ifdef USE_CHUNK_SHUFFLE_MAP
 	std::vector<size_t> chunkShuffleMap(num_chunks);
 	std::iota(chunkShuffleMap.begin(), chunkShuffleMap.end(), 0);
@@ -187,22 +140,25 @@ int main(int argc, char *argv[])
 #if defined(USE_INPLACE_COMPRESSED_CHUNKS)
 		lib842::CLHostDecompressor clDecompress(
 			CHUNK_SIZE, CHUNK_SIZE,
-			lib842::CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS, true);
-		clDecompress.decompress(decompressIn, olen, nullptr, decompressIn,
-					dlen, nullptr, chunkShuffleMapPtr, nullptr);
-		memcpy(decompressOut, decompressIn, olen);
+			lib842::CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS, true, true);
+		clDecompress.decompress(out, outBufferSize, nullptr,
+					out, decompressedBufferSize, nullptr,
+					chunkShuffleMapPtr, nullptr, time_decomp);
+		memcpy(decompressed, out, outBufferSize);
 #elif defined(USE_MAYBE_COMPRESSED_CHUNKS)
 		lib842::CLHostDecompressor clDecompress(
 			CHUNK_SIZE, CHUNK_SIZE,
-			lib842::CLDecompressorInputFormat::MAYBE_COMPRESSED_CHUNKS, true);
-		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
-					dlen, nullptr, chunkShuffleMapPtr, nullptr);
+			lib842::CLDecompressorInputFormat::MAYBE_COMPRESSED_CHUNKS, true, true);
+		clDecompress.decompress(out, outBufferSize, nullptr,
+					decompressed, decompressedBufferSize, nullptr,
+					chunkShuffleMapPtr, nullptr, time_decomp);
 #else
 		lib842::CLHostDecompressor clDecompress(
 			CHUNK_SIZE, CHUNK_SIZE * 2,
-			lib842::CLDecompressorInputFormat::ALWAYS_COMPRESSED_CHUNKS, true);
-		clDecompress.decompress(decompressIn, olen, nullptr, decompressOut,
-					dlen, nullptr, chunkShuffleMapPtr, nullptr);
+			lib842::CLDecompressorInputFormat::ALWAYS_COMPRESSED_CHUNKS, true, true);
+		clDecompress.decompress(out, outBufferSize, nullptr,
+					decompressed, decompressedBufferSize, nullptr,
+					chunkShuffleMapPtr, nullptr, time_decomp);
 #endif
 	} catch (const cl::Error &ex) {
 		std::cerr << "ERROR: " << ex.what() << " (" << ex.err() << ")"
@@ -210,35 +166,36 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (memcmp(compressIn, decompressOut, ilen) == 0) {
-		//printf("Compression performance: %lld ms / %f MiB/s\n", timeend_comp - timestart_comp, (ilen / 1024 / 1024) / ((float) (timeend_comp - timestart_comp) / 1000));
-		//printf("Decompression performance: %lld ms / %f MiB/s\n", timeend_decomp - timestart_decomp, (ilen / 1024 / 1024) / ((float) (timeend_decomp - timestart_decomp) / 1000));
+	*dlen = ilen; // XXX
+	return memcmp(in, decompressed, ilen) == 0;
+}
 
-		printf("Compression- and decompression was successful!\n");
-	} else {
-		/*
-		for (size_t i = 0; i < ilen; i++) {
-			printf("%02x:", compressIn[i]);
-		}
+bool simple_test_core(const uint8_t *in, size_t ilen,
+		      uint8_t *out, size_t *olen,
+		      uint8_t *decompressed, size_t *dlen)
+{
+	int err;
 
-		printf("\n\n");
-
-		for (size_t i = 0; i < olen; i++) {
-			printf("%02x:", compressOut[i]);
-		}
-
-		printf("\n\n");
-
-		for (size_t i = 0; i < dlen; i++) {
-			printf("%02x:", decompressOut[i]);
-		}
-		*/
-
-		printf("\n\n");
-
-		fprintf(stderr,
-			"FAIL: Decompressed data differs from the original input data.\n");
+	err = optsw842_compress(in, ilen, out, olen);
+	if (err != 0) {
+		fprintf(stderr, "Error during compression (%d): %s\n",
+			-err, strerror(-err));
+		return false;
 	}
 
-	return 0;
+	// TODO: This always uses the
+	// CLDecompressorInputFormat::ALWAYS_COMPRESSED_CHUNKS mode
+	err = cl842_decompress(out, *olen, decompressed, dlen);
+	if (err != 0) {
+		fprintf(stderr, "Error during decompression (%d): %s\n",
+			-err, strerror(-err));
+		return false;
+	}
+
+	return true;
+}
+
+int main(int argc, const char *argv[])
+{
+	return compdecomp(argc > 1 ? argv[1] : NULL, CHUNK_SIZE, 0);
 }

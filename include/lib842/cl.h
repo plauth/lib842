@@ -148,7 +148,7 @@ public:
 	CLHostDecompressor(size_t chunkSize,
 			   size_t chunkStride,
 			   CLDecompressorInputFormat inputFormat,
-			   bool verbose = false);
+			   bool verbose, bool profile);
 	void decompress(const uint8_t *input,
 			size_t inputBufferSize,
 			const size_t *inputChunkSizes,
@@ -156,13 +156,14 @@ public:
 			size_t outputBufferSizes,
 			size_t *outputChunkSizes,
 			size_t *chunkShuffleMap,
-			int *returnValues) const;
+			int *returnValues,
+			long long *time) const;
 
 private:
 	size_t m_chunkSize;
 	size_t m_chunkStride;
 	CLDecompressorInputFormat m_inputFormat;
-	bool m_verbose;
+	bool m_verbose, m_profile;
 	cl::vector<cl::Device> m_devices;
 	cl::Context m_context;
 	cl::CommandQueue m_queue;
