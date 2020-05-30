@@ -1,11 +1,14 @@
+// If INDEPTH_TRACE is defined, more traces and statistics are generated
+//#define INDEPTH_TRACE
+
 #include "numa_spread.h"
 
 #include <lib842/stream/decomp.h>
 
 #include <cassert>
-
-// If INDEPTH_TRACE is defined, more traces and statistics are generated
-//#define INDEPTH_TRACE
+#ifdef INDEPTH_TRACE
+#include <chrono>
+#endif
 
 namespace lib842 {
 
@@ -89,6 +92,8 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 		<< "Start decompression thread with id " << thread_id
 		<< std::endl;
 	size_t stat_handled_blocks = 0;
+	auto stat_thread_start_time = std::chrono::steady_clock::now();
+	std::chrono::steady_clock::duration stat_woken_duration(0), stat_process_duration(0);
 #endif
 
 	_threads_ready.count_down();
@@ -105,6 +110,10 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 			});
 			last_trigger = _trigger;
 		}
+
+#ifdef INDEPTH_TRACE
+		auto stat_woken_start_time = std::chrono::steady_clock::now();
+#endif
 
 		// -------------------
 		// DECOMPRESSION PHASE
@@ -128,8 +137,13 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 
 #ifdef INDEPTH_TRACE
 			stat_handled_blocks++;
+			auto stat_process_start_time = std::chrono::steady_clock::now();
 #endif
-			if (!handle_block(block)) {
+			auto block_success = handle_block(block);
+#ifdef INDEPTH_TRACE
+			stat_process_duration += std::chrono::steady_clock::now() - stat_process_start_time;
+#endif
+			if (!block_success) {
 				bool first_error;
 				{
 					std::lock_guard<std::mutex> lock(_mutex);
@@ -173,12 +187,20 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 			if (!quit)
 				finalize_callback(!error);
 		}
+
+#ifdef INDEPTH_TRACE
+		stat_woken_duration += std::chrono::steady_clock::now() - stat_woken_start_time;
+#endif
 	}
 
 #ifdef INDEPTH_TRACE
+	auto stat_thread_duration = std::chrono::steady_clock::now() - stat_thread_start_time;
 	_debug_logger()
-		<< "End decompression thread with id " << thread_id
-		<< " (stat_handled_blocks=" << stat_handled_blocks << ")"
+		<< "End decompression thread with id " << thread_id << " ("
+		<< "stat_handled_blocks=" << stat_handled_blocks << ", "
+		<< "stat_thread_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stat_thread_duration).count() << ", "
+		<< "stat_woken_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stat_woken_duration).count() << ", "
+		<< "stat_process_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stat_process_duration).count() << ")"
 		<< std::endl;
 #endif
 }

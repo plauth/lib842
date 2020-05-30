@@ -128,47 +128,47 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// TODOXXX: Why is the performance on the first run so horrible?
 	//          Is it due to NUMA effects? Why does it not happen with OpenMP?
 	std::vector<lib842::stream::DataCompressionStream::compress_block> comp_blocks;
-	std::mutex comp_blocks_mutex;
-	bool comp_error = false;
+	{
+		//for (int i = 0; i < 2; i++) { comp_blocks.clear();
+		std::mutex comp_blocks_mutex;
+		bool comp_error = false;
+		lib842::stream::DataCompressionStream cstream(
+			lib842_compress, num_threads, thread_policy,
+			get_log_error, get_log_debug);
+		cstream.wait_until_ready();
 
-//	for (int i = 0; i < 2; i++) { comp_blocks.clear();
-	lib842::stream::DataCompressionStream cstream(
-		lib842_compress, num_threads, thread_policy,
-		get_log_error, get_log_debug);
-	cstream.wait_until_ready();
+		long long timestart_comp = timestamp();
+		cstream.start(in, ilen, false, [&comp_blocks, &comp_blocks_mutex, &comp_error]
+			(lib842::stream::DataCompressionStream::compress_block &&cblock) {
+			std::lock_guard<std::mutex> lock(comp_blocks_mutex);
+			if (cblock.source_offset == SIZE_MAX)
+				comp_error = true;
+			if (!comp_error)
+				comp_blocks.push_back(std::move(cblock));
+		});
 
-	long long timestart_comp = timestamp();
-	cstream.start(in, ilen, false, [&comp_blocks, &comp_blocks_mutex, &comp_error]
-		(lib842::stream::DataCompressionStream::compress_block &&cblock) {
-		std::lock_guard<std::mutex> lock(comp_blocks_mutex);
-		if (cblock.source_offset == SIZE_MAX)
-			comp_error = true;
-		if (!comp_error)
-			comp_blocks.push_back(std::move(cblock));
-	});
+		lib842::detail::latch comp_finished(1);
+		comp_error = false;
+		cstream.finalize(false, [&comp_finished,
+					 &comp_error](bool success) {
+			comp_error |= !success;
+			comp_finished.count_down();
+		});
 
-	lib842::detail::latch comp_finished(1);
-	comp_error = false;
-	cstream.finalize(false, [&comp_finished,
-				 &comp_error](bool success) {
-		comp_error |= !success;
-		comp_finished.count_down();
-	});
+		comp_finished.wait();
+		if (comp_error)
+			return false;
 
-	comp_finished.wait();
-	if (comp_error)
-		return false;
-
-	*time_comp = timestamp() - timestart_comp;
+		*time_comp = timestamp() - timestart_comp;
+		//printf("TIME COMP%i: %lli\n", i, *time_comp);
+		//}
+	}
 
 	*olen = 0;
 	for (const auto &cblock : comp_blocks) {
 		for (auto size : cblock.sizes)
 			*olen += size;
 	}
-
-//	printf("TIME COMP%i: %lli\n", i, *time_comp);
-//	}
 
 	// ------------
 	// CONDENSATION
@@ -178,52 +178,54 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// -------------
 	// DECOMPRESSION
 	// -------------
-	lib842::stream::DataDecompressionStream dstream(
-		lib842_decompress, num_threads, thread_policy,
-		get_log_error, get_log_debug);
+	{
+		lib842::stream::DataDecompressionStream dstream(
+			lib842_decompress, num_threads, thread_policy,
+			get_log_error, get_log_debug);
 
-	dstream.wait_until_ready();
+		dstream.wait_until_ready();
 
-	long long timestart_decomp = timestamp();
+		long long timestart_decomp = timestamp();
 
-	dstream.start();
-	for (const auto &cblock : comp_blocks) {
-		lib842::stream::DataDecompressionStream::decompress_block dblock;
-		bool any_compressed = false;
-		for (size_t i = 0; i < lib842::stream::NUM_CHUNKS_PER_BLOCK; i++) {
-			auto dest = decompressed + cblock.source_offset + i * lib842::stream::CHUNK_SIZE;
-			if (cblock.sizes[i] <= lib842::stream::COMPRESSIBLE_THRESHOLD) {
-				dblock.chunks[i] = lib842::stream::DataDecompressionStream::decompress_chunk(
-					cblock.datas[i],
-					cblock.sizes[i],
-					dest
-				);
-				any_compressed = true;
-			} else {
-				// TODOXXX: Should this be done multi thread???
-				//          Or maybe done separately and not even included in the
-				//          timing, since that's usually handled by the network?
-				memcpy(dest, cblock.datas[i], lib842::stream::CHUNK_SIZE);
+		dstream.start();
+		for (const auto &cblock : comp_blocks) {
+			lib842::stream::DataDecompressionStream::decompress_block dblock;
+			bool any_compressed = false;
+			for (size_t i = 0; i < lib842::stream::NUM_CHUNKS_PER_BLOCK; i++) {
+				auto dest = decompressed + cblock.source_offset + i * lib842::stream::CHUNK_SIZE;
+				if (cblock.sizes[i] <= lib842::stream::COMPRESSIBLE_THRESHOLD) {
+					dblock.chunks[i] = lib842::stream::DataDecompressionStream::decompress_chunk(
+						cblock.datas[i],
+						cblock.sizes[i],
+						dest
+					);
+					any_compressed = true;
+				} else {
+					// TODOXXX: Should this be done multi thread???
+					//          Or maybe done separately and not even included in the
+					//          timing, since that's usually handled by the network?
+					memcpy(dest, cblock.datas[i], lib842::stream::CHUNK_SIZE);
+				}
 			}
+
+			if (any_compressed && !dstream.push_block(std::move(dblock)))
+				break;
 		}
 
-		if (any_compressed && !dstream.push_block(std::move(dblock)))
-			break;
+		lib842::detail::latch decomp_finished(1);
+		bool decomp_error = false;
+		dstream.finalize(false, [&decomp_finished,
+					 &decomp_error](bool success) {
+			decomp_error = !success;
+			decomp_finished.count_down();
+		});
+
+		decomp_finished.wait();
+		if (decomp_error)
+			return false;
+
+		*time_decomp = timestamp() - timestart_decomp;
 	}
-
-	lib842::detail::latch decomp_finished(1);
-	bool decomp_error = false;
-	dstream.finalize(false, [&decomp_finished,
-				 &decomp_error](bool success) {
-		decomp_error = !success;
-		decomp_finished.count_down();
-	});
-
-	decomp_finished.wait();
-	if (decomp_error)
-		return false;
-
-	*time_decomp = timestamp() - timestart_decomp;
 
 	*dlen = comp_blocks.size() * lib842::stream::BLOCK_SIZE;
 
