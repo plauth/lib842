@@ -29,11 +29,11 @@ CLDeviceDecompressor::CLDeviceDecompressor(const cl::Context &context,
 					   size_t chunkSize,
 					   size_t chunkStride,
 					   CLDecompressorInputFormat inputFormat,
-					   std::ostream &logger)
+					   std::function<std::ostream&(void)> logger)
 	: m_chunkSize(chunkSize),
 	  m_chunkStride(chunkStride),
 	  m_inputFormat(inputFormat),
-	  m_logger(logger)
+	  m_logger(std::move(logger))
 {
 	buildProgram(context, devices);
 }
@@ -228,7 +228,7 @@ void CLDeviceDecompressor::buildProgram(
 	try {
 		binaries = cache.find();
 	} catch (const std::ifstream::failure &) {
-		m_logger
+		m_logger()
 			<< "WARNING: Could not read lib842's OpenCL program cache"
 			<< std::endl;
 	}
@@ -238,7 +238,7 @@ void CLDeviceDecompressor::buildProgram(
 			m_program.build(devices, options.str().c_str());
 			return;
 		} catch (const cl::Error &ex) {
-			m_logger
+			m_logger()
 				<< "WARNING: Building the lib842's OpenCL program"
 				<< " from cache failed, rebuilding from source"
 				<< std::endl;
@@ -251,7 +251,7 @@ void CLDeviceDecompressor::buildProgram(
 		m_program.build(devices, options.str().c_str());
 	} catch (const cl::Error &ex) {
 		if (ex.err() == CL_BUILD_PROGRAM_FAILURE) {
-			m_logger
+			m_logger()
 				<< "ERROR Building the lib842's OpenCL program"
 				<< " from source failed, build log is:\n"
 				<< m_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(
@@ -276,7 +276,8 @@ CLHostDecompressor::CLHostDecompressor(size_t chunkSize,
 	  m_devices(findDevices()), m_context(m_devices),
 	  m_queue(m_context, m_devices[0], m_verbose ? CL_QUEUE_PROFILING_ENABLE : 0),
 	  m_deviceCompressor(m_context, m_devices, chunkSize,
-			     chunkStride, inputFormat, std::cerr)
+			     chunkStride, inputFormat,
+			     []()  -> std::ostream& { return std::cerr; })
 {
 }
 

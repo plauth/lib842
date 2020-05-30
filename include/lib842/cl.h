@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <functional>
 
 namespace lib842 {
 
@@ -76,7 +77,7 @@ public:
 			     size_t chunkSize,
 			     size_t chunkStride,
 			     CLDecompressorInputFormat inputFormat,
-			     std::ostream &logger);
+			     std::function<std::ostream&(void)> logger);
 	/**
 	* Decompress a buffer containing multiple chunks of 842-compressed data.
 	* Parameters:
@@ -130,7 +131,7 @@ private:
 	size_t m_chunkStride;
 	CLDecompressorInputFormat m_inputFormat;
 	cl::Program m_program;
-	std::ostream &m_logger;
+	std::function<std::ostream&(void)> m_logger;
 
 	void buildProgram(const cl::Context &context, const cl::vector<cl::Device> &devices);
 };
