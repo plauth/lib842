@@ -84,16 +84,15 @@ public:
 	* Decompress a buffer containing multiple chunks of 842-compressed data.
 	* Parameters:
 	* - commandQueue: Command queue on which to enqueue the OpenCL operations.
+	* - numChunks: Number of chunks to decompress.
 	* - inputBuffer: Buffer containing the input data.
 	* - inputOffset: Offset in the input buffer at which the compressed data starts.
 	*                Must be a multiple of 8.
-	* - inputBufferSize: Total size of the buffer containing the input data.
 	* - inputChunkSizes: Specifies the compressed size of each chunk to be decompressed.
 	*                    This is only for error-checking, and is optional (can be null).
 	* - outputBuffer: Buffer where the output data should be written.
 	* - outputOffset: Offset in the output buffer at which the decompressed data should start.
 	*                Must be a multiple of 8.
-	* - outputBufferSize: Total size of the buffer to write the output data to.
 	* - outputChunkSizes: Specifies the maximum size to be written for each chunk.
 	*                     This is only for error-checking, and is optional (can be null).
 	* - returnValues: The error code (C errno) is written here for each chunk.
@@ -115,13 +114,12 @@ public:
 	*                    (like any clEnqueueXXX OpenCL API).
 	*/
 	void decompress(const cl::CommandQueue &commandQueue,
+			size_t numChunks,
 			const cl::Buffer &inputBuffer,
 			size_t inputOffset,
-			size_t inputBufferSize,
 			const cl::Buffer &inputChunkSizes,
 			const cl::Buffer &outputBuffer,
 			size_t outputOffset,
-			size_t outputBufferSizes,
 			const cl::Buffer &outputChunkSizes,
 			const cl::Buffer &returnValues,
 			const cl::Buffer &chunkShuffleMap,

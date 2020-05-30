@@ -41,25 +41,22 @@ CLDeviceDecompressor::CLDeviceDecompressor(const cl::Context &context,
 }
 
 void CLDeviceDecompressor::decompress(const cl::CommandQueue &commandQueue,
+				      size_t numChunks,
 				      const cl::Buffer &inputBuffer,
-				      size_t inputOffset, size_t inputBufferSize,
+				      size_t inputOffset,
 				      const cl::Buffer &inputChunkSizes,
 				      const cl::Buffer &outputBuffer,
-				      size_t outputOffset, size_t outputBufferSize,
+				      size_t outputOffset,
 				      const cl::Buffer &outputChunkSizes,
 				      const cl::Buffer &chunkShuffleMap,
 				      const cl::Buffer &returnValues,
 				      const cl::vector<cl::Event> *events,
 				      cl::Event *event) const
 {
-	if (m_inputFormat == CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS) {
-		if (inputBuffer() != outputBuffer() ||
-		    inputOffset != outputOffset || inputBufferSize != outputBufferSize) {
-			throw cl::Error(CL_INVALID_VALUE);
-		}
+	if (m_inputFormat == CLDecompressorInputFormat::INPLACE_COMPRESSED_CHUNKS &&
+	    (inputBuffer() != outputBuffer() || inputOffset != outputOffset)) {
+		throw cl::Error(CL_INVALID_VALUE);
 	}
-	size_t numChunks =
-		(inputBufferSize + m_chunkStride - 1) / (m_chunkStride);
 
 	cl::Kernel decompressKernel(m_program, "decompress");
 
@@ -402,10 +399,9 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 		cl::Buffer buffer(m_context, CL_MEM_READ_WRITE, inputBufferSize + 64);
 
 		cl::copy(m_queue, input, input + inputBufferSize, buffer);
-		m_deviceCompressor.decompress(m_queue, buffer, 0,
-					      inputBufferSize, inputSizesBuffer,
-					      buffer, 0,
-					      outputBufferSize, outputSizesBuffer,
+		m_deviceCompressor.decompress(m_queue, numChunks,
+					      buffer, 0, inputSizesBuffer,
+					      buffer, 0, outputSizesBuffer,
 					      chunkShuffleMapBuffer, returnValuesBuffer,
 					      nullptr, &decompressEvent);
 		decompressEvent.wait();
@@ -429,10 +425,9 @@ void CLHostDecompressor::decompress(const uint8_t *input, size_t inputBufferSize
 					outputBufferSize != 0 ? outputBufferSize : 1);
 
 		cl::copy(m_queue, input, input + inputBufferSize, inputBuffer);
-		m_deviceCompressor.decompress(m_queue, inputBuffer, 0,
-					      inputBufferSize, inputSizesBuffer,
-					      outputBuffer, 0,
-					      outputBufferSize, outputSizesBuffer,
+		m_deviceCompressor.decompress(m_queue, numChunks,
+					      inputBuffer, 0, inputSizesBuffer,
+					      outputBuffer, 0, outputSizesBuffer,
 					      chunkShuffleMapBuffer, returnValuesBuffer,
 					      nullptr, &decompressEvent);
 		decompressEvent.wait();
