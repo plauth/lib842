@@ -114,6 +114,10 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			     long long *time_decomp) {
 	std::unique_ptr<uint8_t, free_ptr> decompressed(
 		static_cast<uint8_t *>(allocate_aligned(ilen, ALIGNMENT)));
+	if (decompressed.get() == NULL) {
+		fprintf(stderr, "FAIL: decompressed = allocate_aligned(...) failed!\n");
+		return false;
+	}
 	std::memset(decompressed.get(), 0, ilen);
 
 	// -----
