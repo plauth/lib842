@@ -189,5 +189,5 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 
 int main(int argc, const char *argv[])
 {
-	return compdecomp(argc > 1 ? argv[1] : NULL, CHUNK_SIZE, 0);
+	return compdecomp(argc > 1 ? argv[1] : nullptr, CHUNK_SIZE, 0);
 }

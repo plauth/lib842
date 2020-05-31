@@ -114,11 +114,26 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			     long long *time_decomp) {
 	std::unique_ptr<uint8_t, free_ptr> decompressed(
 		static_cast<uint8_t *>(allocate_aligned(ilen, ALIGNMENT)));
-	if (decompressed.get() == NULL) {
+	if (decompressed.get() == nullptr) {
 		fprintf(stderr, "FAIL: decompressed = allocate_aligned(...) failed!\n");
 		return false;
 	}
 	std::memset(decompressed.get(), 0, ilen);
+
+#if 0
+	{ // TODOXXX: Test to see if pre-paging memory has an influence on performance
+		std::vector<std::unique_ptr<uint8_t, free_ptr>> outp;
+		for (size_t i = 0; i < ilen / lib842::stream::CHUNK_SIZE; i++) {
+			std::unique_ptr<uint8_t, free_ptr> out(
+				static_cast<uint8_t *>(allocate_aligned(lib842::stream::CHUNK_SIZE * 2, ALIGNMENT)));
+			if (out.get() == nullptr) {
+				fprintf(stderr, "FAIL: out = allocate_aligned(...) failed!\n");
+				return false;
+			}
+			memset(out.get(), 0, ilen * 2);
+		}
+	}
+#endif
 
 	// -----
 	// SETUP
@@ -175,8 +190,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			return false;
 
 		*time_comp = timestamp() - timestart_comp;
-		//printf("TIME COMP%i: %lli\n", i, *time_comp);
-		//}
+		//printf("TIME COMP%i: %lli\n", i, *time_comp); }
 	}
 
 	*olen = 0;
@@ -280,6 +294,6 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 
 int main(int argc, const char *argv[])
 {
-	return compdecomp(argc > 1 ? argv[1] : NULL,
+	return compdecomp(argc > 1 ? argv[1] : nullptr,
 		lib842::stream::BLOCK_SIZE, ALIGNMENT);
 }
