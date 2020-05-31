@@ -1,6 +1,3 @@
-// If INDEPTH_TRACE is defined, more traces and statistics are generated
-//#define INDEPTH_TRACE
-
 #include "numa_spread.h"
 
 #include <lib842/stream/comp.h>
@@ -8,9 +5,6 @@
 #include <algorithm>
 #include <climits>
 #include <cerrno>
-#ifdef INDEPTH_TRACE
-#include <chrono>
-#endif
 
 // A big offset value so all threads stop processing new work
 // as soon as possible, i.e. to cancel all pending work of the operation
@@ -94,13 +88,12 @@ void DataCompressionStream::finalize(bool cancel, std::function<void(bool)> fina
 }
 
 void DataCompressionStream::loop_compress_thread(size_t thread_id) {
-#ifdef INDEPTH_TRACE
+	stats_per_thread_t stats;
+#ifdef LIB842_STREAM_INDEPTH_TRACE
 	_debug_logger()
 		<< "Start compression thread with id " << thread_id
 		<< std::endl;
-	size_t stat_handled_blocks = 0;
 	auto stat_thread_start_time = std::chrono::steady_clock::now();
-	std::chrono::steady_clock::duration stat_woken_duration(0), stat_process_duration(0);
 #endif
 
 	_threads_ready.count_down();
@@ -118,7 +111,7 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 			last_trigger = _trigger;
 		}
 
-#ifdef INDEPTH_TRACE
+#ifdef LIB842_STREAM_INDEPTH_TRACE
 		auto stat_woken_start_time = std::chrono::steady_clock::now();
 #endif
 
@@ -144,13 +137,13 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 			if (offset >= last_valid_offset)
 				break;
 
-#ifdef INDEPTH_TRACE
-			stat_handled_blocks++;
-			auto stat_process_start_time = std::chrono::steady_clock::now();
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+			stats.handled_blocks++;
+			auto stat_block_start_time = std::chrono::steady_clock::now();
 #endif
-			compress_block block = handle_block(offset);
-#ifdef INDEPTH_TRACE
-			stat_process_duration += std::chrono::steady_clock::now() - stat_process_start_time;
+			compress_block block = handle_block(offset, stats);
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+			stats.block_duration += std::chrono::steady_clock::now() - stat_block_start_time;
 #endif
 			if (block.source_offset == SIZE_MAX) {
 				bool first_error;
@@ -212,24 +205,27 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 				finalize_callback(!error);
 		}
 
-#ifdef INDEPTH_TRACE
-		stat_woken_duration += std::chrono::steady_clock::now() - stat_woken_start_time;
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+		stats.woken_duration += std::chrono::steady_clock::now() - stat_woken_start_time;
 #endif
 	}
 
-#ifdef INDEPTH_TRACE
-	auto stat_thread_duration = std::chrono::steady_clock::now() - stat_thread_start_time;
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+	stats.thread_duration += std::chrono::steady_clock::now() - stat_thread_start_time;
 	_debug_logger()
-		<< "End compression thread with id " << thread_id << " ("
-		<< "stat_handled_blocks=" << stat_handled_blocks << ", "
-		<< "stat_thread_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stat_thread_duration).count() << ", "
-		<< "stat_woken_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stat_woken_duration).count() << ", "
-		<< "stat_process_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stat_process_duration).count() << ")"
+		<< "End compression thread with id " << thread_id << " (stats: "
+		<< "handled_blocks=" << stats.handled_blocks << ", "
+		<< "thread_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stats.thread_duration).count() << ", "
+		<< "woken_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stats.woken_duration).count() << ", "
+		<< "block_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stats.block_duration).count() << ", "
+		<< "compress_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stats.compress_duration).count() << ")"
 		<< std::endl;
 #endif
 }
 
-DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t offset) {
+
+DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t offset,
+									  stats_per_thread_t &stats) {
 	compress_block block;
 	block.source_offset = offset;
 	if (_skip_compress_step) {
@@ -267,7 +263,13 @@ DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t
 			// Compress chunk
 			size_t compressed_size = CHUNK_PADDING;
 
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+			auto stat_compress_start_time = std::chrono::steady_clock::now();
+#endif
 			int ret = _compress842_func(source, CHUNK_SIZE, compressed_destination, &compressed_size);
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+			stats.compress_duration += std::chrono::steady_clock::now() - stat_compress_start_time;
+#endif
 			if (ret != 0 && ret != -ENOSPC) {
 				block.source_offset = SIZE_MAX; // Indicates error to the user
 				break;

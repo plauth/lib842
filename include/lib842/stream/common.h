@@ -41,6 +41,9 @@ enum class thread_policy {
 	spread_threads_among_numa_nodes
 };
 
+// If defined, more traces and performance statistics are generated
+//#define LIB842_STREAM_INDEPTH_TRACE
+
 } // namespace stream
 
 } // namespace lib842

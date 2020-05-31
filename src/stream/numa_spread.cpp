@@ -1,7 +1,6 @@
 #include "numa_spread.h"
 
-// If INDEPTH_TRACE is defined, more traces and statistics are generated
-//#define INDEPTH_TRACE
+#include <lib842/stream/common.h>
 
 #ifdef LIB842_HAVE_NUMA
 
@@ -9,12 +8,12 @@
 #include <numa.h>
 #include <sys/sysinfo.h>
 #include <cstdio>
-#ifdef INDEPTH_TRACE
+#ifdef LIB842_STREAM_INDEPTH_TRACE
 #include <string>
 #include <sstream>
 #endif
 
-#ifdef INDEPTH_TRACE
+#ifdef LIB842_STREAM_INDEPTH_TRACE
 static std::string cpu_set_to_string(cpu_set_t *cpuset)
 {
 	std::ostringstream cpuset_ss;
@@ -69,7 +68,7 @@ static std::vector<cpu_set_t> get_numa_cpusets()
 		numa_cpusets.push_back(cpuset);
 	}
 
-#ifdef INDEPTH_TRACE
+#ifdef LIB842_STREAM_INDEPTH_TRACE
 	for (size_t n = 0; n < numa_cpusets.size(); n++)
 		printf("NUMA CPU set %zu contains %s\n", n,
 			cpu_set_to_string(&numa_cpusets[n]).c_str());
@@ -77,8 +76,6 @@ static std::vector<cpu_set_t> get_numa_cpusets()
 
 	return numa_cpusets;
 }
-
-static std::vector<cpu_set_t> numa_cpusets = get_numa_cpusets();
 
 #endif
 
@@ -88,11 +85,16 @@ void spread_threads_among_numa_nodes(std::vector<std::thread> &threads)
 	fprintf(stderr,
 		"WARNING: libNUMA or pthreads not available, not spreading threads among NUMA nodes\n");
 #else
+	static std::vector<cpu_set_t> numa_cpusets = get_numa_cpusets();
 	if (numa_cpusets.empty())
 		return;
 
 	for (size_t i = 0; i < threads.size(); i++) {
 		cpu_set_t cpuset = numa_cpusets[i % numa_cpusets.size()];
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+		printf("Assigning thread %zu to CPU set %s\n",
+			i, cpu_set_to_string(&cpuset).c_str());
+#endif
 		int err = pthread_setaffinity_np(threads[i].native_handle(), sizeof(cpu_set_t), &cpuset);
 		if (err != 0) {
 			fprintf(stderr, "WARNING: Error setting thread affinity for NUMA spread (%d): %s\n\n",

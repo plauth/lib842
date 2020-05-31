@@ -27,6 +27,9 @@
 #include <cstddef>
 #include <memory>
 #include <ostream>
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+#include <chrono>
+#endif
 
 namespace lib842 {
 
@@ -81,10 +84,20 @@ public:
 	 * The parameter of the callback specifies a success (true) / error (false) status. */
 	void finalize(bool cancel, std::function<void(bool)> finalize_callback);
 
-	bool handle_block(const decompress_block &block);
-
 private:
+	struct stats_per_thread_t {
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+		size_t handled_blocks = 0;
+		std::chrono::steady_clock::duration thread_duration{0};
+		std::chrono::steady_clock::duration woken_duration{0};
+		std::chrono::steady_clock::duration block_duration{0};
+		std::chrono::steady_clock::duration decompress_duration{0};
+#endif
+	};
+
 	void loop_decompress_thread(size_t thread_id);
+	bool handle_block(const decompress_block &block,
+			  stats_per_thread_t &stats);
 
 	lib842_decompress_func _decompress842_func;
 	std::function<std::ostream&(void)> _error_logger;

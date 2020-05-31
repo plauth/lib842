@@ -1,14 +1,8 @@
-// If INDEPTH_TRACE is defined, more traces and statistics are generated
-//#define INDEPTH_TRACE
-
 #include "numa_spread.h"
 
 #include <lib842/stream/decomp.h>
 
 #include <cassert>
-#ifdef INDEPTH_TRACE
-#include <chrono>
-#endif
 
 namespace lib842 {
 
@@ -87,13 +81,12 @@ void DataDecompressionStream::finalize(bool cancel, std::function<void(bool)> fi
 }
 
 void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
-#ifdef INDEPTH_TRACE
+	stats_per_thread_t stats;
+#ifdef LIB842_STREAM_INDEPTH_TRACE
 	_debug_logger()
 		<< "Start decompression thread with id " << thread_id
 		<< std::endl;
-	size_t stat_handled_blocks = 0;
 	auto stat_thread_start_time = std::chrono::steady_clock::now();
-	std::chrono::steady_clock::duration stat_woken_duration(0), stat_process_duration(0);
 #endif
 
 	_threads_ready.count_down();
@@ -111,7 +104,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 			last_trigger = _trigger;
 		}
 
-#ifdef INDEPTH_TRACE
+#ifdef LIB842_STREAM_INDEPTH_TRACE
 		auto stat_woken_start_time = std::chrono::steady_clock::now();
 #endif
 
@@ -135,13 +128,13 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 				_queue.pop();
 			}
 
-#ifdef INDEPTH_TRACE
-			stat_handled_blocks++;
-			auto stat_process_start_time = std::chrono::steady_clock::now();
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+			stats.handled_blocks++;
+			auto stat_block_start_time = std::chrono::steady_clock::now();
 #endif
-			auto block_success = handle_block(block);
-#ifdef INDEPTH_TRACE
-			stat_process_duration += std::chrono::steady_clock::now() - stat_process_start_time;
+			auto block_success = handle_block(block, stats);
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+			stats.block_duration += std::chrono::steady_clock::now() - stat_block_start_time;
 #endif
 			if (!block_success) {
 				bool first_error;
@@ -188,24 +181,26 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 				finalize_callback(!error);
 		}
 
-#ifdef INDEPTH_TRACE
-		stat_woken_duration += std::chrono::steady_clock::now() - stat_woken_start_time;
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+		stats.woken_duration += std::chrono::steady_clock::now() - stat_woken_start_time;
 #endif
 	}
 
-#ifdef INDEPTH_TRACE
-	auto stat_thread_duration = std::chrono::steady_clock::now() - stat_thread_start_time;
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+	stats.thread_duration += std::chrono::steady_clock::now() - stat_thread_start_time;
 	_debug_logger()
-		<< "End decompression thread with id " << thread_id << " ("
-		<< "stat_handled_blocks=" << stat_handled_blocks << ", "
-		<< "stat_thread_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stat_thread_duration).count() << ", "
-		<< "stat_woken_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stat_woken_duration).count() << ", "
-		<< "stat_process_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stat_process_duration).count() << ")"
+		<< "End decompression thread with id " << thread_id << " (stats: "
+		<< "handled_blocks=" << stats.handled_blocks << ", "
+		<< "thread_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stats.thread_duration).count() << ", "
+		<< "woken_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stats.woken_duration).count() << ", "
+		<< "block_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stats.block_duration).count() << ", "
+		<< "decompress_duration (ms)=" << std::chrono::duration_cast<std::chrono::milliseconds>(stats.decompress_duration).count() << ")"
 		<< std::endl;
 #endif
 }
 
-bool DataDecompressionStream::handle_block(const decompress_block &block) {
+bool DataDecompressionStream::handle_block(const decompress_block &block,
+					   stats_per_thread_t &stats) {
 	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 		const auto &chunk = block.chunks[i];
 		if (chunk.compressed_data == nullptr && chunk.compressed_length == 0 &&
@@ -220,9 +215,15 @@ bool DataDecompressionStream::handle_block(const decompress_block &block) {
 		       chunk.compressed_length <= COMPRESSIBLE_THRESHOLD);
 
 		size_t uncompressed_size = CHUNK_SIZE;
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+		auto stat_decompress_start_time = std::chrono::steady_clock::now();
+#endif
 		int ret = _decompress842_func(chunk.compressed_data,
 					      chunk.compressed_length,
 					      destination, &uncompressed_size);
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+		stats.decompress_duration += std::chrono::steady_clock::now() - stat_decompress_start_time;
+#endif
 		if (ret != 0)
 			return false;
 

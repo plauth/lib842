@@ -26,6 +26,9 @@
 #include <memory>
 #include <functional>
 #include <ostream>
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+#include <chrono>
+#endif
 
 namespace lib842 {
 
@@ -74,10 +77,19 @@ public:
 		   std::function<void(compress_block &&)> block_available_callback);
 	void finalize(bool cancel, std::function<void(bool)> finalize_callback);
 
-	compress_block handle_block(size_t offset);
-
 private:
+	struct stats_per_thread_t {
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+		size_t handled_blocks = 0;
+		std::chrono::steady_clock::duration thread_duration{0};
+		std::chrono::steady_clock::duration woken_duration{0};
+		std::chrono::steady_clock::duration block_duration{0};
+		std::chrono::steady_clock::duration compress_duration{0};
+#endif
+	};
+
 	void loop_compress_thread(size_t thread_id);
+	compress_block handle_block(size_t offset, stats_per_thread_t &stats);
 
 	lib842_compress_func _compress842_func;
 	std::function<std::ostream&(void)> _error_logger;
