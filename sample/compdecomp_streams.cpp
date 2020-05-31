@@ -102,7 +102,7 @@ static unsigned int determine_num_threads() {
 
 
 static lib842::stream::thread_policy determine_thread_policy() {
-	return std::getenv("COMPDECOMP_NUMA_SPREAD") != nullptr
+	return std::getenv("COMPDECOMP_NUMA_SPREAD") == nullptr
 		? lib842::stream::thread_policy::use_defaults
 		: lib842::stream::thread_policy::spread_threads_among_numa_nodes;
 }
