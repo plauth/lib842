@@ -28,6 +28,9 @@ typedef int (*lib842_compress_func)(const uint8_t *in, size_t ilen,
 typedef int (*lib842_decompress_func)(const uint8_t *in, size_t ilen,
 				      uint8_t *out, size_t *olen);
 
+// TODOXXX add prototypes for 'chunked' compression modes,
+//         required / preferred alignments
+
 // Used in some contexts where data can be either compressed or decompressed,
 // in order to identify which chunks of it are compressed
 static const uint8_t LIB842_COMPRESSED_CHUNK_MARKER[16] = {

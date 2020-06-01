@@ -120,79 +120,62 @@ static int is_pointer_aligned(const void *ptr, uint16_t alignmask)
 	return ptr == aligned_ptr;
 }
 
-static int c842_compress(struct cryptodev_ctx *ctx, const void *input,
-			 size_t ilen, void *output, size_t *olen)
+static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op, size_t numchunks,
+				 const uint8_t *in, size_t isize, const size_t *ilens,
+				 uint8_t *out, size_t osize, size_t *olens)
 {
 	struct crypt_op cryp = { 0 };
+	__u32 ilens32[CRYPTODEV_COMP_MAX_CHUNKS],
+	      olens32[CRYPTODEV_COMP_MAX_CHUNKS];
 
 	/* check input and output alignment */
-	if (ctx->alignmask && !is_pointer_aligned(input, ctx->alignmask)) {
-		fprintf(stderr, "input is not aligned\n");
+	if (ctx->alignmask && !is_pointer_aligned(in, ctx->alignmask)) {
+		fprintf(stderr, "in is not aligned\n");
 		return -EINVAL;
 	}
-	if (ctx->alignmask && !is_pointer_aligned(output, ctx->alignmask)) {
-		fprintf(stderr, "output is not aligned\n");
+	if (ctx->alignmask && !is_pointer_aligned(out, ctx->alignmask)) {
+		fprintf(stderr, "out is not aligned\n");
 		return -EINVAL;
 	}
 
-	if (ilen > UINT32_MAX) {
-		fprintf(stderr, "ilen too big\n");
+	if (isize > UINT32_MAX) {
+		fprintf(stderr, "isize too big\n");
 		return -EINVAL;
 	}
-	if (*olen > UINT32_MAX) {
-		fprintf(stderr, "olen too big\n");
+	if (osize > UINT32_MAX) {
+		fprintf(stderr, "osize too big\n");
 		return -EINVAL;
+	}
+
+	if (numchunks > CRYPTODEV_COMP_MAX_CHUNKS) {
+		fprintf(stderr, "numchunks too big\n");
+		return -EINVAL;
+	}
+
+	for (size_t i = 0; i < numchunks; i++) {
+		if (ilens[i] > UINT32_MAX) {
+			fprintf(stderr, "ilens[%zu] too big\n", i);
+			return -EINVAL;
+		}
+		if (olens[i] > UINT32_MAX) {
+			fprintf(stderr, "olens[%zu] too big\n", i);
+			return -EINVAL;
+		}
+
+		ilens32[i] = (__u32)ilens[i];
+		olens32[i] = (__u32)olens[i];
 	}
 
 	/* Encrypt data.in to data.encrypted */
 	cryp.ses = ctx->sess.ses;
-	cryp.len = (__u32)ilen;
-	cryp.dlen = (__u32)*olen;
-	cryp.src = (__u8 *)input;
-	cryp.dst = (__u8 *)output;
-	cryp.op = COP_ENCRYPT;
-	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
-		fprintf(stderr, "ioctl(CIOCCRYPT) failed (%d): %s\n",
-			errno, strerror(errno));
-		return -errno;
-	}
-
-	*olen = cryp.dlen;
-
-	return 0;
-}
-
-static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
-			   size_t ilen, void *output, size_t *olen)
-{
-	struct crypt_op cryp = { 0 };
-
-	/* check input and output alignment */
-	if (ctx->alignmask && !is_pointer_aligned(input, ctx->alignmask)) {
-		fprintf(stderr, "input is not aligned\n");
-		return -EINVAL;
-	}
-	if (ctx->alignmask && !is_pointer_aligned(output, ctx->alignmask)) {
-		fprintf(stderr, "output is not aligned\n");
-		return -EINVAL;
-	}
-
-	if (ilen > UINT32_MAX) {
-		fprintf(stderr, "ilen too big\n");
-		return -EINVAL;
-	}
-	if (*olen > UINT32_MAX) {
-		fprintf(stderr, "olen too big\n");
-		return -EINVAL;
-	}
-
-	/* Encrypt data.in to data.encrypted */
-	cryp.ses = ctx->sess.ses;
-	cryp.len = (__u32)ilen;
-	cryp.dlen = (__u32)*olen;
-	cryp.src = (__u8 *)input;
-	cryp.dst = (__u8 *)output;
-	cryp.op = COP_DECRYPT;
+	cryp.op = op;
+	cryp.len = (__u32)isize;
+	cryp.dlen = (__u32)osize;
+	cryp.src = (__u8 *)in;
+	cryp.dst = out;
+	cryp.numchunks = numchunks;
+	cryp.chunklens = ilens32;
+	cryp.chunkdlens = olens32;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
 		int err = -errno;
 		fprintf(stderr, "ioctl(CIOCCRYPT) failed (%d): %s\n",
@@ -200,9 +183,18 @@ static int c842_decompress(struct cryptodev_ctx *ctx, const void *input,
 		return err;
 	}
 
-	*olen = cryp.dlen;
+	for (size_t i = 0; i < numchunks; i++) {
+		olens[i] = olens32[i];
+	}
 
 	return 0;
+}
+
+static int c842_compress(struct cryptodev_ctx *ctx, __u16 op,
+			 const uint8_t *in, size_t ilen,
+			 uint8_t *out, size_t *olen)
+{
+	return c842_compress_chunked(ctx, op, 1, in, ilen, &ilen, out, *olen, olen);
 }
 
 // From the outside, we present an easy-to-use interface with only two
@@ -271,7 +263,7 @@ int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 	if (err)
 		return err;
 
-	return c842_compress(thread_ctx, in, ilen, out, olen);
+	return c842_compress(thread_ctx, COP_ENCRYPT, in, ilen, out, olen);
 }
 
 int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
@@ -281,5 +273,33 @@ int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 	if (err)
 		return err;
 
-	return c842_decompress(thread_ctx, in, ilen, out, olen);
+	return c842_compress(thread_ctx, COP_DECRYPT, in, ilen, out, olen);
+}
+
+int hw842_compress_chunked(size_t numchunks,
+			   const uint8_t *in, size_t isize, const size_t *ilens,
+			   uint8_t *out, size_t osize, size_t *olens)
+{
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
+	if (err)
+		return err;
+
+	return c842_compress_chunked(thread_ctx, COP_ENCRYPT, numchunks,
+				     in, isize, ilens,
+				     out, osize, olens);
+}
+
+int hw842_decompress_chunked(size_t numchunks,
+			     const uint8_t *in, size_t isize, const size_t *ilens,
+			     uint8_t *out, size_t osize, size_t *olens)
+{
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
+	if (err)
+		return err;
+
+	return c842_compress_chunked(thread_ctx, COP_DECRYPT, numchunks,
+				     in, isize, ilens,
+				     out, osize, olens);
 }

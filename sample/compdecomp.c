@@ -7,28 +7,68 @@
 #include <stdbool.h>
 #include "compdecomp_driver.h"
 
+#define CHUNKED_FROM_SIMPLE(chunked_compress_func, simple_compress_func) \
+static int chunked_compress_func(size_t numchunks, \
+				 const uint8_t *in, size_t isize, const size_t *ilens, \
+				 uint8_t *out, size_t osize, size_t *olens) { \
+	int ret; \
+	unsigned i, soffset, doffset; \
+	unsigned int sstride = isize / numchunks; \
+	unsigned int dstride = osize / numchunks; \
+ \
+	for (i = 0, soffset = 0, doffset = 0; \
+	     i < numchunks; \
+	     i++, soffset += sstride, doffset += dstride) { \
+		ret = simple_compress_func( \
+			in + soffset, ilens[i], \
+			out + doffset, &olens[i]); \
+		if (ret) \
+			return ret; \
+	} \
+ \
+	return 0; \
+}
+
 #if defined(USEAIX)
 #include <sys/types.h>
 #include <sys/vminfo.h>
 #define ALIGNMENT 4096
-#define lib842_decompress(in, ilen, out, olen) accel_decompress(in, ilen, out, olen, 0)
-#define lib842_compress(in, ilen, out, olen) accel_compress(in, ilen, out, olen, 0)
+static int accel_decompress_simple(const uint8_t *in, size_t ilen,
+				   uint8_t *out, size_t *olen) {
+	return accel_decompress(in, ilen, out, olen, 0);
+}
+static int accel_compress_simple(const uint8_t *in, size_t ilen,
+				 uint8_t *out, size_t *olen) {
+	return accel_compress(in, ilen, out, olen, 0);
+}
+#define lib842_decompress(in, ilen, out, olen) accel_decompress_simple
+#define lib842_compress(in, ilen, out, olen) accel_compress_simple
+CHUNKED_FROM_SIMPLE(lib842_decompress_chunked, accel_decompress_simple)
+CHUNKED_FROM_SIMPLE(lib842_compress_chunked, accel_compress_simple)
 #elif defined(USEHW)
 #include <lib842/hw.h>
 #define ALIGNMENT 0
 #define lib842_decompress hw842_decompress
 #define lib842_compress hw842_compress
+#define lib842_decompress_chunked hw842_decompress_chunked
+#define lib842_compress_chunked hw842_compress_chunked
 #elif defined(USEOPTSW)
 #include <lib842/sw.h>
 #define ALIGNMENT 0
 #define lib842_decompress optsw842_decompress
 #define lib842_compress optsw842_compress
+CHUNKED_FROM_SIMPLE(lib842_decompress_chunked, optsw842_decompress)
+CHUNKED_FROM_SIMPLE(lib842_compress_chunked, optsw842_compress)
 #else
 #include <lib842/sw.h>
 #define ALIGNMENT 0
 #define lib842_decompress sw842_decompress
 #define lib842_compress sw842_compress
+CHUNKED_FROM_SIMPLE(lib842_decompress_chunked, sw842_decompress)
+CHUNKED_FROM_SIMPLE(lib842_compress_chunked, sw842_compress)
 #endif
+
+#define CHUNKS_PER_BATCH 16
 
 //#define CHUNK_SIZE ((size_t)32768)
 //#define CHUNK_SIZE ((size_t)1024)
@@ -83,15 +123,31 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// -----------
 	// COMPRESSION
 	// -----------
+#if CHUNKS_PER_BATCH > 1
+	size_t input_chunk_sizes[CHUNKS_PER_BATCH];
+	for (size_t i = 0; i < CHUNKS_PER_BATCH; i++)
+		input_chunk_sizes[i] = CHUNK_SIZE;
+#endif
+
 	long long timestart_comp = timestamp();
 #pragma omp parallel for
-	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-		size_t chunk_olen = CHUNK_SIZE * 2;
+	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num += CHUNKS_PER_BATCH) {
+		size_t batch_chunks = num_chunks - chunk_num < CHUNKS_PER_BATCH
+			? num_chunks - chunk_num : CHUNKS_PER_BATCH;
 		const uint8_t *chunk_in = in + (CHUNK_SIZE * chunk_num);
 		uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
 
+		for (size_t i = 0; i < batch_chunks; i++)
+			compressed_chunk_sizes[chunk_num + i] = CHUNK_SIZE * 2;
+#if CHUNKS_PER_BATCH > 1
+		int err = lib842_compress_chunked(
+			batch_chunks,
+			chunk_in, CHUNK_SIZE * batch_chunks, input_chunk_sizes,
+			chunk_out, CHUNK_SIZE * 2 * batch_chunks, &compressed_chunk_sizes[chunk_num]);
+#else
 		int err = lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
-					  &chunk_olen);
+					  &compressed_chunk_sizes[chunk_num]);
+#endif
 		if (err != 0) {
 			bool is_first_failure;
 #pragma omp atomic capture
@@ -101,7 +157,6 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 					-err, strerror(-err));
 			}
 		}
-		compressed_chunk_sizes[chunk_num] = chunk_olen;
 	}
 
 	if (!omp_success)
@@ -148,8 +203,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// -------------
 	long long timestart_decomp = timestamp();
 #pragma omp parallel for
-	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-		size_t chunk_dlen = CHUNK_SIZE;
+	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num += CHUNKS_PER_BATCH) {
+		size_t batch_chunks = num_chunks - chunk_num < CHUNKS_PER_BATCH
+			? num_chunks - chunk_num : CHUNKS_PER_BATCH;
 #ifdef CONDENSE
 		uint8_t *chunk_out = out_condensed + compressed_chunk_positions[chunk_num];
 #else
@@ -157,9 +213,19 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 #endif
 		uint8_t *chunk_decomp = decompressed + (CHUNK_SIZE * chunk_num);
 
+		for (size_t i = 0; i < batch_chunks; i++)
+			decompressed_chunk_sizes[chunk_num + i] = CHUNK_SIZE;
+#if CHUNKS_PER_BATCH > 1
+		int err = lib842_decompress_chunked(
+			batch_chunks,
+			chunk_out, CHUNK_SIZE * 2 * batch_chunks, &compressed_chunk_sizes[chunk_num],
+			chunk_decomp, CHUNK_SIZE * batch_chunks, &decompressed_chunk_sizes[chunk_num]);
+#else
 		int err = lib842_decompress(chunk_out,
 					    compressed_chunk_sizes[chunk_num],
-					    chunk_decomp, &chunk_dlen);
+					    chunk_decomp, &decompressed_chunk_sizes[chunk_num]);
+#endif
+
 		if (err != 0) {
 			bool is_first_failure;
 #pragma omp atomic capture
@@ -169,7 +235,6 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 					-err, strerror(-err));
 			}
 		}
-		decompressed_chunk_sizes[chunk_num] = chunk_dlen;
 	}
 
 	if (!omp_success)
