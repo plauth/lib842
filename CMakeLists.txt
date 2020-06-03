@@ -72,6 +72,11 @@ if(CRYPTODEV_LINUX_COMP_FOUND)
     set(SRCFILES ${SRCFILES} src/cryptodev/842_interface.c)
 endif()
 
+if (AIX_HWCOMPRESSION_FOUND)
+    set(LIB842_HAVE_AIX_HWCOMPRESSION ON)
+    set(SRCFILES ${SRCFILES} src/aix/aix.c)
+endif()
+
 # Streams
 set(SRCFILES ${SRCFILES} src/stream/DataCompressionStream.cpp
                          src/stream/DataDecompressionStream.cpp
@@ -165,6 +170,7 @@ if(STANDALONE_BUILD)
     if (AIX_HWCOMPRESSION_FOUND)
         add_executable(test_aix_standalone sample/compdecomp.c sample/compdecomp_driver.c)
         target_compile_definitions(test_aix_standalone PRIVATE "USEAIX")
+        target_link_libraries(test_aix_standalone 842)
         if (OpenMP_FOUND)
             target_link_libraries(test_aix_standalone OpenMP::OpenMP_C)
         endif()

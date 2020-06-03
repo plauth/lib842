@@ -8,25 +8,8 @@
 #include "compdecomp_driver.h"
 
 #if defined(USEAIX)
-#include <sys/types.h>
-#include <sys/vminfo.h>
-static int aix842_compress(const uint8_t *in, size_t ilen,
-			   uint8_t *out, size_t *olen) {
-	return accel_compress(in, ilen, out, olen, 0);
-}
-static int aix842_decompress(const uint8_t *in, size_t ilen,
-			     uint8_t *out, size_t *olen) {
-	return accel_decompress(in, ilen, out, olen, 0);
-}
-LIB842_DEFINE_TRIVIAL_CHUNKED_COMPRESS(aix842_compress_chunked, aix842_compress)
-LIB842_DEFINE_TRIVIAL_CHUNKED_DECOMPRESS(aix842_decompress_chunked, aix842_decompress)
-static lib842_implementation lib842impl = {
-	aix842_compress,
-	aix842_decompress,
-	aix842_compress_chunked,
-	aix842_decompress_chunked,
-	4096
-};
+#include <lib842/aix.h>
+#define lib842impl aix842_implementation
 #elif defined(USEHW)
 #include <lib842/hw.h>
 #define lib842impl hw842_implementation
