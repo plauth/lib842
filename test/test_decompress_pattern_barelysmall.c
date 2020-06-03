@@ -11,7 +11,7 @@
 
 int main(int argc, char *argv[])
 {
-	const struct test842_impl *impl;
+	const struct lib842_implementation *impl;
 	const struct test842_pattern *pattern;
 	if (argc != 3 || (impl = test842_get_impl_by_name(argv[1])) == NULL ||
 	    (pattern = test842_get_pattern_by_name(argv[2])) == NULL) {
@@ -20,10 +20,11 @@ int main(int argc, char *argv[])
 	}
 
 	assert(pattern->uncompressed_len > 1);
-	uint8_t out[pattern->uncompressed_len - 1];
+	uint8_t *in = aligned_alloc(impl->required_alignment, pattern->compressed_len);
+	memcpy(in, pattern->compressed, pattern->compressed_len);
+	uint8_t *out = aligned_alloc(impl->required_alignment, pattern->uncompressed_len - 1);
 	size_t olen = pattern->uncompressed_len - 1;
-	if (impl->decompress(pattern->compressed, pattern->compressed_len, out,
-			     &olen) != -ENOSPC) {
+	if (impl->decompress(in, pattern->compressed_len, out, &olen) != -ENOSPC) {
 		printf("Decompression should have failed with ENOSPC\n");
 		return EXIT_FAILURE;
 	}

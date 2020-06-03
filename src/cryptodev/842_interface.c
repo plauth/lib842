@@ -25,6 +25,7 @@
 #include <sys/ioctl.h>
 #include <crypto/cryptodev.h>
 #include <lib842/hw.h>
+#include <unistd.h>
 
 struct cryptodev_ctx {
 	int cfd;
@@ -251,6 +252,18 @@ static int get_thread_cryptodev_ctx(struct cryptodev_ctx **rctx)
 	return 0;
 }
 
+static size_t hw842_get_required_alignment() {
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
+	if (err) {
+		// Maximum alignment (note alignmask is a uint16_t)
+		// It will likely fail again later anyway
+		return 0x10000;
+	}
+
+	return thread_ctx->alignmask + 1;
+}
+
 int hw842_available() {
 	// TODO: A self-test trying to decompress a known bitstream would be better here
 	return access("/dev/crypto", F_OK) == 0;
@@ -304,10 +317,21 @@ int hw842_decompress_chunked(size_t numchunks,
 				     out, osize, olens);
 }
 
-struct lib842_implementation hw842_implementation = {
-	hw842_compress,
-	hw842_decompress,
-	hw842_compress_chunked,
-	hw842_decompress_chunked,
-	0
+const struct lib842_implementation *get_hw842_implementation() {
+	static struct lib842_implementation hw842_implementation = {
+		.compress = hw842_compress,
+		.decompress = hw842_decompress,
+		.compress_chunked = hw842_compress_chunked,
+		.decompress_chunked = hw842_decompress_chunked,
+		.required_alignment = 1,
+		.preferred_alignment = 0
+	};
+	if (hw842_implementation.required_alignment == 0)
+		hw842_implementation.required_alignment = hw842_get_required_alignment();
+	// The cryptodev implementation can work better (do zero copy)
+	// if the buffers are page-aligned
+	if (hw842_implementation.preferred_alignment == 0)
+		hw842_implementation.preferred_alignment = sysconf(_SC_PAGESIZE);
+
+	return &hw842_implementation;
 };

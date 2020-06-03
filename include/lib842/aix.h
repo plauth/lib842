@@ -27,7 +27,7 @@ int aix842_decompress_chunked(size_t numchunks,
 			      const uint8_t *in, size_t isize, const size_t *ilens,
 			      uint8_t *out, size_t osize, size_t *olens);
 
-extern struct lib842_implementation aix842_implementation;
+const struct lib842_implementation *get_aix842_implementation();
 
 #ifdef __cplusplus
 }

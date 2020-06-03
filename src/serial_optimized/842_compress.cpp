@@ -695,10 +695,19 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 
 LIB842_DEFINE_TRIVIAL_CHUNKED_COMPRESS(optsw842_decompress_chunked, optsw842_decompress)
 LIB842_DEFINE_TRIVIAL_CHUNKED_DECOMPRESS(optsw842_compress_chunked, optsw842_compress)
-struct lib842_implementation optsw842_implementation = {
-	optsw842_compress,
-	optsw842_decompress,
-	optsw842_compress_chunked,
-	optsw842_decompress_chunked,
-	0
+
+const struct lib842_implementation *get_optsw842_implementation() {
+	static struct lib842_implementation optsw842_implementation = {
+		.compress = optsw842_compress,
+		.decompress = optsw842_decompress,
+		.compress_chunked = optsw842_compress_chunked,
+		.decompress_chunked = optsw842_decompress_chunked,
+		// The implementation accesses the input buffer as 64-bit integers,
+		// and unaligned access to basic integer types aren't guaranteed to
+		// work by C/C++, even though they do (with terrible performance)
+		// in some platforms like x86_64
+		.required_alignment = sizeof(uint64_t),
+		.preferred_alignment = sizeof(uint64_t)
+	};
+	return &optsw842_implementation;
 };

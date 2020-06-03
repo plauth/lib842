@@ -22,36 +22,26 @@ void test842_hexdump(const uint8_t *data, size_t len)
 	}
 }
 
-static const struct test842_impl IMPL_SW = { .compress = sw842_compress,
-					     .decompress = sw842_decompress };
-
-static const struct test842_impl IMPL_OPTSW = { .compress = optsw842_compress,
-						.decompress = optsw842_decompress };
-
-#ifdef LIB842_HAVE_CRYPTODEV_LINUX_COMP
-static const struct test842_impl IMPL_HW = { .compress = hw842_compress,
-					     .decompress = hw842_decompress };
-#endif
-
 #ifdef LIB842_HAVE_OPENCL
-static const struct test842_impl IMPL_CL = { .compress = NULL,
-					     .decompress = cl842_decompress };
+static const struct lib842_implementation IMPL_CL = { // Test mock
+	.decompress = cl842_decompress,
+	.required_alignment = 1
+};
 #endif
 
-const struct test842_impl *test842_get_impl_by_name(const char *name)
+const struct lib842_implementation *test842_get_impl_by_name(const char *name)
 {
-	if (strcmp(name, "sw") == 0) {
-		return &IMPL_SW;
-	} else if (strcmp(name, "optsw") == 0) {
-		return &IMPL_OPTSW;
+	if (strcmp(name, "sw") == 0)
+		return get_sw842_implementation();
+	if (strcmp(name, "optsw") == 0)
+		return get_optsw842_implementation();
 #ifdef LIB842_HAVE_CRYPTODEV_LINUX_COMP
-	} else if (strcmp(name, "hw") == 0) {
-		return &IMPL_HW;
+	if (strcmp(name, "hw") == 0)
+		return get_hw842_implementation();
 #endif
 #ifdef LIB842_HAVE_OPENCL
-	} else if (strcmp(name, "cl") == 0) {
+	if (strcmp(name, "cl") == 0)
 		return &IMPL_CL;
 #endif
-	}
 	return NULL;
 }

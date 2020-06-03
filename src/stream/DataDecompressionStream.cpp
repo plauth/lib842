@@ -9,12 +9,12 @@ namespace lib842 {
 namespace stream {
 
 DataDecompressionStream::DataDecompressionStream(
-	lib842_decompress_func decompress842_func,
+	const lib842_implementation &impl842,
 	unsigned int num_threads,
 	thread_policy thread_policy_,
 	std::function<std::ostream&(void)> error_logger,
 	std::function<std::ostream&(void)> debug_logger) :
-	_decompress842_func(decompress842_func),
+	_impl842(impl842),
 	_error_logger(std::move(error_logger)),
 	_debug_logger(std::move(debug_logger)),
 	_threads_ready(num_threads),
@@ -22,6 +22,10 @@ DataDecompressionStream::DataDecompressionStream(
 	_error(false),
 	_finalizing(false), _finalize_barrier(num_threads),
 	_quit(false) {
+	if ((CHUNK_SIZE % impl842.required_alignment) != 0) {
+		_error_logger() << "CHUNK_SIZE must be a multiple of the required 842 alignment" << std::endl;
+		throw std::runtime_error("CHUNK_SIZE must be a multiple of the required 842 alignment");
+	}
 	_threads.reserve(num_threads);
 	for (size_t i = 0; i < num_threads; i++)
 		_threads.emplace_back(&DataDecompressionStream::loop_decompress_thread, this, i);
@@ -201,6 +205,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 
 bool DataDecompressionStream::handle_block(const decompress_block &block,
 					   stats_per_thread_t &stats) {
+	// TODOXXX use chunked mode
 	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 		const auto &chunk = block.chunks[i];
 		if (chunk.compressed_data == nullptr && chunk.compressed_length == 0 &&
@@ -218,7 +223,7 @@ bool DataDecompressionStream::handle_block(const decompress_block &block,
 #ifdef LIB842_STREAM_INDEPTH_TRACE
 		auto stat_decompress_start_time = std::chrono::steady_clock::now();
 #endif
-		int ret = _decompress842_func(chunk.compressed_data,
+		int ret = _impl842.decompress(chunk.compressed_data,
 					      chunk.compressed_length,
 					      destination, &uncompressed_size);
 #ifdef LIB842_STREAM_INDEPTH_TRACE

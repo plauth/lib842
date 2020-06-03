@@ -690,10 +690,15 @@ cleanup:
 
 LIB842_DEFINE_TRIVIAL_CHUNKED_COMPRESS(sw842_decompress_chunked, sw842_decompress)
 LIB842_DEFINE_TRIVIAL_CHUNKED_DECOMPRESS(sw842_compress_chunked, sw842_compress)
-struct lib842_implementation sw842_implementation = {
-	sw842_compress,
-	sw842_decompress,
-	sw842_compress_chunked,
-	sw842_decompress_chunked,
-	0
+
+const struct lib842_implementation *get_sw842_implementation() {
+	static struct lib842_implementation sw842_implementation = {
+		.compress = sw842_compress,
+		.decompress = sw842_decompress,
+		.compress_chunked = sw842_compress_chunked,
+		.decompress_chunked = sw842_decompress_chunked,
+		.required_alignment = 1,
+		.preferred_alignment = 1
+	};
+	return &sw842_implementation;
 };

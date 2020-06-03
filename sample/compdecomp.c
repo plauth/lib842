@@ -9,16 +9,16 @@
 
 #if defined(USEAIX)
 #include <lib842/aix.h>
-#define lib842impl aix842_implementation
+#define lib842impl (*get_aix842_implementation())
 #elif defined(USEHW)
 #include <lib842/hw.h>
-#define lib842impl hw842_implementation
+#define lib842impl (*get_hw842_implementation())
 #elif defined(USEOPTSW)
 #include <lib842/sw.h>
-#define lib842impl optsw842_implementation
+#define lib842impl (*get_optsw842_implementation())
 #else
 #include <lib842/sw.h>
-#define lib842impl sw842_implementation
+#define lib842impl (*get_sw842_implementation())
 #endif
 
 #define CHUNKS_PER_BATCH 16
@@ -40,16 +40,21 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	bool ret = false;
 	bool omp_success = true;
 
-	uint8_t *out = allocate_aligned(ilen * 2, lib842impl.alignment);
+	if (CHUNKS_PER_BATCH > 1 && (CHUNK_SIZE % lib842impl.required_alignment) != 0) {
+		fprintf(stderr, "FAIL: CHUNK_SIZE must be a multiple of the required 842 alignment\n");
+		return ret;
+	}
+
+	uint8_t *out = aligned_alloc(lib842impl.preferred_alignment, ilen * 2);
 	if (out == NULL) {
-		fprintf(stderr, "FAIL: out = allocate_aligned(...) failed!\n");
+		fprintf(stderr, "FAIL: out = aligned_alloc(...) failed!\n");
 		return ret;
 	}
 	memset(out, 0, ilen * 2);
 
-	uint8_t *decompressed = allocate_aligned(ilen, lib842impl.alignment);
+	uint8_t *decompressed = aligned_alloc(lib842impl.preferred_alignment, ilen);
 	if (decompressed == NULL) {
-		fprintf(stderr, "FAIL: decompressed = allocate_aligned(...) failed!\n");
+		fprintf(stderr, "FAIL: decompressed = aligned_alloc(...) failed!\n");
 		goto exit_free_out;
 	}
 	memset(decompressed, 0, ilen);
@@ -255,5 +260,5 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 
 int main(int argc, const char *argv[])
 {
-	return compdecomp(argc > 1 ? argv[1] : NULL, CHUNK_SIZE, lib842impl.alignment);
+	return compdecomp(argc > 1 ? argv[1] : NULL, CHUNK_SIZE, lib842impl.preferred_alignment);
 }

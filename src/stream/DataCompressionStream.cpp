@@ -3,8 +3,11 @@
 #include <lib842/stream/comp.h>
 
 #include <algorithm>
+#include <stdexcept>
 #include <climits>
 #include <cerrno>
+#include <stdlib.h> // Hacky use of C11 aligned_alloc,
+		    // since std::aligned_alloc is not available until C++17
 
 // A big offset value so all threads stop processing new work
 // as soon as possible, i.e. to cancel all pending work of the operation
@@ -15,12 +18,12 @@ namespace lib842 {
 namespace stream {
 
 DataCompressionStream::DataCompressionStream(
-	lib842_compress_func compress842_func,
+	const lib842_implementation &impl842,
 	unsigned int num_threads,
 	thread_policy thread_policy_,
 	std::function<std::ostream&(void)> error_logger,
 	std::function<std::ostream&(void)> debug_logger) :
-	_compress842_func(compress842_func),
+	_impl842(impl842),
 	_error_logger(std::move(error_logger)),
 	_debug_logger(std::move(debug_logger)),
 	_threads_ready(num_threads),
@@ -29,6 +32,10 @@ DataCompressionStream::DataCompressionStream(
 	_current_offset(0), _error(false),
 	_finalizing(false), _finalize_barrier(num_threads),
 	_quit(false), _offset_sync_epoch_multiple_log2(UINT_MAX) {
+	if ((CHUNK_SIZE % impl842.required_alignment) != 0) {
+		_error_logger() << "CHUNK_SIZE must be a multiple of the required 842 alignment" << std::endl;
+		throw std::runtime_error("CHUNK_SIZE must be a multiple of the required 842 alignment");
+	}
 	_threads.reserve(num_threads);
 	for (size_t i = 0; i < num_threads; i++)
 		_threads.emplace_back(&DataCompressionStream::loop_compress_thread, this, i);
@@ -245,6 +252,8 @@ DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t
 			block.sizes[i] = chunk_buffer_size;
 		}
 	} else {
+		// TODOXXX use chunked mode
+
 		// TODOXXX: This can be reduced to e.g. COMPRESSIBLE_THRESHOLD or CHUNK_SIZE,
 		// as long as the lib842 compressor respects the destination buffer size
 		// (input value of the olen parameter to the compression function)
@@ -252,8 +261,8 @@ DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t
 		// respect olen when compiled without ENABLE_ERROR_HANDLING (for performance),
 		// so this is necessary to handle this case
 		static constexpr size_t CHUNK_PADDING = 2 * CHUNK_SIZE;
-		block.compress_buffer.reset(
-			new uint8_t[CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK]);
+		block.compress_buffer.reset(static_cast<uint8_t *>(aligned_alloc(
+			_impl842.preferred_alignment, CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK)));
 
 		bool any_compressible = false;
 		for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
@@ -266,7 +275,7 @@ DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t
 #ifdef LIB842_STREAM_INDEPTH_TRACE
 			auto stat_compress_start_time = std::chrono::steady_clock::now();
 #endif
-			int ret = _compress842_func(source, CHUNK_SIZE, compressed_destination, &compressed_size);
+			int ret = _impl842.compress(source, CHUNK_SIZE, compressed_destination, &compressed_size);
 #ifdef LIB842_STREAM_INDEPTH_TRACE
 			stats.compress_duration += std::chrono::steady_clock::now() - stat_compress_start_time;
 #endif

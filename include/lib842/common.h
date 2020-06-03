@@ -57,11 +57,9 @@ struct lib842_implementation {
 	lib842_decompress_func decompress;
 	lib842_compress_chunked_func compress_chunked;
 	lib842_decompress_chunked_func decompress_chunked;
-	size_t alignment;
+	size_t required_alignment;
+	size_t preferred_alignment;
 };
-
-// TODOXXX add prototypes for 'chunked' compression modes,
-//         required / preferred alignments
 
 // Used in some contexts where data can be either compressed or decompressed,
 // in order to identify which chunks of it are compressed

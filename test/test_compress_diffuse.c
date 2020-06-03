@@ -20,17 +20,17 @@ unsigned xorshift_next()
 
 int main(int argc, char *argv[])
 {
-	const struct test842_impl *impl;
+	const struct lib842_implementation *impl;
 	if (argc != 2 ||
 	    (impl = test842_get_impl_by_name(argv[1])) == NULL) {
 		printf("test_compress_diffuse IMPL\n");
 		return EXIT_FAILURE;
 	}
 
-	uint8_t *data_buffer = (uint8_t *)malloc(BUFFER_SIZE),
-		*tmpbuf = (uint8_t *)malloc(BUFFER_SIZE),
-		*comp_data = (uint8_t *)malloc(2 * BUFFER_SIZE),
-		*uncomp_data = (uint8_t *)malloc(BUFFER_SIZE);
+	uint8_t *data_buffer = aligned_alloc(impl->required_alignment, BUFFER_SIZE),
+		*tmpbuf = malloc(BUFFER_SIZE),
+		*comp_data = aligned_alloc(impl->required_alignment, 2 * BUFFER_SIZE),
+		*uncomp_data = aligned_alloc(impl->required_alignment, BUFFER_SIZE);
 	int ret = EXIT_SUCCESS;
 
 	// Initialize data_buffer with a random pattern
@@ -55,37 +55,27 @@ int main(int argc, char *argv[])
 						  comp_data, &comp_size);
 		if (ret_compress != 0) {
 			printf("it=%i: Compression FAILED (ret=%d)\n", it, ret_compress);
-			ret = EXIT_FAILURE;
-			goto cleanup;
+			return EXIT_FAILURE;
 		}
 
-		uint8_t *uncomp_data = (uint8_t *)malloc(BUFFER_SIZE);
 		size_t uncomp_size = BUFFER_SIZE;
 		int ret_decompress = impl->decompress(comp_data, comp_size,
 						      uncomp_data, &uncomp_size);
 		if (ret_decompress != 0) {
 			printf("it=%i: Pattern compressed to %zu bytes but decompression FAILED (ret=%d)\n",
 			       it, comp_size, ret_decompress);
-			ret = EXIT_FAILURE;
-			goto cleanup;
+			return EXIT_FAILURE;
 		}
 
 		if (memcmp(data_buffer, uncomp_data, BUFFER_SIZE) != 0) {
 			printf("it=%i: Pattern compressed to %zu bytes but decompression INCORRECT\n",
 			       it, comp_size);
-			ret = EXIT_FAILURE;
-			goto cleanup;
+			return EXIT_FAILURE;
 		}
 
 		printf("it=%i: Pattern compressed to %zu bytes and decompressed OK\n",
 		       it, comp_size);
 	}
-
-cleanup:
-	free(uncomp_data);
-	free(comp_data);
-	free(data_buffer);
-	free(tmpbuf);
 
 	return ret;
 }

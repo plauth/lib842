@@ -18,19 +18,22 @@ unsigned xorshift_next()
 
 int main(int argc, char *argv[])
 {
-	const struct test842_impl *impl;
+	const struct lib842_implementation *impl;
 	if (argc != 2 || (impl = test842_get_impl_by_name(argv[1])) == NULL) {
 		printf("test_decompress_invalid_generator IMPL\n");
 		return EXIT_FAILURE;
 	}
 
+	const size_t insize = 32, outsize = 1024;
+	uint8_t *in = aligned_alloc(impl->required_alignment, insize);
+	uint8_t *out = aligned_alloc(impl->required_alignment, outsize);
+
 	for (size_t i = 0; i < 5000; i++) {
-		uint8_t in[32], out[1024];
-		size_t olen = sizeof(out);
-		for (size_t j = 0; j < sizeof(in); j++) {
+		size_t olen = outsize;
+		for (size_t j = 0; j < insize; j++) {
 			in[j] = (uint8_t)xorshift_next();
 		}
-		int ret = impl->decompress(in, sizeof(in), out, &olen);
+		int ret = impl->decompress(in, insize, out, &olen);
 		printf("[Run %zu] Decompression returned %d\n", i, ret);
 	}
 

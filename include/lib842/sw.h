@@ -24,7 +24,7 @@ int sw842_decompress_chunked(size_t numchunks,
 			     const uint8_t *in, size_t isize, const size_t *ilens,
 			     uint8_t *out, size_t osize, size_t *olens);
 
-extern struct lib842_implementation sw842_implementation;
+const struct lib842_implementation *get_sw842_implementation();
 
 int optsw842_compress(const uint8_t *in, size_t ilen,
 		      uint8_t *out, size_t *olen);
@@ -40,7 +40,7 @@ int optsw842_decompress_chunked(size_t numchunks,
 			        const uint8_t *in, size_t isize, const size_t *ilens,
 			        uint8_t *out, size_t osize, size_t *olens);
 
-extern struct lib842_implementation optsw842_implementation;
+const struct lib842_implementation *get_optsw842_implementation();
 
 #ifdef __cplusplus
 }

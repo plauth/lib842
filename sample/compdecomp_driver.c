@@ -14,15 +14,6 @@ long long timestamp()
 	return ms;
 }
 
-void *allocate_aligned(size_t size, size_t alignment)
-{
-	if (alignment == 0)
-		return malloc(size);
-
-	size_t padded_size = (size + (alignment - 1)) & ~(alignment - 1);
-	return aligned_alloc(alignment, padded_size);
-}
-
 static size_t nextMultipleOfChunkSize(size_t input, size_t chunk_size)
 {
 	return (input + (chunk_size - 1)) & ~(chunk_size - 1);
@@ -55,7 +46,7 @@ static uint8_t *read_file(const char *file_name, size_t *ilen, size_t chunk_size
 
 	*ilen = nextMultipleOfChunkSize((size_t)flen, chunk_size);
 
-	uint8_t *file_data = allocate_aligned(*ilen, alignment);
+	uint8_t *file_data = aligned_alloc(alignment, *ilen);
 	if (file_data == NULL) {
 		fprintf(stderr, "FAIL: Could not allocate memory to read the file.\n");
 		goto fail_file;
@@ -89,7 +80,7 @@ static uint8_t *get_test_string(size_t *ilen, size_t alignment) {
 	}; //"0011223344556677889900AABBCCDDEE";
 
 	*ilen = sizeof(TEST_STRING);
-	uint8_t *test_string = allocate_aligned(*ilen, alignment);
+	uint8_t *test_string = aligned_alloc(alignment, *ilen);
 	if (test_string == NULL) {
 		fprintf(stderr, "FAIL: Could not allocate memory for the test string.\n");
 		return NULL;
@@ -178,17 +169,17 @@ int compdecomp(const char *file_name, size_t chunk_size, size_t alignment)
 		printf("Running simple test\n");
 
 		size_t olen = ilen * 2;
-		uint8_t *out = allocate_aligned(olen, alignment);
+		uint8_t *out = aligned_alloc(alignment, olen);
 		if (out == NULL) {
-			fprintf(stderr, "FAIL: out = allocate_aligned(...) failed!\n");
+			fprintf(stderr, "FAIL: out = aligned_alloc(...) failed!\n");
 			goto return_free_in;
 		}
 		memset(out, 0, olen);
 
 		size_t dlen = ilen;
-		uint8_t *decompressed = allocate_aligned(dlen, alignment);
+		uint8_t *decompressed = aligned_alloc(alignment, dlen);
 		if (decompressed == NULL) {
-			fprintf(stderr, "FAIL: decompressed = allocate_aligned(...) failed!\n");
+			fprintf(stderr, "FAIL: decompressed = aligned_alloc(...) failed!\n");
 			goto return_free_out;
 		}
 		memset(decompressed, 0, dlen);

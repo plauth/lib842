@@ -13,15 +13,17 @@ static const uint8_t INVALID_BITSTREAM[] = {
 
 int main(int argc, char *argv[])
 {
-	const struct test842_impl *impl;
+	const struct lib842_implementation *impl;
 	if (argc != 2 || (impl = test842_get_impl_by_name(argv[1])) == NULL) {
 		printf("test_decompress_crcerror IMPL\n");
 		return EXIT_FAILURE;
 	}
 
-	uint8_t out[sizeof(INVALID_BITSTREAM) * 2];
-	size_t olen = sizeof(out);
-	int err = impl->decompress(INVALID_BITSTREAM, sizeof(INVALID_BITSTREAM), out, &olen);
+	uint8_t *in = aligned_alloc(impl->required_alignment, sizeof(INVALID_BITSTREAM));
+	memcpy(in, INVALID_BITSTREAM, sizeof(INVALID_BITSTREAM));
+	size_t olen = sizeof(INVALID_BITSTREAM) * 2;
+	uint8_t *out = aligned_alloc(impl->required_alignment, olen);
+	int err = impl->decompress(in, sizeof(INVALID_BITSTREAM), out, &olen);
 	// FIXME TESTFAILURE: This test fails on the OpenCL implementation because
 	//                    it currently doesn't check that the CRC is valid
 	if (err == 0 && strcmp(argv[1], "cl") == 0) {

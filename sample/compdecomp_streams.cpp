@@ -15,19 +15,21 @@
 #include <functional>
 #include <iostream>
 #include <sstream>
+#include <stdlib.h> // Hacky use of C11 aligned_alloc,
+		    // since std::aligned_alloc is not available until C++17
 
 #if defined(USEAIX)
 #include <lib842/aix.h>
-#define lib842impl aix842_implementation
+#define lib842impl (*get_aix842_implementation())
 #elif defined(USEHW)
 #include <lib842/hw.h>
-#define lib842impl hw842_implementation
+#define lib842impl (*get_hw842_implementation())
 #elif defined(USEOPTSW)
 #include <lib842/sw.h>
-#define lib842impl optsw842_implementation
+#define lib842impl (*get_optsw842_implementation())
 #else
 #include <lib842/sw.h>
-#define lib842impl sw842_implementation
+#define lib842impl (*get_sw842_implementation())
 #endif
 
 #include <lib842/stream/comp.h>
@@ -100,9 +102,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			     long long *time_condense,
 			     long long *time_decomp) {
 	std::unique_ptr<uint8_t, free_ptr> decompressed(
-		static_cast<uint8_t *>(allocate_aligned(ilen, lib842impl.alignment)));
+		static_cast<uint8_t *>(aligned_alloc(lib842impl.preferred_alignment, ilen)));
 	if (decompressed.get() == nullptr) {
-		fprintf(stderr, "FAIL: decompressed = allocate_aligned(...) failed!\n");
+		fprintf(stderr, "FAIL: decompressed = aligned_alloc(...) failed!\n");
 		return false;
 	}
 	std::memset(decompressed.get(), 0, ilen);
@@ -112,9 +114,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		std::vector<std::unique_ptr<uint8_t, free_ptr>> outp;
 		for (size_t i = 0; i < ilen / lib842::stream::CHUNK_SIZE; i++) {
 			std::unique_ptr<uint8_t, free_ptr> out(
-				static_cast<uint8_t *>(allocate_aligned(lib842::stream::CHUNK_SIZE * 2, lib842impl.alignment)));
+				static_cast<uint8_t *>(aligned_alloc(lib842impl.preferred_alignment, lib842::stream::CHUNK_SIZE * 2)));
 			if (out.get() == nullptr) {
-				fprintf(stderr, "FAIL: out = allocate_aligned(...) failed!\n");
+				fprintf(stderr, "FAIL: out = aligned_alloc(...) failed!\n");
 				return false;
 			}
 			memset(out.get(), 0, ilen * 2);
@@ -150,7 +152,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		std::mutex comp_blocks_mutex;
 		bool comp_error = false;
 		lib842::stream::DataCompressionStream cstream(
-			lib842impl.compress, num_threads, thread_policy,
+			lib842impl, num_threads, thread_policy,
 			get_log_error, get_log_debug);
 		cstream.wait_until_ready();
 
@@ -196,7 +198,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// -------------
 	{
 		lib842::stream::DataDecompressionStream dstream(
-			lib842impl.decompress, num_threads, thread_policy,
+			lib842impl, num_threads, thread_policy,
 			get_log_error, get_log_debug);
 
 		dstream.wait_until_ready();
@@ -282,5 +284,5 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 int main(int argc, const char *argv[])
 {
 	return compdecomp(argc > 1 ? argv[1] : nullptr,
-		lib842::stream::BLOCK_SIZE, lib842impl.alignment);
+		lib842::stream::BLOCK_SIZE, lib842impl.preferred_alignment);
 }

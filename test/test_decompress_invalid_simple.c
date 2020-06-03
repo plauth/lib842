@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include "test_util.h"
 
@@ -13,16 +14,18 @@ static const uint8_t INVALID_BITSTREAM[] = {
 
 int main(int argc, char *argv[])
 {
-	const struct test842_impl *impl;
+	const struct lib842_implementation *impl;
 	if (argc != 2 || (impl = test842_get_impl_by_name(argv[1])) == NULL) {
 		printf("test_decompress_invalid_simple IMPL\n");
 		return EXIT_FAILURE;
 	}
 
-	uint8_t out[sizeof(INVALID_BITSTREAM) * 2];
-	size_t olen = sizeof(out);
-	if (impl->decompress(INVALID_BITSTREAM, sizeof(INVALID_BITSTREAM), out,
-			     &olen) != -EINVAL) {
+
+	uint8_t *in = aligned_alloc(impl->required_alignment, sizeof(INVALID_BITSTREAM));
+	memcpy(in, INVALID_BITSTREAM, sizeof(INVALID_BITSTREAM));
+	size_t olen = sizeof(INVALID_BITSTREAM) * 2;
+	uint8_t *out = aligned_alloc(impl->required_alignment, olen);
+	if (impl->decompress(in, sizeof(INVALID_BITSTREAM), out, &olen) != -EINVAL) {
 		printf("Decompression should have failed with EINVAL\n");
 		return EXIT_FAILURE;
 	}

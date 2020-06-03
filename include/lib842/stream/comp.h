@@ -10,6 +10,7 @@
 
 #include <lib842/detail/barrier.h>
 #include <lib842/detail/latch.h>
+#include <lib842/detail/free_unique_ptr.h>
 
 #include <lib842/stream/common.h>
 #include <lib842/common.h>
@@ -45,10 +46,10 @@ public:
 		std::array<size_t, NUM_CHUNKS_PER_BLOCK> sizes;
 
 		// Buffer that owns the pointers used in 'datas'. Used internally.
-		std::unique_ptr<uint8_t[]> compress_buffer;
+		detail::free_unique_ptr<uint8_t> compress_buffer;
 	};
 
-	DataCompressionStream(lib842_compress_func compress842_func,
+	DataCompressionStream(const lib842_implementation &impl842,
 			      unsigned int num_threads,
 			      thread_policy thread_policy_,
 			      std::function<std::ostream&(void)> error_logger,
@@ -91,7 +92,7 @@ private:
 	void loop_compress_thread(size_t thread_id);
 	compress_block handle_block(size_t offset, stats_per_thread_t &stats);
 
-	lib842_compress_func _compress842_func;
+	const lib842_implementation &_impl842;
 	std::function<std::ostream&(void)> _error_logger;
 	std::function<std::ostream&(void)> _debug_logger;
 

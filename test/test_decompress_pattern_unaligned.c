@@ -5,18 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdalign.h>
-#include <signal.h>
 #include "test_patterns.h"
 #include "test_util.h"
 
-void pass_on_sigbus(int signo) {
-	printf("Got SIGBUS (likely platform does not support unaligned pointers)\n");
-	exit(EXIT_SUCCESS);
-}
-
 int main(int argc, char *argv[])
 {
-	const struct test842_impl *impl;
+	const struct lib842_implementation *impl;
 	const struct test842_pattern *pattern;
 	if (argc != 3 || (impl = test842_get_impl_by_name(argv[1])) == NULL ||
 	    (pattern = test842_get_pattern_by_name(argv[2])) == NULL) {
@@ -24,10 +18,10 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	// The optimized software implementation relies on unaligned pointer
-	// access being supported by the platform, so don't fail if it doesn't
-	if (strcmp(argv[1], "optsw") == 0)
-		signal(SIGBUS, pass_on_sigbus);
+	if (impl->required_alignment != 1) {
+		printf("Implementation does not support unaligned buffers; Test pass\n");
+		return EXIT_SUCCESS;
+	}
 
 	// Note: We overallocate the output buffer a bit (5 bytes), to make sure
 	// the decompressor recovers the correct uncompressed length
@@ -44,8 +38,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (olen != pattern->uncompressed_len ||
-	    memcmp(out, pattern->uncompressed, pattern->uncompressed_len) !=
-		    0) {
+	    memcmp(out, pattern->uncompressed, pattern->uncompressed_len) != 0) {
 		printf("Invalid decompression result\n");
 		printf("Input (%zu bytes):\n", pattern->compressed_len);
 		test842_hexdump(pattern->compressed, pattern->compressed_len);
