@@ -22,6 +22,7 @@
 #include "kerneldeps.h"
 #include "../common/crc32.h"
 #include "../common/endianness.h"
+#include "../common/trivial_chunked.h"
 #include <lib842/sw.h>
 
 #include <stdio.h>

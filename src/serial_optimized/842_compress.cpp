@@ -22,6 +22,7 @@
 #include "../common/endianness.h"
 #include "../common/memaccess.h"
 #include "../common/crc32.h"
+#include "../common/trivial_chunked.h"
 
 #include <cstdio>
 #include <cstdint>
