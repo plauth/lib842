@@ -2,6 +2,7 @@
 #define LIB842_HW_H
 
 #include <lib842/config.h>
+#include <lib842/common.h>
 
 #ifdef LIB842_HAVE_CRYPTODEV_LINUX_COMP
 
@@ -27,6 +28,8 @@ int hw842_compress_chunked(size_t numchunks,
 int hw842_decompress_chunked(size_t numchunks,
 			     const uint8_t *in, size_t isize, const size_t *ilens,
 			     uint8_t *out, size_t osize, size_t *olens);
+
+extern struct lib842_implementation hw842_implementation;
 
 #ifdef __cplusplus
 }

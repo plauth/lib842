@@ -691,3 +691,13 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 
 	return 0;
 }
+
+LIB842_DEFINE_TRIVIAL_CHUNKED_COMPRESS(optsw842_decompress_chunked, optsw842_decompress)
+LIB842_DEFINE_TRIVIAL_CHUNKED_DECOMPRESS(optsw842_compress_chunked, optsw842_compress)
+struct lib842_implementation optsw842_implementation = {
+	optsw842_compress,
+	optsw842_decompress,
+	optsw842_compress_chunked,
+	optsw842_decompress_chunked,
+	0
+};

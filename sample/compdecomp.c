@@ -7,65 +7,35 @@
 #include <stdbool.h>
 #include "compdecomp_driver.h"
 
-#define CHUNKED_FROM_SIMPLE(chunked_compress_func, simple_compress_func) \
-static int chunked_compress_func(size_t numchunks, \
-				 const uint8_t *in, size_t isize, const size_t *ilens, \
-				 uint8_t *out, size_t osize, size_t *olens) { \
-	int ret; \
-	unsigned i, soffset, doffset; \
-	unsigned int sstride = isize / numchunks; \
-	unsigned int dstride = osize / numchunks; \
- \
-	for (i = 0, soffset = 0, doffset = 0; \
-	     i < numchunks; \
-	     i++, soffset += sstride, doffset += dstride) { \
-		ret = simple_compress_func( \
-			in + soffset, ilens[i], \
-			out + doffset, &olens[i]); \
-		if (ret) \
-			return ret; \
-	} \
- \
-	return 0; \
-}
-
 #if defined(USEAIX)
 #include <sys/types.h>
 #include <sys/vminfo.h>
-#define ALIGNMENT 4096
-static int accel_decompress_simple(const uint8_t *in, size_t ilen,
-				   uint8_t *out, size_t *olen) {
-	return accel_decompress(in, ilen, out, olen, 0);
-}
-static int accel_compress_simple(const uint8_t *in, size_t ilen,
-				 uint8_t *out, size_t *olen) {
+static int aix842_compress(const uint8_t *in, size_t ilen,
+			   uint8_t *out, size_t *olen) {
 	return accel_compress(in, ilen, out, olen, 0);
 }
-#define lib842_decompress(in, ilen, out, olen) accel_decompress_simple
-#define lib842_compress(in, ilen, out, olen) accel_compress_simple
-CHUNKED_FROM_SIMPLE(lib842_decompress_chunked, accel_decompress_simple)
-CHUNKED_FROM_SIMPLE(lib842_compress_chunked, accel_compress_simple)
+static int aix842_decompress(const uint8_t *in, size_t ilen,
+			     uint8_t *out, size_t *olen) {
+	return accel_decompress(in, ilen, out, olen, 0);
+}
+LIB842_DEFINE_TRIVIAL_CHUNKED_COMPRESS(aix842_compress_chunked, aix842_compress)
+LIB842_DEFINE_TRIVIAL_CHUNKED_DECOMPRESS(aix842_decompress_chunked, aix842_decompress)
+static lib842_implementation lib842impl = {
+	aix842_compress,
+	aix842_decompress,
+	aix842_compress_chunked,
+	aix842_decompress_chunked,
+	4096
+};
 #elif defined(USEHW)
 #include <lib842/hw.h>
-#define ALIGNMENT 0
-#define lib842_decompress hw842_decompress
-#define lib842_compress hw842_compress
-#define lib842_decompress_chunked hw842_decompress_chunked
-#define lib842_compress_chunked hw842_compress_chunked
+#define lib842impl hw842_implementation
 #elif defined(USEOPTSW)
 #include <lib842/sw.h>
-#define ALIGNMENT 0
-#define lib842_decompress optsw842_decompress
-#define lib842_compress optsw842_compress
-CHUNKED_FROM_SIMPLE(lib842_decompress_chunked, optsw842_decompress)
-CHUNKED_FROM_SIMPLE(lib842_compress_chunked, optsw842_compress)
+#define lib842impl optsw842_implementation
 #else
 #include <lib842/sw.h>
-#define ALIGNMENT 0
-#define lib842_decompress sw842_decompress
-#define lib842_compress sw842_compress
-CHUNKED_FROM_SIMPLE(lib842_decompress_chunked, sw842_decompress)
-CHUNKED_FROM_SIMPLE(lib842_compress_chunked, sw842_compress)
+#define lib842impl sw842_implementation
 #endif
 
 #define CHUNKS_PER_BATCH 16
@@ -87,14 +57,14 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	bool ret = false;
 	bool omp_success = true;
 
-	uint8_t *out = allocate_aligned(ilen * 2, ALIGNMENT);
+	uint8_t *out = allocate_aligned(ilen * 2, lib842impl.alignment);
 	if (out == NULL) {
 		fprintf(stderr, "FAIL: out = allocate_aligned(...) failed!\n");
 		return ret;
 	}
 	memset(out, 0, ilen * 2);
 
-	uint8_t *decompressed = allocate_aligned(ilen, ALIGNMENT);
+	uint8_t *decompressed = allocate_aligned(ilen, lib842impl.alignment);
 	if (decompressed == NULL) {
 		fprintf(stderr, "FAIL: decompressed = allocate_aligned(...) failed!\n");
 		goto exit_free_out;
@@ -140,13 +110,13 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		for (size_t i = 0; i < batch_chunks; i++)
 			compressed_chunk_sizes[chunk_num + i] = CHUNK_SIZE * 2;
 #if CHUNKS_PER_BATCH > 1
-		int err = lib842_compress_chunked(
+		int err = lib842impl.compress_chunked(
 			batch_chunks,
 			chunk_in, CHUNK_SIZE * batch_chunks, input_chunk_sizes,
 			chunk_out, CHUNK_SIZE * 2 * batch_chunks, &compressed_chunk_sizes[chunk_num]);
 #else
-		int err = lib842_compress(chunk_in, CHUNK_SIZE, chunk_out,
-					  &compressed_chunk_sizes[chunk_num]);
+		int err = lib842impl.compress(chunk_in, CHUNK_SIZE, chunk_out,
+					      &compressed_chunk_sizes[chunk_num]);
 #endif
 		if (err != 0) {
 			bool is_first_failure;
@@ -216,14 +186,14 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		for (size_t i = 0; i < batch_chunks; i++)
 			decompressed_chunk_sizes[chunk_num + i] = CHUNK_SIZE;
 #if CHUNKS_PER_BATCH > 1
-		int err = lib842_decompress_chunked(
+		int err = lib842impl.decompress_chunked(
 			batch_chunks,
 			chunk_out, CHUNK_SIZE * 2 * batch_chunks, &compressed_chunk_sizes[chunk_num],
 			chunk_decomp, CHUNK_SIZE * batch_chunks, &decompressed_chunk_sizes[chunk_num]);
 #else
-		int err = lib842_decompress(chunk_out,
-					    compressed_chunk_sizes[chunk_num],
-					    chunk_decomp, &decompressed_chunk_sizes[chunk_num]);
+		int err = lib842impl.decompress(chunk_out,
+					        compressed_chunk_sizes[chunk_num],
+					        chunk_decomp, &decompressed_chunk_sizes[chunk_num]);
 #endif
 
 		if (err != 0) {
@@ -283,14 +253,14 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 {
 	int err;
 
-	err = lib842_compress(in, ilen, out, olen);
+	err = lib842impl.compress(in, ilen, out, olen);
 	if (err != 0) {
 		fprintf(stderr, "Error during compression (%d): %s\n",
 			-err, strerror(-err));
 		return false;
 	}
 
-	err = lib842_decompress(out, *olen, decompressed, dlen);
+	err = lib842impl.decompress(out, *olen, decompressed, dlen);
 	if (err != 0) {
 		fprintf(stderr, "Error during decompression (%d): %s\n",
 			-err, strerror(-err));
@@ -302,5 +272,5 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 
 int main(int argc, const char *argv[])
 {
-	return compdecomp(argc > 1 ? argv[1] : NULL, CHUNK_SIZE, ALIGNMENT);
+	return compdecomp(argc > 1 ? argv[1] : NULL, CHUNK_SIZE, lib842impl.alignment);
 }

@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// ----------------------------------------
-// Common interface for all implementations
-// ----------------------------------------
+// -----------------------------------------------------------
+// Common interface for implementations working in main memory
+// -----------------------------------------------------------
 
 // Compresses a sequence of bytes in single chunk mode
 // in: Input buffer containing the data to be compressed
@@ -27,6 +27,64 @@ typedef int (*lib842_compress_func)(const uint8_t *in, size_t ilen,
 // Returns: 0 on success, a negative value (errno) on failure
 typedef int (*lib842_decompress_func)(const uint8_t *in, size_t ilen,
 				      uint8_t *out, size_t *olen);
+
+// Compresses sequences of bytes in multiple chunk mode
+// This is functionally equivalent to calling a lib842_compress_func
+// in succession, but may allow better use of the available resources
+// (note, however, that it does *not* involve multithreading)
+//
+// 'isize' and 'osize' are the total sizes of the input and output buffers, where
+// chunks are evenly spaced by (isize / numchunks) and (osize / numchunks) bytes
+typedef int (*lib842_compress_chunked_func)(
+	size_t numchunks,
+	const uint8_t *in, size_t isize, const size_t *ilens,
+	uint8_t *out, size_t osize, size_t *olens);
+
+// Decompresses sequences of bytes in multiple chunk mode
+// This is functionally equivalent to calling a lib842_decompress_func
+// in succession, but may allow better use of the available resources
+// (note, however, that it does *not* involve multithreading)
+//
+// 'isize' and 'osize' are the total sizes of the input and output buffers, where
+// chunks are evenly spaced by (isize / numchunks) and (osize / numchunks) bytes
+typedef int (*lib842_decompress_chunked_func)(
+	size_t numchunks,
+	const uint8_t *in, size_t isize, const size_t *ilens,
+	uint8_t *out, size_t osize, size_t *olens);
+
+struct lib842_implementation {
+	lib842_compress_func compress;
+	lib842_decompress_func decompress;
+	lib842_compress_chunked_func compress_chunked;
+	lib842_decompress_chunked_func decompress_chunked;
+	size_t alignment;
+};
+
+// Defines the multi-chunk versions of the compression and decompression functions
+// by just calling the single-chunk versions sequentially, for cases where the
+// implementation can't benefit from batching of multiple chunks
+#define LIB842_DEFINE_TRIVIAL_CHUNKED_COMPRESS(chunked_compress_func, simple_compress_func) \
+int chunked_compress_func(size_t numchunks, \
+			  const uint8_t *in, size_t isize, const size_t *ilens, \
+			  uint8_t *out, size_t osize, size_t *olens) { \
+	int ret; \
+	unsigned int sstride = isize / numchunks; \
+	unsigned int dstride = osize / numchunks; \
+ \
+	for (unsigned int i = 0, soffset = 0, doffset = 0; \
+	     i < numchunks; \
+	     i++, soffset += sstride, doffset += dstride) { \
+		ret = simple_compress_func( \
+			in + soffset, ilens[i], \
+			out + doffset, &olens[i]); \
+		if (ret) \
+			return ret; \
+	} \
+ \
+	return 0; \
+}
+
+#define LIB842_DEFINE_TRIVIAL_CHUNKED_DECOMPRESS LIB842_DEFINE_TRIVIAL_CHUNKED_COMPRESS
 
 // TODOXXX add prototypes for 'chunked' compression modes,
 //         required / preferred alignments

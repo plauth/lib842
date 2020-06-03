@@ -303,3 +303,11 @@ int hw842_decompress_chunked(size_t numchunks,
 				     in, isize, ilens,
 				     out, osize, olens);
 }
+
+struct lib842_implementation hw842_implementation = {
+	hw842_compress,
+	hw842_decompress,
+	hw842_compress_chunked,
+	hw842_decompress_chunked,
+	0
+};

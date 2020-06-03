@@ -19,28 +19,32 @@
 #if defined(USEAIX)
 #include <sys/types.h>
 #include <sys/vminfo.h>
-#define ALIGNMENT 4096
-static int lib842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen) {
-	return accel_decompress(in, ilen, out, olen, 0);
-}
-static int lib842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen) {
+static int aix842_compress(const uint8_t *in, size_t ilen,
+			   uint8_t *out, size_t *olen) {
 	return accel_compress(in, ilen, out, olen, 0);
 }
+static int aix842_decompress(const uint8_t *in, size_t ilen,
+			     uint8_t *out, size_t *olen) {
+	return accel_decompress(in, ilen, out, olen, 0);
+}
+LIB842_DEFINE_TRIVIAL_CHUNKED_COMPRESS(aix842_compress_chunked, aix842_compress)
+LIB842_DEFINE_TRIVIAL_CHUNKED_DECOMPRESS(aix842_decompress_chunked, aix842_decompress)
+static lib842_implementation lib842impl = {
+	aix842_compress,
+	aix842_decompress,
+	aix842_compress_chunked,
+	aix842_decompress_chunked,
+	4096
+};
 #elif defined(USEHW)
 #include <lib842/hw.h>
-#define ALIGNMENT 0
-#define lib842_decompress hw842_decompress
-#define lib842_compress hw842_compress
+#define lib842impl hw842_implementation
 #elif defined(USEOPTSW)
 #include <lib842/sw.h>
-#define ALIGNMENT 0
-#define lib842_decompress optsw842_decompress
-#define lib842_compress optsw842_compress
+#define lib842impl optsw842_implementation
 #else
 #include <lib842/sw.h>
-#define ALIGNMENT 0
-#define lib842_decompress sw842_decompress
-#define lib842_compress sw842_compress
+#define lib842impl sw842_implementation
 #endif
 
 #include <lib842/stream/comp.h>
@@ -113,7 +117,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			     long long *time_condense,
 			     long long *time_decomp) {
 	std::unique_ptr<uint8_t, free_ptr> decompressed(
-		static_cast<uint8_t *>(allocate_aligned(ilen, ALIGNMENT)));
+		static_cast<uint8_t *>(allocate_aligned(ilen, lib842impl.alignment)));
 	if (decompressed.get() == nullptr) {
 		fprintf(stderr, "FAIL: decompressed = allocate_aligned(...) failed!\n");
 		return false;
@@ -125,7 +129,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		std::vector<std::unique_ptr<uint8_t, free_ptr>> outp;
 		for (size_t i = 0; i < ilen / lib842::stream::CHUNK_SIZE; i++) {
 			std::unique_ptr<uint8_t, free_ptr> out(
-				static_cast<uint8_t *>(allocate_aligned(lib842::stream::CHUNK_SIZE * 2, ALIGNMENT)));
+				static_cast<uint8_t *>(allocate_aligned(lib842::stream::CHUNK_SIZE * 2, lib842impl.alignment)));
 			if (out.get() == nullptr) {
 				fprintf(stderr, "FAIL: out = allocate_aligned(...) failed!\n");
 				return false;
@@ -163,7 +167,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		std::mutex comp_blocks_mutex;
 		bool comp_error = false;
 		lib842::stream::DataCompressionStream cstream(
-			lib842_compress, num_threads, thread_policy,
+			lib842impl.compress, num_threads, thread_policy,
 			get_log_error, get_log_debug);
 		cstream.wait_until_ready();
 
@@ -209,7 +213,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// -------------
 	{
 		lib842::stream::DataDecompressionStream dstream(
-			lib842_decompress, num_threads, thread_policy,
+			lib842impl.decompress, num_threads, thread_policy,
 			get_log_error, get_log_debug);
 
 		dstream.wait_until_ready();
@@ -275,14 +279,14 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 {
 	int err;
 
-	err = lib842_compress(in, ilen, out, olen);
+	err = lib842impl.compress(in, ilen, out, olen);
 	if (err != 0) {
 		fprintf(stderr, "Error during compression (%d): %s\n",
 			-err, strerror(-err));
 		return false;
 	}
 
-	err = lib842_decompress(out, *olen, decompressed, dlen);
+	err = lib842impl.decompress(out, *olen, decompressed, dlen);
 	if (err != 0) {
 		fprintf(stderr, "Error during decompression (%d): %s\n",
 			-err, strerror(-err));
@@ -295,5 +299,5 @@ bool simple_test_core(const uint8_t *in, size_t ilen,
 int main(int argc, const char *argv[])
 {
 	return compdecomp(argc > 1 ? argv[1] : nullptr,
-		lib842::stream::BLOCK_SIZE, ALIGNMENT);
+		lib842::stream::BLOCK_SIZE, lib842impl.alignment);
 }
