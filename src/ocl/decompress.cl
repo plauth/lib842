@@ -138,7 +138,8 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 #endif
 		p->in++;
 		value |= p->buffer >> (WSIZE - (n - p->bits));
-		p->buffer <<= n - p->bits;
+		// Avoid shift by 64 (only shifts of strictly less bits bits are allowed by the standard)
+		p->buffer = ((p->buffer << (n - p->bits - 1)) << 1);
 		p->bits += WSIZE - n;
 		p->buffer *= (p->bits > 0);
 	} else {
