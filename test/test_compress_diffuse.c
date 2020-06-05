@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <errno.h>
 #include "test_util.h"
 
 #define BUFFER_SIZE 2048

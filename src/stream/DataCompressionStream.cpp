@@ -232,7 +232,7 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 
 
 DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t offset,
-									  stats_per_thread_t &stats) {
+									  stats_per_thread_t &stats) const {
 	compress_block block;
 	block.source_offset = offset;
 	if (_skip_compress_step) {

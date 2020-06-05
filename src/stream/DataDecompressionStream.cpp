@@ -204,7 +204,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 }
 
 bool DataDecompressionStream::handle_block(const decompress_block &block,
-					   stats_per_thread_t &stats) {
+					   stats_per_thread_t &stats) const {
 	// TODOXXX use chunked mode
 	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 		const auto &chunk = block.chunks[i];

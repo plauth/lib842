@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdalign.h>
 #include "test_patterns.h"
 #include "test_util.h"
 

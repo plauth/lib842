@@ -5,15 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdalign.h>
-#include <signal.h>
 #include <errno.h>
 #include "test_patterns.h"
 #include "test_util.h"
-
-void pass_on_sigbus(int signo) {
-	printf("Got SIGBUS (likely platform does not support unaligned pointers)\n");
-	exit(EXIT_SUCCESS);
-}
 
 int main(int argc, char *argv[])
 {

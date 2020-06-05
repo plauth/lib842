@@ -334,4 +334,4 @@ const struct lib842_implementation *get_hw842_implementation() {
 		hw842_implementation.preferred_alignment = sysconf(_SC_PAGESIZE);
 
 	return &hw842_implementation;
-};
+}

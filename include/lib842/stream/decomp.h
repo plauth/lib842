@@ -98,7 +98,7 @@ private:
 
 	void loop_decompress_thread(size_t thread_id);
 	bool handle_block(const decompress_block &block,
-			  stats_per_thread_t &stats);
+			  stats_per_thread_t &stats) const;
 
 	const lib842_implementation &_impl842;
 	std::function<std::ostream&(void)> _error_logger;

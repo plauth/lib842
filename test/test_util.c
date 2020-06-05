@@ -1,7 +1,6 @@
 #include "test_util.h"
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
 #include <lib842/sw.h>
 #include <lib842/hw.h>
 #include <lib842/cl.h>

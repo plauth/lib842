@@ -710,4 +710,4 @@ const struct lib842_implementation *get_optsw842_implementation() {
 		.preferred_alignment = sizeof(uint64_t)
 	};
 	return &optsw842_implementation;
-};
+}

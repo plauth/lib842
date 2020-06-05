@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <errno.h>
 #include "test_util.h"
 
 static unsigned xorshift_seed = 12345;

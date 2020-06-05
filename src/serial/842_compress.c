@@ -701,4 +701,4 @@ const struct lib842_implementation *get_sw842_implementation() {
 		.preferred_alignment = 1
 	};
 	return &sw842_implementation;
-};
+}

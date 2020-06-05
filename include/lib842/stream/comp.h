@@ -90,7 +90,7 @@ private:
 	};
 
 	void loop_compress_thread(size_t thread_id);
-	compress_block handle_block(size_t offset, stats_per_thread_t &stats);
+	compress_block handle_block(size_t offset, stats_per_thread_t &stats) const;
 
 	const lib842_implementation &_impl842;
 	std::function<std::ostream&(void)> _error_logger;
