@@ -52,75 +52,6 @@ struct sw842_param_decomp {
 /* number of bits in a buffered word */
 #define WSIZE 64 //sizeof(uint64_t)
 
-#if defined(BRANCH_FREE) && BRANCH_FREE == 1
-static const uint16_t fifo_sizes[9] = { 0, 0, I2_FIFO_SIZE, 0, I4_FIFO_SIZE, 0,
-				        0, 0, I8_FIFO_SIZE };
-
-static const uint8_t dec_templates[26][4][2] = {
-	// params size in bits
-	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
-	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x02: { D4, I2, D2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x03: { D4, I2, I2, N0 }, 48 bits
-
-	{ OP_DEC_D4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x04: { D4, I4, N0, N0 }, 41 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x05: { D2, I2, D4, N0 }, 56 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x06: { D2, I2, D2, I2 }, 48 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x07: { D2, I2, I2, D2 }, 48 bits
-
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x08: { D2, I2, I2, I2 }, 40 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x09: { D2, I2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_D4, OP_DEC_N0 }, // 0x0a: { I2, D2, D4, N0 }, 56 bits
-	{ OP_DEC_I2, OP_DEC_D4, OP_DEC_I2, OP_DEC_N0 }, // 0x0b: { I2, D4, I2, N0 }, 48 bits
-
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_D2 }, // 0x0c: { I2, D2, I2, D2 }, 48 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2 }, // 0x0d: { I2, D2, I2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0 }, // 0x0e: { I2, D2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x0f: { I2, I2, D4, N0 }, 48 bits
-
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x10: { I2, I2, D2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x11: { I2, I2, I2, D2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x12: { I2, I2, I2, I2 }, 32 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x13: { I2, I2, I4, N0 }, 25 bits
-
-	{ OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0 }, // 0x14: { I4, D4, N0, N0 }, 41 bits
-	{ OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x15: { I4, D2, I2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x16: { I4, I2, D2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x17: { I4, I2, I2, N0 }, 25 bits
-
-	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
-	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
-};
-static const uint8_t bits_per_op[26] = {
-	64,
-	56,
-	56,
-	48,
-	41,
-	56,
-	48,
-	48,
-	40,
-	33,
-	56,
-	48,
-	48,
-	40,
-	33,
-	48,
-	40,
-	40,
-	32,
-	25,
-	41,
-	33,
-	33,
-	25,
-	18,
-	8
-};
-#endif
-
 /* read a single uint64_t from memory */
 static inline uint64_t read_word(struct sw842_param_decomp *p)
 {
@@ -276,7 +207,10 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 		return;
 	}
 #endif
-	uint8_t opbits = bits_per_op[op];
+
+	// TODOXXX explain the patterns those formulas are based on
+	uint8_t opbits = 64 - ((op % 5) + 1) / 2 * 8 - ((op % 5) / 4) * 7
+			    - ((op / 5) + 1) / 2 * 8 - ((op / 5) / 4) * 7;
 	uint64_t params = read_bits(p, opbits);
 #ifdef ENABLE_ERROR_HANDLING
 	if (p->errorcode != 0)
@@ -288,10 +222,12 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 		values[i] = 0;
 		values[4 + i] = 0;
 
-		uint8_t dec_template = dec_templates[op][i][0];
-		uint8_t is_index = (dec_template >> 7);
-		uint8_t num_bits = dec_template & 0x7F;
-		uint8_t dst_size = dec_templates[op][i][1];
+		// TODOXXX explain the patterns those formulas are based on
+		uint8_t opchunk = (i < 2) ? op / 5 : op % 5;
+		uint32_t is_index = (i & 1) * (opchunk & 1) + ((i & 1) ^ 1) * (opchunk >= 2);
+		uint32_t dst_size = 2 + (opchunk >= 4) * (1 - 2 * (i % 2)) * 2;
+		uint8_t num_bits = (i & 1) * (16 - (opchunk % 2) * 8 - (opchunk >= 4) * 16) +
+				   ((i & 1) ^ 1) * (16 - (opchunk / 2) * 8 + (opchunk >= 4) * 9);
 
 		// https://stackoverflow.com/a/28703383
 		uint64_t bitsmask = ((uint64_t)-(num_bits != 0)) &
@@ -300,14 +236,15 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 			(params >> (opbits - num_bits)) & bitsmask;
 		opbits -= num_bits;
 
+		// TODOXXX explain how this relates to In_FIFO_SIZE constants
 #ifdef ENABLE_ERROR_HANDLING
 		uint64_t offset = is_index ? get_index(p, dst_size,
-			values[4 + i], fifo_sizes[dst_size]) : 0;
+			values[4 + i], 2048 - 1536 * ((dst_size >> 2) < 1)) : 0;
 		if (p->errorcode != 0)
 			return;
 #else
 		uint64_t offset = get_index(p, dst_size,
-			values[4 + i], fifo_sizes[dst_size]);
+			values[4 + i], 2048 - 1536 * ((dst_size >> 2) < 1));
 #endif
 		memcpy(&values[4 + i],
 		       &p->ostart[offset * is_index], dst_size * is_index);
@@ -569,14 +506,34 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 			break;
 		case OP_END:
 			break;
-		default:
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
+		case (OPS_MAX - 1): {
+			uint64_t value = read_bits(&p, 8);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+#endif
+			uint64_t offset = get_index(&p, 8, value, I8_FIFO_SIZE);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+			if (p.out - p.ostart + 8 > p.olen) {
+				return -ENOSPC;
+			}
+#endif
+			memcpy(&value, &p.ostart[offset], 8);
+			write64(p.out, value);
+			p.out += 8;
+		}
+		break;
+		default:
 			do_op(&p, op);
 #ifdef ENABLE_ERROR_HANDLING
 			if (p.errorcode != 0)
 				return p.errorcode;
 #endif
 #else
+		default:
 			fprintf(stderr, "Invalid op template: %" PRIx64 "\n", op);
 			return -EINVAL;
 #endif
