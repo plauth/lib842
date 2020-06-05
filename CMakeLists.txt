@@ -244,7 +244,8 @@ if(STANDALONE_BUILD AND BUILD_TESTING)
                  test_decompress_pattern_barelysmall
                  test_decompress_invalid_simple
                  test_decompress_invalid_generator
-                 test_decompress_crcerror)
+                 test_decompress_crcerror
+                 test_decompress_boundscheck)
         add_executable(${test} test/${test}.c test/test_patterns.c test/test_util.c)
         target_link_libraries(${test} 842)
     endforeach()
@@ -285,5 +286,6 @@ if(STANDALONE_BUILD AND BUILD_TESTING)
         add_test(test_decompress_invalid_simple_${IMPL} test_decompress_invalid_simple ${IMPL})
         add_test(test_decompress_invalid_generator_${IMPL} test_decompress_invalid_generator ${IMPL})
         add_test(test_decompress_crcerror_${IMPL} test_decompress_crcerror ${IMPL})
+        add_test(test_decompress_boundscheck_${IMPL} test_decompress_boundscheck ${IMPL})
     endforeach()
 endif()

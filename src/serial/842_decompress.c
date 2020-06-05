@@ -220,6 +220,9 @@ static int __do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, 
 		       (unsigned long)beN_to_cpu(&p->ostart[offset], size));
 #endif
 
+	if (size > p->olen)
+		return -ENOSPC;
+
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;
 	p->olen -= size;
@@ -357,6 +360,9 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 
 			if (!bytes || bytes > SHORT_DATA_BITS_MAX)
 				return -EINVAL;
+
+			if (bytes > p.olen)
+				return -ENOSPC;
 
 			while (bytes-- > 0) {
 				ret = next_bits(&p, &tmp, 8);

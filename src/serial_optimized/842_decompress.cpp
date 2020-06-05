@@ -195,6 +195,14 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size,
 	}
 #endif
 
+#ifdef ENABLE_ERROR_HANDLING
+	if (static_cast<size_t>(p->out - p->ostart + size) > p->olen) {
+		if (p->errorcode == 0)
+			p->errorcode = -ENOSPC;
+		return;
+	}
+#endif
+
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;
 }
