@@ -91,6 +91,34 @@ static const uint8_t dec_templates[26][4][2] = {
 	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
 	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
+static const uint8_t bits_per_op[26] = {
+	64,
+	56,
+	56,
+	48,
+	41,
+	56,
+	48,
+	48,
+	40,
+	33,
+	56,
+	48,
+	48,
+	40,
+	33,
+	48,
+	40,
+	40,
+	32,
+	25,
+	41,
+	33,
+	33,
+	25,
+	18,
+	8
+};
 #endif
 
 /* read a single uint64_t from memory */
@@ -107,11 +135,10 @@ static inline uint64_t read_word(struct sw842_param_decomp *p)
 	return w;
 }
 
-/* read 0 <= n <= 64 bits */
+/* read 0 < n <= 64 bits */
 static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 {
-	// Avoid shift by 64 (only shifts of strictly less bits are allowed by the standard)
-	uint64_t value = (n > 0) ? (p->buffer >> (WSIZE - n)) : 0;
+	uint64_t value = p->buffer >> (WSIZE - n);
 	if (p->bits < n) {
 		/* fetch WSIZE bits  */
 		p->buffer = read_word(p);
@@ -128,7 +155,8 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 }
 
 #if (defined(BRANCH_FREE) && BRANCH_FREE == 0) || not defined(BRANCH_FREE)
-template <uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
+template <uint8_t N> static inline void do_data(struct sw842_param_decomp *p,
+						uint64_t data)
 {
 #ifdef ENABLE_ERROR_HANDLING
 	if (static_cast<size_t>(p->out - p->ostart + N) > p->olen) {
@@ -140,13 +168,13 @@ template <uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
 
 	switch (N) {
 	case 2:
-		write16(p->out, swap_be_to_native16(read_bits(p, 16)));
+		write16(p->out, swap_be_to_native16(data));
 		break;
 	case 4:
-		write32(p->out, swap_be_to_native32(read_bits(p, 32)));
+		write32(p->out, swap_be_to_native32(data));
 		break;
 	case 8:
-		write64(p->out, swap_be_to_native64(read_bits(p, 64)));
+		write64(p->out, swap_be_to_native64(data));
 		break;
 	}
 
@@ -154,11 +182,9 @@ template <uint8_t N> static inline void do_data(struct sw842_param_decomp *p)
 }
 
 static inline void do_index(struct sw842_param_decomp *p, uint8_t size,
-			    uint8_t bits, uint64_t fsize)
+			    uint64_t index, uint64_t fsize)
 {
-	uint64_t index, offset, total = round_down(p->out - p->ostart, 8);
-
-	index = read_bits(p, bits);
+	uint64_t offset, total = round_down(p->out - p->ostart, 8);
 
 	offset = index * size;
 
@@ -250,6 +276,13 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 		return;
 	}
 #endif
+	uint8_t opbits = bits_per_op[op];
+	uint64_t params = read_bits(p, opbits);
+#ifdef ENABLE_ERROR_HANDLING
+	if (p->errorcode != 0)
+		return;
+#endif
+
 	for (int i = 0; i < 4; i++) {
 		// 0-initialize all values-fields
 		values[i] = 0;
@@ -260,12 +293,12 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 		uint8_t num_bits = dec_template & 0x7F;
 		uint8_t dst_size = dec_templates[op][i][1];
 
+		// https://stackoverflow.com/a/28703383
+		uint64_t bitsmask = ((uint64_t)-(num_bits != 0)) &
+				    (((uint64_t)-1) >> (64 - num_bits));
 		values[(4 * is_index) + i] =
-			read_bits(p, num_bits);
-#ifdef ENABLE_ERROR_HANDLING
-		if (p->errorcode != 0)
-			return;
-#endif
+			(params >> (opbits - num_bits)) & bitsmask;
+		opbits -= num_bits;
 
 #ifdef ENABLE_ERROR_HANDLING
 		uint64_t offset = is_index ? get_index(p, dst_size,
@@ -345,135 +378,161 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 		switch (op) {
 #if (defined(BRANCH_FREE) && BRANCH_FREE == 0) || not defined(BRANCH_FREE)
 		case 0x00: // { D8, N0, N0, N0 }, 64 bits
-			do_data<8>(&p);
+			rep = read_bits(&p, 64);
+			do_data<8>(&p, rep);
 			break;
 		case 0x01: // { D4, D2, I2, N0 }, 56 bits
-			do_data<4>(&p);
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, 32 + 16 + I2_BITS);
+			do_data<4>(&p, (rep >> 24) & ((1ULL << 32) - 1));
+			do_data<2>(&p, (rep >> 8) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x02: // { D4, I2, D2, N0 }, 56 bits
-			do_data<4>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
+			rep = read_bits(&p, 32 + I2_BITS + 16);
+			do_data<4>(&p, (rep >> 24) & ((1ULL << 32) - 1));
+			do_index(&p, 2, (rep >> 16) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 0) & ((1ULL << 16) - 1));
 			break;
 		case 0x03: // { D4, I2, I2, N0 }, 48 bits
-			do_data<4>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, 32 + I2_BITS + I2_BITS);
+			do_data<4>(&p, (rep >> 16) & ((1ULL << 32) - 1));
+			do_index(&p, 2, (rep >> 8) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x04: // { D4, I4, N0, N0 }, 41 bits
-			do_data<4>(&p);
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			rep = read_bits(&p, 32 + I4_BITS);
+			do_data<4>(&p, (rep >> 9) & ((1ULL << 32) - 1));
+			do_index(&p, 4, (rep >> 0) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
 			break;
 		case 0x05: // { D2, I2, D4, N0 }, 56 bits
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<4>(&p);
+			rep = read_bits(&p, 16 + I2_BITS + 32);
+			do_data<2>(&p, (rep >> 40) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 32) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<4>(&p, (rep >> 0) & ((1ULL << 32) - 1));
 			break;
 		case 0x06: // { D2, I2, D2, I2 }, 48 bits
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, 16 + I2_BITS + 16 + I2_BITS);
+			do_data<2>(&p, (rep >> 32) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 24) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 8) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x07: // { D2, I2, I2, D2 }, 48 bits
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
+			rep = read_bits(&p, 16 + I2_BITS + I2_BITS + 16);
+			do_data<2>(&p, (rep >> 32) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 24) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 16) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 0) & ((1ULL << 16) - 1));
 			break;
 		case 0x08: // { D2, I2, I2, I2 }, 40 bits
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, 16 + I2_BITS + I2_BITS + I2_BITS);
+			do_data<2>(&p, (rep >> 24) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 16) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 8) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x09: // { D2, I2, I4, N0 }, 33 bits
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			rep = read_bits(&p, 16 + I2_BITS + I4_BITS);
+			do_data<2>(&p, (rep >> 17) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 9) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 4, (rep >> 0) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
 			break;
 		case 0x0a: // { I2, D2, D4, N0 }, 56 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
-			do_data<4>(&p);
+			rep = read_bits(&p, I2_BITS + 16 + 32);
+			do_index(&p, 2, (rep >> 48) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 32) & ((1ULL << 16) - 1));
+			do_data<4>(&p, (rep >> 0) & ((1ULL << 32) - 1));
 			break;
 		case 0x0b: // { I2, D4, I2, N0 }, 48 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<4>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, I2_BITS + 32 + I2_BITS);
+			do_index(&p, 2, (rep >> 40) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<4>(&p, (rep >> 8) & ((1ULL << 32) - 1));
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x0c: // { I2, D2, I2, D2 }, 48 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
+			rep = read_bits(&p, I2_BITS + 16 + I2_BITS + 16);
+			do_index(&p, 2, (rep >> 40) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 24) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 16) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 0) & ((1ULL << 16) - 1));
 			break;
 		case 0x0d: // { I2, D2, I2, I2 }, 40 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, I2_BITS + 16 + I2_BITS + I2_BITS);
+			do_index(&p, 2, (rep >> 32) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 16) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 8) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x0e: // { I2, D2, I4, N0 }, 33 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			rep = read_bits(&p, I2_BITS + 16 + I4_BITS);
+			do_index(&p, 2, (rep >> 25) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 9) & ((1ULL << 16) - 1));
+			do_index(&p, 4, (rep >> 0) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
 			break;
 		case 0x0f: // { I2, I2, D4, N0 }, 48 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<4>(&p);
+			rep = read_bits(&p, I2_BITS + I2_BITS + 32);
+			do_index(&p, 2, (rep >> 40) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 32) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<4>(&p, (rep >> 0) & ((1ULL << 32) - 1));
 			break;
 		case 0x10: // { I2, I2, D2, I2 }, 40 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, I2_BITS + I2_BITS + 16 + I2_BITS);
+			do_index(&p, 2, (rep >> 32) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 24) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 8) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x11: // { I2, I2, I2, D2 }, 40 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
+			rep = read_bits(&p, I2_BITS + I2_BITS + I2_BITS + 16);
+			do_index(&p, 2, (rep >> 32) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 24) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 16) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 0) & ((1ULL << 16) - 1));
 			break;
 		case 0x12: // { I2, I2, I2, I2 }, 32 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, I2_BITS + I2_BITS + I2_BITS + I2_BITS);
+			do_index(&p, 2, (rep >> 24) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 16) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 8) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x13: // { I2, I2, I4, N0 }, 25 bits
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			rep = read_bits(&p, I2_BITS + I2_BITS + I4_BITS);
+			do_index(&p, 2, (rep >> 17) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 9) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 4, (rep >> 0) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
 			break;
 		case 0x14: // { I4, D4, N0, N0 }, 41 bits
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-			do_data<4>(&p);
+			rep = read_bits(&p, I4_BITS + 32);
+			do_index(&p, 4, (rep >> 32) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
+			do_data<4>(&p, (rep >> 0) & ((1ULL << 32) - 1));
 			break;
 		case 0x15: // { I4, D2, I2, N0 }, 33 bits
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-			do_data<2>(&p);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, I4_BITS + 16 + I2_BITS);
+			do_index(&p, 4, (rep >> 24) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 8) & ((1ULL << 16) - 1));
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x16: // { I4, I2, D2, N0 }, 33 bits
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_data<2>(&p);
+			rep = read_bits(&p, I4_BITS + I2_BITS + 16);
+			do_index(&p, 4, (rep >> 24) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 16) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_data<2>(&p, (rep >> 0) & ((1ULL << 16) - 1));
 			break;
 		case 0x17: // { I4, I2, I2, N0 }, 25 bits
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
-			do_index(&p, 2, I2_BITS, I2_FIFO_SIZE);
+			rep = read_bits(&p, I4_BITS + I2_BITS + I2_BITS);
+			do_index(&p, 4, (rep >> 16) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 8) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
+			do_index(&p, 2, (rep >> 0) & ((1ULL << I2_BITS) - 1), I2_FIFO_SIZE);
 			break;
 		case 0x18: // { I4, I4, N0, N0 }, 18 bits
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
-			do_index(&p, 4, I4_BITS, I4_FIFO_SIZE);
+			rep = read_bits(&p, I4_BITS + I4_BITS);
+			do_index(&p, 4, (rep >> 9) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
+			do_index(&p, 4, (rep >> 0) & ((1ULL << I4_BITS) - 1), I4_FIFO_SIZE);
 			break;
 		case 0x19: // { I8, N0, N0, N0 }, 8 bits
-			do_index(&p, 8, I8_BITS, I8_FIFO_SIZE);
+			rep = read_bits(&p, I8_BITS);
+			do_index(&p, 8, (rep >> 0) & ((1ULL << I8_BITS) - 1), I8_FIFO_SIZE);
 			break;
 #endif
 		case OP_REPEAT:

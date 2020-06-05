@@ -97,6 +97,34 @@ __constant static const uint8_t dec_templates[26][4][2] = {
 	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
 	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
+__constant static const uint8_t bits_per_op[26] = {
+       64,
+       56,
+       56,
+       48,
+       41,
+       56,
+       48,
+       48,
+       40,
+       33,
+       56,
+       48,
+       48,
+       40,
+       33,
+       48,
+       40,
+       40,
+       32,
+       25,
+       41,
+       33,
+       33,
+       25,
+       18,
+       8
+};
 
 static inline uint64_t swap_be_to_native64(uint64_t value)
 {
@@ -152,8 +180,7 @@ static inline uint16_t swap_native_to_be16(uint16_t value)
 
 static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 {
-	// Avoid shift by 64 (only shifts of strictly less bits are allowed by the standard)
-	uint64_t value = (n > 0) ? (p->buffer >> (WSIZE - n)) : 0;
+	uint64_t value = p->buffer >> (WSIZE - n);
 	if (p->bits < n) {
 #ifdef ENABLE_ERROR_HANDLING
 	if ((p->in - p->istart + 1) * sizeof(uint64_t) > p->ilen) {
@@ -235,19 +262,27 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 	uint64_t output_word = 0;
 	uint32_t bits = 0;
 
+	uint8_t opbits = bits_per_op[op];
+	uint64_t params = read_bits(p, opbits);
+#ifdef ENABLE_ERROR_HANDLING
+	if (p->errorcode != 0)
+		return;
+#endif
+
 	for (int i = 0; i < 4; i++) {
 		uint64_t value;
 
 		uint32_t dec_template = dec_templates[op][i][0];
 		//printf("op is %x\n", dec_template & 0x7F);
 		uint32_t is_index = (dec_template >> 7);
+		uint8_t num_bits = dec_template & 0x7F;
 		uint32_t dst_size = dec_templates[op][i][1];
 
-		value = read_bits(p, dec_template & 0x7F);
-#ifdef ENABLE_ERROR_HANDLING
-		if (p->errorcode != 0)
-			return;
-#endif
+		// https://stackoverflow.com/a/28703383
+		uint64_t bitsmask = ((uint64_t)-(num_bits != 0)) &
+				    (((uint64_t)-1) >> (64 - num_bits));
+		value = (params >> (opbits - num_bits)) & bitsmask;
+		opbits -= num_bits;
 
 		if (is_index) {
 			uint64_t offset = get_index(
