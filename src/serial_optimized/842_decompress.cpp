@@ -240,6 +240,63 @@ static inline uint64_t get_index(struct sw842_param_decomp *p,
 
 	return offset;
 }
+
+static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
+{
+	uint64_t output_word = 0;
+	uint64_t values[8] = { 0 };
+	uint8_t bits = 0;
+
+#ifdef ENABLE_ERROR_HANDLING
+	if (op >= OPS_MAX) {
+		p->errorcode = -EINVAL;
+		return;
+	}
+#endif
+	for (int i = 0; i < 4; i++) {
+		// 0-initialize all values-fields
+		values[i] = 0;
+		values[4 + i] = 0;
+
+		uint8_t dec_template = dec_templates[op][i][0];
+		uint8_t is_index = (dec_template >> 7);
+		uint8_t num_bits = dec_template & 0x7F;
+		uint8_t dst_size = dec_templates[op][i][1];
+
+		values[(4 * is_index) + i] =
+			read_bits(p, num_bits);
+#ifdef ENABLE_ERROR_HANDLING
+		if (p->errorcode != 0)
+			return;
+#endif
+
+#ifdef ENABLE_ERROR_HANDLING
+		uint64_t offset = is_index ? get_index(p, dst_size,
+			values[4 + i], fifo_sizes[dst_size]) : 0;
+		if (p->errorcode != 0)
+			return;
+#else
+		uint64_t offset = get_index(p, dst_size,
+			values[4 + i], fifo_sizes[dst_size]);
+#endif
+		memcpy(&values[4 + i],
+		       &p->ostart[offset * is_index], dst_size * is_index);
+		values[4 + i] = swap_be_to_native64(
+			values[4 + i] << (WSIZE - (dst_size << 3)));
+
+		values[i] = values[4 + i] * is_index | values[i];
+		output_word |= values[i] << (64 - (dst_size << 3) - bits);
+		bits += dst_size << 3;
+	}
+#ifdef ENABLE_ERROR_HANDLING
+	if (p->out - p->ostart + 8 > p->olen) {
+		p->errorcode = -ENOSPC;
+		return;
+	}
+#endif
+	write64(p->out, swap_native_to_be64(output_word));
+	p->out += 8;
+}
 #endif
 
 /**
@@ -277,12 +334,6 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 
 	uint64_t op, rep;
 
-#if defined(BRANCH_FREE) && BRANCH_FREE == 1
-	uint64_t output_word;
-	uint64_t values[8];
-	uint8_t bits;
-#endif
-
 	do {
 		op = read_bits(&p, OP_BITS);
 #ifdef ENABLE_ERROR_HANDLING
@@ -292,12 +343,6 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 
 #ifdef DEBUG
 		printf("template is %llx\n", op);
-#endif
-
-#if defined(BRANCH_FREE) && BRANCH_FREE == 1
-		output_word = 0;
-		bits = 0;
-		memset(values, 0, 64);
 #endif
 
 		switch (op) {
@@ -469,66 +514,15 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 		case OP_END:
 			break;
 		default:
-#ifdef ENABLE_ERROR_HANDLING
-			if (op >= OPS_MAX)
-				return -EINVAL;
-#endif
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
-			for (int i = 0; i < 4; i++) {
-				// 0-initialize all values-fields
-				values[i] = 0;
-				values[4 + i] = 0;
-
-				uint8_t dec_template =
-					dec_templates[op][i][0];
-				uint8_t is_index = (dec_template >> 7);
-				uint8_t num_bits = dec_template & 0x7F;
-				uint8_t dst_size =
-					dec_templates[op][i][1];
-
-				values[(4 * is_index) + i] =
-					read_bits(&p, num_bits);
+			do_op(&p, op);
 #ifdef ENABLE_ERROR_HANDLING
-				if (p.errorcode != 0)
-					return p.errorcode;
+			if (p.errorcode != 0)
+				return p.errorcode;
 #endif
-
-#ifdef ENABLE_ERROR_HANDLING
-
-				uint64_t offset =
-					is_index ? get_index(&p, dst_size,
-					values[4 + i], fifo_sizes[dst_size]) : 0;
-				if (p.errorcode != 0)
-					return p.errorcode;
 #else
-				uint64_t offset = get_index(&p, dst_size,
-					values[4 + i], fifo_sizes[dst_size]);
-#endif
-				memcpy(&values[4 + i],
-				       &p.ostart[offset * is_index], dst_size * is_index);
-				values[4 + i] = swap_be_to_native64(
-					values[4 + i]
-					<< (WSIZE - (dst_size << 3)));
-
-				values[i] = values[4 + i] * is_index |
-					    values[i];
-				output_word |=
-					values[i]
-					<< (64 - (dst_size << 3) -
-					    bits);
-				bits += dst_size << 3;
-			}
-#ifdef ENABLE_ERROR_HANDLING
-			if (p.out - p.ostart + 8 > p.olen)
-				return -ENOSPC;
-#endif
-			write64(p.out,
-				swap_native_to_be64(output_word));
-			p.out += 8;
-#else
-		fprintf(stderr, "Invalid op template: %" PRIx64 "\n",
-			op);
-		return -EINVAL;
+			fprintf(stderr, "Invalid op template: %" PRIx64 "\n", op);
+			return -EINVAL;
 #endif
 		}
 
