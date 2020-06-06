@@ -64,14 +64,7 @@ struct sw842_param_decomp {
 static inline uint64_t swap_be_to_native64(uint64_t value)
 {
 #ifdef __ENDIAN_LITTLE__
-	return (uint64_t)((value & (uint64_t)0x00000000000000ff) << 56) |
-	       (uint64_t)((value & (uint64_t)0x000000000000ff00) << 40) |
-	       (uint64_t)((value & (uint64_t)0x0000000000ff0000) << 24) |
-	       (uint64_t)((value & (uint64_t)0x00000000ff000000) << 8) |
-	       (uint64_t)((value & (uint64_t)0x000000ff00000000) >> 8) |
-	       (uint64_t)((value & (uint64_t)0x0000ff0000000000) >> 24) |
-	       (uint64_t)((value & (uint64_t)0x00ff000000000000) >> 40) |
-	       (uint64_t)((value & (uint64_t)0xff00000000000000) >> 56);
+	return as_ulong(as_uchar8(value).s76543210);
 #else
 	return value;
 #endif
@@ -80,14 +73,7 @@ static inline uint64_t swap_be_to_native64(uint64_t value)
 static inline uint64_t swap_native_to_be64(uint64_t value)
 {
 #ifdef __ENDIAN_LITTLE__
-	return (uint64_t)((value & (uint64_t)0x00000000000000ff) << 56) |
-	       (uint64_t)((value & (uint64_t)0x000000000000ff00) << 40) |
-	       (uint64_t)((value & (uint64_t)0x0000000000ff0000) << 24) |
-	       (uint64_t)((value & (uint64_t)0x00000000ff000000) << 8) |
-	       (uint64_t)((value & (uint64_t)0x000000ff00000000) >> 8) |
-	       (uint64_t)((value & (uint64_t)0x0000ff0000000000) >> 24) |
-	       (uint64_t)((value & (uint64_t)0x00ff000000000000) >> 40) |
-	       (uint64_t)((value & (uint64_t)0xff00000000000000) >> 56);
+	return as_ulong(as_uchar8(value).s76543210);
 #else
 	return value;
 #endif
@@ -96,8 +82,7 @@ static inline uint64_t swap_native_to_be64(uint64_t value)
 static inline uint16_t swap_be_to_native16(uint16_t value)
 {
 #ifdef __ENDIAN_LITTLE__
-	return (uint16_t)((value & (uint16_t)0x00ff) << 8) |
-	       (uint16_t)((value & (uint16_t)0xff00) >> 8);
+	return as_ushort(as_uchar2(value).s10);
 #else
 	return value;
 #endif
@@ -106,8 +91,7 @@ static inline uint16_t swap_be_to_native16(uint16_t value)
 static inline uint16_t swap_native_to_be16(uint16_t value)
 {
 #ifdef __ENDIAN_LITTLE__
-	return (uint16_t)((value & (uint16_t)0x00ff) << 8) |
-	       (uint16_t)((value & (uint16_t)0xff00) >> 8);
+	return as_ushort(as_uchar2(value).s10);
 #else
 	return value;
 #endif
