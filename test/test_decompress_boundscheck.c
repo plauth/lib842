@@ -1,5 +1,6 @@
-/* Test for regression in the original software decompressor implementation
-   in the Linux Kernel (https://lkml.org/lkml/2020/6/5/727). Description:
+/* Test for regression present in the original software decompressor
+   implementation in the Linux Kernel (https://lkml.org/lkml/2020/6/5/727),
+   which also formerly affected our implementations. Description:
 
    The software 842 decompressor receives, through the initial value of the
    'olen' parameter, the capacity of the buffer pointed to by 'out'. If this
