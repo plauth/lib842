@@ -42,12 +42,9 @@ size_t stream_size(const struct bitstream *s)
 	return sizeof(uint64_t) * (s->ptr - s->begin);
 }
 
-/* write 0 <= n <= 64 low bits of value and return remaining bits */
+/* write 0 < n <= 64 low bits of value and return remaining bits */
 void stream_write_bits(struct bitstream *s, uint64_t value, uint8_t n)
 {
-	// Avoid shift by 64 (only shifts of strictly less bits are allowed by the standard)
-	if (n == 0)
-		return;
 	//shift value with MSB
 	value <<= wsize - n;
 	/* append bit string to buffer */
