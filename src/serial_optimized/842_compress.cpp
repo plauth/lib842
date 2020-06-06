@@ -165,9 +165,6 @@ static inline void add_template(const struct sw842_param *p)
 	case 0x00: // { D8, N0, N0, N0 }, 64 bits
 		stream_write_bits(p->stream, TEMPLATE_KEY, OP_BITS);
 		stream_write_bits(p->stream, p->dataAndIndices[6], D8_BITS);
-		stream_write_bits(p->stream, p->dataAndIndices[15], 0);
-		stream_write_bits(p->stream, p->dataAndIndices[15], 0);
-		stream_write_bits(p->stream, p->dataAndIndices[15], 0);
 		break;
 	case 0x01: // { D4, D2, I2, N0 }, 56 bits
 		out = (((uint64_t)TEMPLATE_KEY) << (D4_BITS + D2_BITS + I2_BITS)) |
