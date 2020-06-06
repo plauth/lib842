@@ -89,14 +89,6 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 template <uint8_t N> static inline void do_data(struct sw842_param_decomp *p,
 						uint64_t data)
 {
-#ifdef ENABLE_ERROR_HANDLING
-	if (static_cast<size_t>(p->out - p->ostart + N) > p->olen) {
-		if (p->errorcode == 0)
-			p->errorcode = -ENOSPC;
-		return;
-	}
-#endif
-
 	switch (N) {
 	case 2:
 		write16(p->out, swap_be_to_native16(data));
@@ -142,14 +134,6 @@ static inline void do_index(struct sw842_param_decomp *p, uint8_t size,
 				(unsigned long)offset, (unsigned long)total);
 			p->errorcode = -EINVAL;
 		}
-		return;
-	}
-#endif
-
-#ifdef ENABLE_ERROR_HANDLING
-	if (static_cast<size_t>(p->out - p->ostart + size) > p->olen) {
-		if (p->errorcode == 0)
-			p->errorcode = -ENOSPC;
 		return;
 	}
 #endif
@@ -310,6 +294,15 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 
 #ifdef DEBUG
 		printf("template is %llx\n", op);
+#endif
+
+#ifdef ENABLE_ERROR_HANDLING
+		// All valid ops except OP_REPEAT and OP_END generate exactly
+		// 8 bytes of output, so check the buffer capacity here for
+		// all of those instead of doing it separately for each opcode
+		if ((op < OPS_MAX || op == OP_ZEROS) &&
+		    static_cast<size_t>(p.out - p.ostart + 8) > p.olen)
+			return -ENOSPC;
 #endif
 
 		switch (op) {
@@ -496,11 +489,6 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 			}
 			break;
 		case OP_ZEROS:
-#ifdef ENABLE_ERROR_HANDLING
-			if (static_cast<size_t>(p.out - p.ostart + 8) > p.olen)
-				return -ENOSPC;
-#endif
-
 			memset(p.out, 0, 8);
 			p.out += 8;
 			break;
@@ -517,9 +505,6 @@ int optsw842_decompress(const uint8_t *in, size_t ilen,
 #ifdef ENABLE_ERROR_HANDLING
 			if (p.errorcode != 0)
 				return p.errorcode;
-			if (p.out - p.ostart + 8 > p.olen) {
-				return -ENOSPC;
-			}
 #endif
 			memcpy(&value, &p.ostart[offset], 8);
 			write64(p.out, value);
