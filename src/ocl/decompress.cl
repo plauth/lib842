@@ -217,9 +217,7 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 			__global uint16_t *ostart16 =
 				(__global uint16_t *)p->ostart;
 			value = (((uint64_t)swap_be_to_native16(ostart16[offset])) << 48) |
-				(((uint64_t)swap_be_to_native16(ostart16[offset + 1])) << 32) |
-				(((uint64_t)swap_be_to_native16(ostart16[offset + 2])) << 16) |
-				(((uint64_t)swap_be_to_native16(ostart16[offset + 3])));
+				(((uint64_t)swap_be_to_native16(ostart16[offset + 1])) << 32);
 			value >>= (WSIZE - (dst_size << 3));
 		}
 		output_word |= value
