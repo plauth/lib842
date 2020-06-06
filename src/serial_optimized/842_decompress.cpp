@@ -229,11 +229,9 @@ static inline uint64_t get_index(struct sw842_param_decomp *p,
 
 #ifdef ENABLE_ERROR_HANDLING
 	if (offset + size > total) {
-		if (p->errorcode == 0) {
-			fprintf(stderr, "index%x %lx points past end %lx\n", size,
-				(unsigned long)offset, (unsigned long)total);
-			p->errorcode = -EINVAL;
-		}
+		fprintf(stderr, "index%x %lx points past end %lx\n", size,
+			(unsigned long)offset, (unsigned long)total);
+		p->errorcode = -EINVAL;
 		return 0;
 	}
 #endif
