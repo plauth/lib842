@@ -3,6 +3,7 @@
 #include <lib842/stream/decomp.h>
 
 #include <cassert>
+#include <algorithm>
 
 namespace lib842 {
 
@@ -210,11 +211,19 @@ bool DataDecompressionStream::handle_block(const Block &block,
 	// TODOXXX use chunked mode
 	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 		if (block.datas[i] == nullptr && block.sizes[i] == 0) {
-			// Chunk was transferred uncompressed, nothing to do
+			// Chunk not present, nothing to do
+			// (This case happens when the application places uncompressed chunks directly
+			//  on the destination so they don't go through the DataDecompressionStream)
 			continue;
 		}
 
 		auto destination = static_cast<uint8_t *>(_ptr) + block.offset + i * CHUNK_SIZE;
+
+		if (block.sizes[i] == CHUNK_SIZE) {
+			// Uncompressed (uncompressible) chunk, copy to the destination as-is
+			std::copy(block.datas[i], block.datas[i] + CHUNK_SIZE, destination);
+			continue;
+		}
 
 		assert(block.sizes[i] > 0 &&
 		       block.sizes[i] <= COMPRESSIBLE_THRESHOLD);

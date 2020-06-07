@@ -206,28 +206,8 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		long long timestart_decomp = timestamp();
 
 		dstream.start(decompressed.get());
-		for (const auto &cblock : comp_blocks) {
-			lib842::stream::Block dblock;
-			dblock.offset = cblock.offset;
-			bool any_compressed = false;
-			for (size_t i = 0; i < lib842::stream::NUM_CHUNKS_PER_BLOCK; i++) {
-				if (cblock.sizes[i] <= lib842::stream::COMPRESSIBLE_THRESHOLD) {
-					dblock.datas[i] = cblock.datas[i];
-					dblock.sizes[i] = cblock.sizes[i];
-					any_compressed = true;
-				} else {
-					// Leave chunk empty and copy it ourselves (TODOXXX: Change this? See below)
-					dblock.datas[i] = nullptr;
-					dblock.sizes[i] = 0;
-					// TODOXXX: Should this be done multi thread???
-					//          Or maybe done separately and not even included in the
-					//          timing, since that's usually handled by the network?
-					memcpy(decompressed.get() + cblock.offset + i * lib842::stream::CHUNK_SIZE,
-					       cblock.datas[i], lib842::stream::CHUNK_SIZE);
-				}
-			}
-
-			if (any_compressed && !dstream.push_block(std::move(dblock)))
+		for (auto &cblock : comp_blocks) {
+			if (!dstream.push_block(std::move(cblock)))
 				break;
 		}
 
