@@ -26,7 +26,7 @@ DataCompressionStream::DataCompressionStream(
 	_debug_logger(std::move(debug_logger)),
 	_threads_ready(num_threads),
 	_trigger(0),
-	_ptr(nullptr), _size(0), _skip_compress_step(false),
+	_ptr(nullptr), _size(0),
 	_current_offset(0), _error(false),
 	_finalizing(false), _finalize_barrier(num_threads),
 	_quit(false), _offset_sync_epoch_multiple_log2(UINT_MAX) {
@@ -71,11 +71,10 @@ void DataCompressionStream::wait_until_ready() {
 }
 
 void DataCompressionStream::start(
-	const void *ptr, size_t size, bool skip_compress_step,
+	const void *ptr, size_t size,
 	std::function<void(Block &&)> block_available_callback) {
 	_ptr = ptr;
 	_size = size;
-	_skip_compress_step = skip_compress_step;
 	_block_available_callback = std::move(block_available_callback);
 
 	std::lock_guard<std::mutex> lock(_mutex);
@@ -196,7 +195,6 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 				if (!quit) {
 					_ptr = nullptr;
 					_size = 0;
-					_skip_compress_step = false;
 					_block_available_callback = std::function<void(Block &&)>();
 					_current_offset = 0;
 					error = _error;
@@ -232,67 +230,51 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &stats) const {
 	Block block;
 	block.offset = offset;
-	if (_skip_compress_step) {
-		for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
-			auto source = static_cast<const uint8_t *>(_ptr) + offset + i * CHUNK_SIZE;
 
-			auto is_compressed = std::equal(source,source + sizeof(LIB842_COMPRESSED_CHUNK_MARKER), LIB842_COMPRESSED_CHUNK_MARKER);
+	// TODOXXX use chunked mode
 
-			auto chunk_buffer_size = is_compressed
-				 ? *reinterpret_cast<const uint64_t *>((source + sizeof(LIB842_COMPRESSED_CHUNK_MARKER)))
-				: CHUNK_SIZE;
-			auto chunk_buffer = is_compressed
-					? source + CHUNK_SIZE - chunk_buffer_size
-					: source;
+	// TODOXXX: This can be reduced to e.g. COMPRESSIBLE_THRESHOLD or CHUNK_SIZE,
+	// as long as the lib842 compressor respects the destination buffer size
+	// (input value of the olen parameter to the compression function)
+	// However, currently the serial_optimized lib842 implementation does not
+	// respect olen when compiled without ENABLE_ERROR_HANDLING (for performance),
+	// so this is necessary to handle this case
+	static constexpr size_t CHUNK_PADDING = 2 * CHUNK_SIZE;
+	uint8_t *chunk_buffer = block.allocate_buffer(
+		_impl842.preferred_alignment, CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK);
 
-			block.datas[i] = chunk_buffer;
-			block.sizes[i] = chunk_buffer_size;
-		}
-	} else {
-		// TODOXXX use chunked mode
+	bool any_compressible = false;
+	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
+		auto source = static_cast<const uint8_t *>(_ptr) + offset + i * CHUNK_SIZE;
+		auto compressed_destination = chunk_buffer + i * CHUNK_PADDING;
 
-		// TODOXXX: This can be reduced to e.g. COMPRESSIBLE_THRESHOLD or CHUNK_SIZE,
-		// as long as the lib842 compressor respects the destination buffer size
-		// (input value of the olen parameter to the compression function)
-		// However, currently the serial_optimized lib842 implementation does not
-		// respect olen when compiled without ENABLE_ERROR_HANDLING (for performance),
-		// so this is necessary to handle this case
-		static constexpr size_t CHUNK_PADDING = 2 * CHUNK_SIZE;
-		uint8_t *chunk_buffer = block.allocate_buffer(
-			_impl842.preferred_alignment, CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK);
-
-		bool any_compressible = false;
-		for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
-			auto source = static_cast<const uint8_t *>(_ptr) + offset + i * CHUNK_SIZE;
-			auto compressed_destination = chunk_buffer + i * CHUNK_PADDING;
-
-			// Compress chunk
-			size_t compressed_size = CHUNK_PADDING;
+		// Compress chunk
+		size_t compressed_size = CHUNK_PADDING;
 
 #ifdef LIB842_STREAM_INDEPTH_TRACE
-			auto stat_compress_start_time = std::chrono::steady_clock::now();
+		auto stat_compress_start_time = std::chrono::steady_clock::now();
 #endif
-			int ret = _impl842.compress(source, CHUNK_SIZE, compressed_destination, &compressed_size);
+		int ret = _impl842.compress(source, CHUNK_SIZE, compressed_destination, &compressed_size);
 #ifdef LIB842_STREAM_INDEPTH_TRACE
-			stats.compress_duration += std::chrono::steady_clock::now() - stat_compress_start_time;
+		stats.compress_duration += std::chrono::steady_clock::now() - stat_compress_start_time;
 #endif
-			if (ret != 0 && ret != -ENOSPC) {
-				block.offset = SIZE_MAX; // Indicates error to the user
-				break;
-			}
-
-			// Push into the chunk queue
-			auto compressible = ret == 0 && compressed_size <= COMPRESSIBLE_THRESHOLD;
-
-			block.datas[i] = compressible ? compressed_destination : source;
-			block.sizes[i] = compressible ? compressed_size : CHUNK_SIZE;
-			any_compressible |= compressible;
+		if (ret != 0 && ret != -ENOSPC) {
+			block.offset = SIZE_MAX; // Indicates error to the user
+			break;
 		}
 
-		// If no chunk is compressible, release the unused compression buffer now
-		if (!any_compressible)
-			block.release_buffer();
+		// Push into the chunk queue
+		auto compressible = ret == 0 && compressed_size <= COMPRESSIBLE_THRESHOLD;
+
+		block.datas[i] = compressible ? compressed_destination : source;
+		block.sizes[i] = compressible ? compressed_size : CHUNK_SIZE;
+		any_compressible |= compressible;
 	}
+
+	// If no chunk is compressible, release the unused compression buffer now
+	if (!any_compressible)
+		block.release_buffer();
+
 	return block;
 }
 

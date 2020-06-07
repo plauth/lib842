@@ -60,7 +60,7 @@ public:
 	   This isn't only for debugging and benchmarking */
 	void wait_until_ready();
 
-	void start(const void *ptr, size_t size, bool skip_compress_step,
+	void start(const void *ptr, size_t size,
 		   std::function<void(Block &&)> block_available_callback);
 	void finalize(bool cancel, std::function<void(bool)> finalize_callback);
 
@@ -97,7 +97,6 @@ private:
 	// Parameters for the compression operation in course
 	const void *_ptr;
 	size_t _size;
-	bool _skip_compress_step;
 	std::function<void(Block &&)> _block_available_callback;
 	// Stores the offset of the next block to be compressed
 	std::atomic<size_t> _current_offset;
