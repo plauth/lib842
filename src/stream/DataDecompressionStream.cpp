@@ -54,13 +54,15 @@ void DataDecompressionStream::wait_until_ready() {
 	_threads_ready.wait();
 }
 
-void DataDecompressionStream::start() {
+void DataDecompressionStream::start(void *ptr) {
+	_ptr = ptr;
+
 	std::lock_guard<std::mutex> lock(_mutex);
 	_trigger++;
 	_trigger_changed.notify_all();
 }
 
-bool DataDecompressionStream::push_block(DataDecompressionStream::decompress_block &&dm) {
+bool DataDecompressionStream::push_block(Block &&dm) {
 	std::lock_guard<std::mutex> lock(_mutex);
 	assert(!_finalizing);
 	if (_error) {
@@ -80,7 +82,7 @@ void DataDecompressionStream::finalize(bool cancel, std::function<void(bool)> fi
 	_finalizing = true;
 	_finalize_callback = std::move(finalize_callback);
 	if (cancel)
-		_queue = std::queue<decompress_block>();
+		_queue = std::queue<Block>();
 	_queue_available.notify_all();
 }
 
@@ -117,7 +119,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 		// -------------------
 		while (true) {
 			// (Blocking) pop from the chunk queue
-			decompress_block block;
+			Block block;
 
 			{
 				std::unique_lock<std::mutex> lock(_mutex);
@@ -146,7 +148,7 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 					std::lock_guard<std::mutex> lock(_mutex);
 					first_error = !_error;
 					_error = true;
-					_queue = std::queue<decompress_block>();
+					_queue = std::queue<Block>();
 				}
 
 				if (first_error) {
@@ -203,28 +205,26 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 #endif
 }
 
-bool DataDecompressionStream::handle_block(const decompress_block &block,
+bool DataDecompressionStream::handle_block(const Block &block,
 					   stats_per_thread_t &stats) const {
 	// TODOXXX use chunked mode
 	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
-		const auto &chunk = block.chunks[i];
-		if (chunk.compressed_data == nullptr && chunk.compressed_length == 0 &&
-		    chunk.destination == nullptr) {
+		if (block.datas[i] == nullptr && block.sizes[i] == 0) {
 			// Chunk was transferred uncompressed, nothing to do
 			continue;
 		}
 
-		auto destination = static_cast<uint8_t *>(chunk.destination);
+		auto destination = static_cast<uint8_t *>(_ptr) + block.offset + i * CHUNK_SIZE;
 
-		assert(chunk.compressed_length > 0 &&
-		       chunk.compressed_length <= COMPRESSIBLE_THRESHOLD);
+		assert(block.sizes[i] > 0 &&
+		       block.sizes[i] <= COMPRESSIBLE_THRESHOLD);
 
 		size_t uncompressed_size = CHUNK_SIZE;
 #ifdef LIB842_STREAM_INDEPTH_TRACE
 		auto stat_decompress_start_time = std::chrono::steady_clock::now();
 #endif
-		int ret = _impl842.decompress(chunk.compressed_data,
-					      chunk.compressed_length,
+		int ret = _impl842.decompress(block.datas[i],
+					      block.sizes[i],
 					      destination, &uncompressed_size);
 #ifdef LIB842_STREAM_INDEPTH_TRACE
 		stats.decompress_duration += std::chrono::steady_clock::now() - stat_decompress_start_time;

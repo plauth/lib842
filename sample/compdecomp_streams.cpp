@@ -146,7 +146,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	//          Is it due to NUMA effects? Why does it not happen with OpenMP?
 	//          It could also be because a lot of new memory needs to be paged in?
 	//          (In the OpenMP version, the memset will do this!)
-	std::vector<lib842::stream::DataCompressionStream::compress_block> comp_blocks;
+	std::vector<lib842::stream::Block> comp_blocks;
 	{
 		//for (int i = 0; i < 2; i++) { comp_blocks.clear();
 		std::mutex comp_blocks_mutex;
@@ -158,9 +158,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 		long long timestart_comp = timestamp();
 		cstream.start(in, ilen, false, [&comp_blocks, &comp_blocks_mutex, &comp_error]
-			(lib842::stream::DataCompressionStream::compress_block &&cblock) {
+			(lib842::stream::Block &&cblock) {
 			std::lock_guard<std::mutex> lock(comp_blocks_mutex);
-			if (cblock.source_offset == SIZE_MAX)
+			if (cblock.offset == SIZE_MAX)
 				comp_error = true;
 			if (!comp_error)
 				comp_blocks.push_back(std::move(cblock));
@@ -205,24 +205,25 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 		long long timestart_decomp = timestamp();
 
-		dstream.start();
+		dstream.start(decompressed.get());
 		for (const auto &cblock : comp_blocks) {
-			lib842::stream::DataDecompressionStream::decompress_block dblock;
+			lib842::stream::Block dblock;
+			dblock.offset = cblock.offset;
 			bool any_compressed = false;
 			for (size_t i = 0; i < lib842::stream::NUM_CHUNKS_PER_BLOCK; i++) {
-				auto dest = decompressed.get() + cblock.source_offset + i * lib842::stream::CHUNK_SIZE;
 				if (cblock.sizes[i] <= lib842::stream::COMPRESSIBLE_THRESHOLD) {
-					dblock.chunks[i] = lib842::stream::DataDecompressionStream::decompress_chunk(
-						cblock.datas[i],
-						cblock.sizes[i],
-						dest
-					);
+					dblock.datas[i] = cblock.datas[i];
+					dblock.sizes[i] = cblock.sizes[i];
 					any_compressed = true;
 				} else {
+					// Leave chunk empty and copy it ourselves (TODOXXX: Change this? See below)
+					dblock.datas[i] = nullptr;
+					dblock.sizes[i] = 0;
 					// TODOXXX: Should this be done multi thread???
 					//          Or maybe done separately and not even included in the
 					//          timing, since that's usually handled by the network?
-					memcpy(dest, cblock.datas[i], lib842::stream::CHUNK_SIZE);
+					memcpy(decompressed.get() + cblock.offset + i * lib842::stream::CHUNK_SIZE,
+					       cblock.datas[i], lib842::stream::CHUNK_SIZE);
 				}
 			}
 

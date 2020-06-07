@@ -74,7 +74,7 @@ void DataCompressionStream::wait_until_ready() {
 
 void DataCompressionStream::start(
 	const void *ptr, size_t size, bool skip_compress_step,
-	std::function<void(compress_block &&)> block_available_callback) {
+	std::function<void(Block &&)> block_available_callback) {
 	_ptr = ptr;
 	_size = size;
 	_skip_compress_step = skip_compress_step;
@@ -148,11 +148,11 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 			stats.handled_blocks++;
 			auto stat_block_start_time = std::chrono::steady_clock::now();
 #endif
-			compress_block block = handle_block(offset, stats);
+			Block block = handle_block(offset, stats);
 #ifdef LIB842_STREAM_INDEPTH_TRACE
 			stats.block_duration += std::chrono::steady_clock::now() - stat_block_start_time;
 #endif
-			if (block.source_offset == SIZE_MAX) {
+			if (block.offset == SIZE_MAX) {
 				bool first_error;
 				{
 					std::lock_guard<std::mutex> lock(_mutex);
@@ -199,7 +199,7 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 					_ptr = nullptr;
 					_size = 0;
 					_skip_compress_step = false;
-					_block_available_callback = std::function<void(compress_block &&)>();
+					_block_available_callback = std::function<void(Block &&)>();
 					_current_offset = 0;
 					error = _error;
 					_error = false;
@@ -231,10 +231,9 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 }
 
 
-DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t offset,
-									  stats_per_thread_t &stats) const {
-	compress_block block;
-	block.source_offset = offset;
+Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &stats) const {
+	Block block;
+	block.offset = offset;
 	if (_skip_compress_step) {
 		for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 			auto source = static_cast<const uint8_t *>(_ptr) + offset + i * CHUNK_SIZE;
@@ -261,13 +260,14 @@ DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t
 		// respect olen when compiled without ENABLE_ERROR_HANDLING (for performance),
 		// so this is necessary to handle this case
 		static constexpr size_t CHUNK_PADDING = 2 * CHUNK_SIZE;
-		block.compress_buffer.reset(static_cast<uint8_t *>(aligned_alloc(
-			_impl842.preferred_alignment, CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK)));
+		uint8_t *compress_buffer = static_cast<uint8_t *>(aligned_alloc(
+			_impl842.preferred_alignment, CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK));
+		block.compress_buffer.reset(compress_buffer);
 
 		bool any_compressible = false;
 		for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 			auto source = static_cast<const uint8_t *>(_ptr) + offset + i * CHUNK_SIZE;
-			auto compressed_destination = block.compress_buffer.get() + i * CHUNK_PADDING;
+			auto compressed_destination = compress_buffer + i * CHUNK_PADDING;
 
 			// Compress chunk
 			size_t compressed_size = CHUNK_PADDING;
@@ -280,7 +280,7 @@ DataCompressionStream::compress_block DataCompressionStream::handle_block(size_t
 			stats.compress_duration += std::chrono::steady_clock::now() - stat_compress_start_time;
 #endif
 			if (ret != 0 && ret != -ENOSPC) {
-				block.source_offset = SIZE_MAX; // Indicates error to the user
+				block.offset = SIZE_MAX; // Indicates error to the user
 				break;
 			}
 

@@ -10,9 +10,9 @@
 
 #include <lib842/detail/barrier.h>
 #include <lib842/detail/latch.h>
-#include <lib842/detail/free_unique_ptr.h>
 
 #include <lib842/stream/common.h>
+#include <lib842/stream/block.h>
 #include <lib842/common.h>
 
 #include <thread>
@@ -20,10 +20,8 @@
 #include <atomic>
 #include <condition_variable>
 
-#include <array>
 #include <vector>
 
-#include <cstdint>
 #include <memory>
 #include <functional>
 #include <ostream>
@@ -37,18 +35,6 @@ namespace stream {
 
 class DataCompressionStream {
 public:
-	struct compress_block {
-		// Offset into the source buffer where the data associated with the block comes from
-		size_t source_offset;
-		// Data for each (possibly compressed) chunk in the block
-		std::array<const uint8_t *, NUM_CHUNKS_PER_BLOCK> datas;
-		// Size for each (possibly compressed) chunk in the block
-		std::array<size_t, NUM_CHUNKS_PER_BLOCK> sizes;
-
-		// Buffer that owns the pointers used in 'datas'. Used internally.
-		detail::free_unique_ptr<uint8_t> compress_buffer;
-	};
-
 	DataCompressionStream(const lib842_implementation &impl842,
 			      unsigned int num_threads,
 			      thread_policy thread_policy_,
@@ -75,7 +61,7 @@ public:
 	void wait_until_ready();
 
 	void start(const void *ptr, size_t size, bool skip_compress_step,
-		   std::function<void(compress_block &&)> block_available_callback);
+		   std::function<void(Block &&)> block_available_callback);
 	void finalize(bool cancel, std::function<void(bool)> finalize_callback);
 
 private:
@@ -90,7 +76,7 @@ private:
 	};
 
 	void loop_compress_thread(size_t thread_id);
-	compress_block handle_block(size_t offset, stats_per_thread_t &stats) const;
+	Block handle_block(size_t offset, stats_per_thread_t &stats) const;
 
 	const lib842_implementation &_impl842;
 	std::function<std::ostream&(void)> _error_logger;
@@ -112,7 +98,7 @@ private:
 	const void *_ptr;
 	size_t _size;
 	bool _skip_compress_step;
-	std::function<void(compress_block &&)> _block_available_callback;
+	std::function<void(Block &&)> _block_available_callback;
 	// Stores the offset of the next block to be compressed
 	std::atomic<size_t> _current_offset;
 	// Set to true if an error happens during 842 compression
