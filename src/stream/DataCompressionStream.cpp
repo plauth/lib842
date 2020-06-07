@@ -6,8 +6,6 @@
 #include <stdexcept>
 #include <climits>
 #include <cerrno>
-#include <stdlib.h> // Hacky use of C11 aligned_alloc,
-		    // since std::aligned_alloc is not available until C++17
 
 // A big offset value so all threads stop processing new work
 // as soon as possible, i.e. to cancel all pending work of the operation
@@ -260,14 +258,13 @@ Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &sta
 		// respect olen when compiled without ENABLE_ERROR_HANDLING (for performance),
 		// so this is necessary to handle this case
 		static constexpr size_t CHUNK_PADDING = 2 * CHUNK_SIZE;
-		uint8_t *compress_buffer = static_cast<uint8_t *>(aligned_alloc(
-			_impl842.preferred_alignment, CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK));
-		block.compress_buffer.reset(compress_buffer);
+		uint8_t *chunk_buffer = block.allocate_buffer(
+			_impl842.preferred_alignment, CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK);
 
 		bool any_compressible = false;
 		for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 			auto source = static_cast<const uint8_t *>(_ptr) + offset + i * CHUNK_SIZE;
-			auto compressed_destination = compress_buffer + i * CHUNK_PADDING;
+			auto compressed_destination = chunk_buffer + i * CHUNK_PADDING;
 
 			// Compress chunk
 			size_t compressed_size = CHUNK_PADDING;
@@ -294,7 +291,7 @@ Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &sta
 
 		// If no chunk is compressible, release the unused compression buffer now
 		if (!any_compressible)
-			block.compress_buffer.reset();
+			block.release_buffer();
 	}
 	return block;
 }
