@@ -94,7 +94,6 @@ static inline void find_index(struct sw842_param *p)
 	isIndexValid[5] = (index[5] >= 0) ? 0xFFFF : 0x0000;
 	isIndexValid[6] = (index[6] >= 0) ? 0xFFFF : 0x0000;
 
-#ifdef ONLY_WELL_DEFINED_BEHAVIOUR
 	isDataValid[0] = (index[0] >= 0 && p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
 	isDataValid[1] = (index[1] >= 0 && p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
 	isDataValid[2] = (index[2] >= 0 && p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
@@ -102,16 +101,6 @@ static inline void find_index(struct sw842_param *p)
 	isDataValid[4] = (index[4] >= 0 && p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
 	isDataValid[5] = (index[5] >= 0 && p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
 	isDataValid[6] = (index[6] >= 0 && p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
-#else
-	// Causes (generally inocuous) out-of-bounds access when index[i] is negative
-	isDataValid[0] = (p->rollingFifo16[index[0]] == p->dataAndIndices[0]) ? 0xFFFF : 0x0000;
-	isDataValid[1] = (p->rollingFifo16[index[1]] == p->dataAndIndices[1]) ? 0xFFFF : 0x0000;
-	isDataValid[2] = (p->rollingFifo16[index[2]] == p->dataAndIndices[2]) ? 0xFFFF : 0x0000;
-	isDataValid[3] = (p->rollingFifo16[index[3]] == p->dataAndIndices[3]) ? 0xFFFF : 0x0000;
-	isDataValid[4] = (p->rollingFifo32[index[4]] == p->dataAndIndices[4]) ? 0xFFFF : 0x0000;
-	isDataValid[5] = (p->rollingFifo32[index[5]] == p->dataAndIndices[5]) ? 0xFFFF : 0x0000;
-	isDataValid[6] = (p->rollingFifo64[index[6]] == p->dataAndIndices[6]) ? 0xFFFF : 0x0000;
-#endif
 
 	p->validity[0] = isIndexValid[0] & isDataValid[0];
 	p->validity[1] = isIndexValid[1] & isDataValid[1];
