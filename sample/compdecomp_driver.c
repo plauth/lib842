@@ -165,6 +165,7 @@ int compdecomp(const char *file_name, size_t chunk_size, size_t alignment)
 		printf("Using chunks of %zu bytes\n", chunk_size);
 		if (!compress_benchmark(in, ilen))
 			goto return_free_in;
+		ret = EXIT_SUCCESS;
 	} else {
 		printf("Running simple test\n");
 
@@ -186,15 +187,13 @@ int compdecomp(const char *file_name, size_t chunk_size, size_t alignment)
 
 		if (!simple_test(in, ilen, out, olen, decompressed, dlen))
 			goto return_free_decompressed;
+		ret = EXIT_SUCCESS;
 
 return_free_decompressed:
 		free(decompressed);
 return_free_out:
 		free(out);
-		goto return_free_in;
 	}
-
-	ret = EXIT_SUCCESS;
 
 return_free_in:
 	free(in);
