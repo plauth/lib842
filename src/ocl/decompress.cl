@@ -117,10 +117,8 @@ static inline uint64_t bswap(uint64_t value)
 
 static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 {
-	uint64_t value = p->buffer >> (WSIZE - n);
-	if (n == 0)
-		value = 0;
-
+	// Avoid shift by 64 (only shifts of strictly less bits are allowed by the standard)
+	uint64_t value = (n > 0) ? (p->buffer >> (WSIZE - n)) : 0;
 	if (p->bits < n) {
 #ifdef ENABLE_ERROR_HANDLING
 	if ((p->in - p->istart + 1) * sizeof(uint64_t) > p->ilen) {
@@ -142,7 +140,7 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 #endif
 		p->in++;
 		value |= p->buffer >> (WSIZE - (n - p->bits));
-		// Avoid shift by 64 (only shifts of strictly less bits bits are allowed by the standard)
+		// Avoid shift by 64 (only shifts of strictly less bits are allowed by the standard)
 		p->buffer = ((p->buffer << (n - p->bits - 1)) << 1);
 		p->bits += WSIZE - n;
 		p->buffer *= (p->bits > 0);

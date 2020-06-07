@@ -110,14 +110,13 @@ static inline uint64_t read_word(struct sw842_param_decomp *p)
 /* read 0 <= n <= 64 bits */
 static inline uint64_t read_bits(struct sw842_param_decomp *p, uint8_t n)
 {
-	uint64_t value = p->buffer >> (WSIZE - n);
-	value &= (n > 0) ? 0xFFFFFFFFFFFFFFFF : 0x0000000000000000;
-
+	// Avoid shift by 64 (only shifts of strictly less bits are allowed by the standard)
+	uint64_t value = (n > 0) ? (p->buffer >> (WSIZE - n)) : 0;
 	if (p->bits < n) {
 		/* fetch WSIZE bits  */
 		p->buffer = read_word(p);
 		value |= p->buffer >> (WSIZE - (n - p->bits));
-		// Avoid shift by 64 (only shifts of strictly less bits bits are allowed by the standard)
+		// Avoid shift by 64 (only shifts of strictly less bits are allowed by the standard)
 		p->buffer = ((p->buffer << (n - p->bits - 1)) << 1);
 		p->bits += WSIZE - n;
 		p->buffer *= (p->bits > 0);
