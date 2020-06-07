@@ -2,6 +2,10 @@
 //     i.e. we kind of do the equivalent to this include:
 // #include "../common/842.h"
 
+#ifndef __ENDIAN_LITTLE__
+#error TODO: This kernel does not currently work on big endian
+#endif
+
 typedef uchar uint8_t;
 typedef ushort uint16_t;
 typedef short int16_t;
