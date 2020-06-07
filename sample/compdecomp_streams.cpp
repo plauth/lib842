@@ -157,7 +157,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		cstream.wait_until_ready();
 
 		long long timestart_comp = timestamp();
-		cstream.start(in, ilen, false, [&comp_blocks, &comp_blocks_mutex, &comp_error]
+		cstream.start(in, ilen, [&comp_blocks, &comp_blocks_mutex, &comp_error]
 			(lib842::stream::Block &&cblock) {
 			std::lock_guard<std::mutex> lock(comp_blocks_mutex);
 			if (cblock.offset == SIZE_MAX)
