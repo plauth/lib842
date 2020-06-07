@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <array>
+#include <new>
 
 #include <stdlib.h> // Hacky use of C11 aligned_alloc,
 		    // since std::aligned_alloc is not available until C++17
@@ -27,6 +28,8 @@ struct Block {
 
 	uint8_t *allocate_buffer(size_t alignment, size_t size) {
 		uint8_t *ptr = static_cast<uint8_t *>(aligned_alloc(alignment, size));
+		if (ptr == nullptr)
+			throw std::bad_alloc();
 		assert(chunk_buffer.get() == nullptr);
 		chunk_buffer.reset(ptr);
 		return ptr;
