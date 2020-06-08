@@ -589,84 +589,80 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 
 	p->stream = stream_open(out, *olen);
 
-#ifdef ENABLE_ERROR_HANDLING
 	try {
-#endif
-	p->olen = *olen;
+		p->olen = *olen;
 
-	*olen = 0;
+		*olen = 0;
 
-	/* make initial 'last' different so we don't match the first time */
-	last = ~read64(p->in);
+		/* make initial 'last' different so we don't match the first time */
+		last = ~read64(p->in);
 
-	while (p->ilen > 7) {
-		next = read64(p->in);
+		while (p->ilen > 7) {
+			next = read64(p->in);
 
-		/* must get the next data, as we need to update the hashtable
-		 * entries with the new data every time
-		 */
-		get_next_data(p);
+			/* must get the next data, as we need to update the hashtable
+			 * entries with the new data every time
+			 */
+			get_next_data(p);
 
-#ifdef LIB842_CUDA_STRICT
-		/* we don't care about endianness in last or next;
-		 * we're just comparing 8 bytes to another 8 bytes,
-		 * they're both the same endianness
-		 */
-		if (next == last) {
-			/* repeat count bits are 0-based, so we stop at +1 */
-			if (++repeat_count <= REPEAT_BITS_MAX)
-				goto repeat;
-		}
-		if (repeat_count) {
-			add_repeat_template(p, repeat_count);
-			repeat_count = 0;
-			if (next == last) /* reached max repeat bits */
-				goto repeat;
-		}
+	#ifdef LIB842_CUDA_STRICT
+			/* we don't care about endianness in last or next;
+			 * we're just comparing 8 bytes to another 8 bytes,
+			 * they're both the same endianness
+			 */
+			if (next == last) {
+				/* repeat count bits are 0-based, so we stop at +1 */
+				if (++repeat_count <= REPEAT_BITS_MAX)
+					goto repeat;
+			}
+			if (repeat_count) {
+				add_repeat_template(p, repeat_count);
+				repeat_count = 0;
+				if (next == last) /* reached max repeat bits */
+					goto repeat;
+			}
 
-		if (next == 0)
-			add_zeros_template(p);
-		else
+			if (next == 0)
+				add_zeros_template(p);
+			else
+				process_next(p);
+
+		repeat:
+			last = next;
+	#else
 			process_next(p);
+	#endif
+			update_hashtables(p);
+			p->in += 8;
+			p->ilen -= 8;
+		}
 
-	repeat:
-		last = next;
-#else
-		process_next(p);
-#endif
-		update_hashtables(p);
-		p->in += 8;
-		p->ilen -= 8;
-	}
+		if (repeat_count)
+			add_repeat_template(p, repeat_count);
 
-	if (repeat_count)
-		add_repeat_template(p, repeat_count);
+		add_end_template(p);
 
-	add_end_template(p);
+		/*
+		 * crc(0:31) is appended to target data starting with the next
+		 * bit after End of stream template.
+		 * nx842 calculates CRC for data in big-endian format. So doing
+		 * same here so that sw842 decompression can be used for both
+		 * compressed data.
+		 */
+	#ifndef DISABLE_CRC
+		uint32_t crc = crc32_be(0, in, ilen);
 
-	/*
-	 * crc(0:31) is appended to target data starting with the next
-	 * bit after End of stream template.
-	 * nx842 calculates CRC for data in big-endian format. So doing
-	 * same here so that sw842 decompression can be used for both
-	 * compressed data.
-	 */
-#ifndef DISABLE_CRC
-	uint32_t crc = crc32_be(0, in, ilen);
+		stream_write_bits(p->stream, crc, CRC_BITS);
+	#endif
 
-	stream_write_bits(p->stream, crc, CRC_BITS);
-#endif
+		stream_flush(p->stream);
 
-	stream_flush(p->stream);
-
-	*olen = stream_size(p->stream);
-#ifdef ENABLE_ERROR_HANDLING
+		*olen = stream_size(p->stream);
 	} catch (const bitstream_full_exception &) {
 		stream_close(p->stream);
 		free(p);
 		return -ENOSPC;
 	}
-#endif
 
 	stream_close(p->stream);
 	free(p);
