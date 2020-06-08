@@ -179,8 +179,11 @@ static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op, size_t num
 	cryp.chunkdlens = olens32;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
 		int err = -errno;
-		fprintf(stderr, "ioctl(CIOCCRYPT) failed (%d): %s\n",
-			errno, strerror(errno));
+		// TODOXXX this is hacky, it should be a return per chunk instead of a single global ENOSPC return
+		if (err != -ENOSPC) {
+			fprintf(stderr, "ioctl(CIOCCRYPT) failed (%d): %s\n",
+				errno, strerror(errno));
+		}
 		return err;
 	}
 
