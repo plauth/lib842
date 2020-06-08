@@ -233,13 +233,10 @@ Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &sta
 
 	// TODOXXX use chunked mode
 
-	// TODOXXX: This can be reduced to e.g. COMPRESSIBLE_THRESHOLD or CHUNK_SIZE,
-	// as long as the lib842 compressor respects the destination buffer size
-	// (input value of the olen parameter to the compression function)
-	// However, currently the serial_optimized lib842 implementation does not
-	// respect olen when compiled without ENABLE_ERROR_HANDLING (for performance),
-	// so this is necessary to handle this case
-	static constexpr size_t CHUNK_PADDING = 2 * CHUNK_SIZE;
+	// Use a padding of CHUNK_SIZE instead of COMPRESSIBLE_THRESHOLD to
+	// hopefully get better alignment for HW compression
+	// (CHUNK_SIZE is guaranteed to be a power of two)
+	static constexpr size_t CHUNK_PADDING = CHUNK_SIZE; // COMPRESSIBLE_THRESHOLD;
 	uint8_t *chunk_buffer = block.allocate_buffer(
 		_impl842.preferred_alignment, CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK);
 
@@ -249,7 +246,7 @@ Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &sta
 		auto compressed_destination = chunk_buffer + i * CHUNK_PADDING;
 
 		// Compress chunk
-		size_t compressed_size = CHUNK_PADDING;
+		size_t compressed_size = CHUNK_SIZE;
 
 #ifdef LIB842_STREAM_INDEPTH_TRACE
 		auto stat_compress_start_time = std::chrono::steady_clock::now();
@@ -264,7 +261,7 @@ Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &sta
 		}
 
 		// Push into the chunk queue
-		auto compressible = ret == 0 && compressed_size <= COMPRESSIBLE_THRESHOLD;
+		auto compressible = ret == 0;
 
 		block.datas[i] = compressible ? compressed_destination : source;
 		block.sizes[i] = compressible ? compressed_size : CHUNK_SIZE;
