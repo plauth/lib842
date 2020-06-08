@@ -589,6 +589,9 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 
 	p->stream = stream_open(out, *olen);
 
+#ifdef ENABLE_ERROR_HANDLING
+	try {
+#endif
 	p->olen = *olen;
 
 	*olen = 0;
@@ -634,11 +637,6 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 		update_hashtables(p);
 		p->in += 8;
 		p->ilen -= 8;
-
-#ifdef ENABLE_ERROR_HANDLING
-		if (stream_is_overfull(p->stream))
-			break;
-#endif
 	}
 
 	if (repeat_count)
@@ -661,20 +659,17 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 
 	stream_flush(p->stream);
 
-#ifdef ENABLE_ERROR_HANDLING
-	bool overfull = stream_is_overfull(p->stream);
-#endif
-
 	*olen = stream_size(p->stream);
+#ifdef ENABLE_ERROR_HANDLING
+	} catch (const bitstream_full_exception &) {
+		stream_close(p->stream);
+		free(p);
+		return -ENOSPC;
+	}
+#endif
 
 	stream_close(p->stream);
 	free(p);
-
-
-#ifdef ENABLE_ERROR_HANDLING
-	if (overfull)
-		return -ENOSPC;
-#endif
 
 	return 0;
 }
