@@ -2,10 +2,6 @@
 //     i.e. we kind of do the equivalent to this include:
 // #include "../common/842.h"
 
-#ifndef __ENDIAN_LITTLE__
-#error TODO: This kernel does not currently work on big endian
-#endif
-
 typedef uchar uint8_t;
 typedef ushort uint16_t;
 typedef short int16_t;
@@ -66,7 +62,6 @@ struct sw842_param_decomp {
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
 __constant static const uint16_t fifo_sizes[3] = { I2_FIFO_SIZE, I4_FIFO_SIZE, I8_FIFO_SIZE };
-__constant static const uint64_t masks[3] = { 0x000000000000FFFF, 0x00000000FFFFFFFF, 0xFFFFFFFFFFFFFFFF };
 __constant static const uint8_t dec_templates[26][4][2] = {
 	// params size in bits
 	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
@@ -103,8 +98,9 @@ __constant static const uint8_t dec_templates[26][4][2] = {
 	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
 };
 
-static inline uint64_t bswap(uint64_t value)
+static inline uint64_t swap_be_to_native64(uint64_t value)
 {
+#ifdef __ENDIAN_LITTLE__
 	return (uint64_t)((value & (uint64_t)0x00000000000000ff) << 56) |
 	       (uint64_t)((value & (uint64_t)0x000000000000ff00) << 40) |
 	       (uint64_t)((value & (uint64_t)0x0000000000ff0000) << 24) |
@@ -113,6 +109,45 @@ static inline uint64_t bswap(uint64_t value)
 	       (uint64_t)((value & (uint64_t)0x0000ff0000000000) >> 24) |
 	       (uint64_t)((value & (uint64_t)0x00ff000000000000) >> 40) |
 	       (uint64_t)((value & (uint64_t)0xff00000000000000) >> 56);
+#else
+	return value;
+#endif
+}
+
+static inline uint64_t swap_native_to_be64(uint64_t value)
+{
+#ifdef __ENDIAN_LITTLE__
+	return (uint64_t)((value & (uint64_t)0x00000000000000ff) << 56) |
+	       (uint64_t)((value & (uint64_t)0x000000000000ff00) << 40) |
+	       (uint64_t)((value & (uint64_t)0x0000000000ff0000) << 24) |
+	       (uint64_t)((value & (uint64_t)0x00000000ff000000) << 8) |
+	       (uint64_t)((value & (uint64_t)0x000000ff00000000) >> 8) |
+	       (uint64_t)((value & (uint64_t)0x0000ff0000000000) >> 24) |
+	       (uint64_t)((value & (uint64_t)0x00ff000000000000) >> 40) |
+	       (uint64_t)((value & (uint64_t)0xff00000000000000) >> 56);
+#else
+	return value;
+#endif
+}
+
+static inline uint16_t swap_be_to_native16(uint16_t value)
+{
+#ifdef __ENDIAN_LITTLE__
+	return (uint16_t)((value & (uint16_t)0x00ff) << 8) |
+	       (uint16_t)((value & (uint16_t)0xff00) >> 8);
+#else
+	return value;
+#endif
+}
+
+static inline uint16_t swap_native_to_be16(uint16_t value)
+{
+#ifdef __ENDIAN_LITTLE__
+	return (uint16_t)((value & (uint16_t)0x00ff) << 8) |
+	       (uint16_t)((value & (uint16_t)0xff00) >> 8);
+#else
+	return value;
+#endif
 }
 
 static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
@@ -134,9 +169,9 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 		p->lookAheadBuffer[2] = p->lookAheadBuffer[3];
 		p->lookAheadBuffer[3] = p->lookAheadBuffer[4];
 		p->lookAheadBuffer[4] = p->lookAheadBuffer[5];
-		p->lookAheadBuffer[5] = bswap(*p->in);
+		p->lookAheadBuffer[5] = swap_be_to_native64(*p->in);
 #else
-		p->buffer = bswap(*p->in);
+		p->buffer = swap_be_to_native64(*p->in);
 #endif
 		p->in++;
 		value |= p->buffer >> (WSIZE - (n - p->bits));
@@ -225,12 +260,10 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 			offset >>= 1;
 			__global uint16_t *ostart16 =
 				(__global uint16_t *)p->ostart;
-			value = (((uint64_t)ostart16[offset])) |
-				(((uint64_t)ostart16[offset + 1]) << 16) |
-				(((uint64_t)ostart16[offset + 2]) << 32) |
-				(((uint64_t)ostart16[offset + 3]) << 48);
-			value &= masks[dst_size >> 2];
-			value = bswap(value);
+			value = (((uint64_t)swap_be_to_native16(ostart16[offset])) << 48) |
+				(((uint64_t)swap_be_to_native16(ostart16[offset + 1])) << 32) |
+				(((uint64_t)swap_be_to_native16(ostart16[offset + 2])) << 16) |
+				(((uint64_t)swap_be_to_native16(ostart16[offset + 3])));
 			value >>= (WSIZE - (dst_size << 3));
 		}
 		output_word |= value
@@ -243,7 +276,7 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 		return;
 	}
 #endif
-	*p->out++ = bswap(output_word);
+	*p->out++ = swap_native_to_be64(output_word);
 }
 
 static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLACE in, size_t ilen,
@@ -261,12 +294,12 @@ static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLA
 
 	p.buffer = 0;
 #ifdef USE_INPLACE_COMPRESSED_CHUNKS
-	p.lookAheadBuffer[0] = bswap(*p.in++);
-	p.lookAheadBuffer[1] = bswap(*p.in++);
-	p.lookAheadBuffer[2] = bswap(*p.in++);
-	p.lookAheadBuffer[3] = bswap(*p.in++);
-	p.lookAheadBuffer[4] = bswap(*p.in++);
-	p.lookAheadBuffer[5] = bswap(*p.in++);
+	p.lookAheadBuffer[0] = swap_be_to_native64(*p.in++);
+	p.lookAheadBuffer[1] = swap_be_to_native64(*p.in++);
+	p.lookAheadBuffer[2] = swap_be_to_native64(*p.in++);
+	p.lookAheadBuffer[3] = swap_be_to_native64(*p.in++);
+	p.lookAheadBuffer[4] = swap_be_to_native64(*p.in++);
+	p.lookAheadBuffer[5] = swap_be_to_native64(*p.in++);
 #endif
 	p.bits = 0;
 
