@@ -230,8 +230,8 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 				(((uint64_t)ostart16[offset + 2]) << 32) |
 				(((uint64_t)ostart16[offset + 3]) << 48);
 			value &= masks[dst_size >> 2];
-			value <<= (WSIZE - (dst_size << 3));
 			value = bswap(value);
+			value >>= (WSIZE - (dst_size << 3));
 		}
 		output_word |= value
 			       << (64 - (dst_size << 3) - bits);

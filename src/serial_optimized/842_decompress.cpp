@@ -279,7 +279,7 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 		memcpy(&values[4 + i],
 		       &p->ostart[offset * is_index], dst_size * is_index);
 		values[4 + i] = swap_be_to_native64(
-			values[4 + i] << (WSIZE - (dst_size << 3)));
+			values[4 + i]) >> (WSIZE - (dst_size << 3));
 
 		values[i] = values[4 + i] * is_index | values[i];
 		output_word |= values[i] << (64 - (dst_size << 3) - bits);
