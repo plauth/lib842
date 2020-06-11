@@ -261,7 +261,7 @@ Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &sta
 		}
 
 		// Push into the chunk queue
-		auto compressible = ret == 0;
+		auto compressible = ret == 0 && compressed_size <= COMPRESSIBLE_THRESHOLD;
 
 		block.datas[i] = compressible ? compressed_destination : source;
 		block.sizes[i] = compressible ? compressed_size : CHUNK_SIZE;
