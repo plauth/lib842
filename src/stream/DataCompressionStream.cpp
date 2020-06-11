@@ -246,7 +246,7 @@ Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &sta
 		auto compressed_destination = chunk_buffer + i * CHUNK_PADDING;
 
 		// Compress chunk
-		size_t compressed_size = CHUNK_SIZE;
+		size_t compressed_size = CHUNK_PADDING;
 
 #ifdef LIB842_STREAM_INDEPTH_TRACE
 		auto stat_compress_start_time = std::chrono::steady_clock::now();
