@@ -459,12 +459,17 @@ static inline void process_next(struct sw842_param *p)
 
 #if defined(BRANCH_FREE) && BRANCH_FREE == 1
 	stream_write_bits(p->stream, templateKey, OP_BITS);
+
+	// Group all parameters for the four ops. into a single bitstream write
+	uint64_t paramword = 0;
+	uint8_t totalbits = 0;
 	for (int opnum = 0; opnum < 4; opnum++) {
-		stream_write_bits(
-			p->stream,
-			p->dataAndIndices[templates[templateKey][opnum][0]],
-			templates[templateKey][opnum][1]);
+		uint8_t opbits = templates[templateKey][opnum][1];
+		paramword <<= opbits;
+		paramword |= p->dataAndIndices[templates[templateKey][opnum][0]];
+		totalbits += opbits;
 	}
+	stream_write_bits(p->stream, paramword, totalbits);
 #else
 	switch (templateKey) {
 	case 0x00: // { D8, N0, N0, N0 }, 64 bits

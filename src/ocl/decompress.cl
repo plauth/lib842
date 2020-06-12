@@ -61,54 +61,10 @@ struct sw842_param_decomp {
 #define __round_mask(x, y) ((y)-1)
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
-__constant static const uint16_t fifo_sizes[3] = { I2_FIFO_SIZE, I4_FIFO_SIZE, I8_FIFO_SIZE };
-__constant static const uint8_t dec_templates[26][4][2] = {
-	// params size in bits
-	{ OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x00: { D8, N0, N0, N0 }, 64 bits
-	{ OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x01: { D4, D2, I2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x02: { D4, I2, D2, N0 }, 56 bits
-	{ OP_DEC_D4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x03: { D4, I2, I2, N0 }, 48 bits
-
-	{ OP_DEC_D4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x04: { D4, I4, N0, N0 }, 41 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x05: { D2, I2, D4, N0 }, 56 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x06: { D2, I2, D2, I2 }, 48 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x07: { D2, I2, I2, D2 }, 48 bits
-
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x08: { D2, I2, I2, I2 }, 40 bits
-	{ OP_DEC_D2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x09: { D2, I2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_D4, OP_DEC_N0 }, // 0x0a: { I2, D2, D4, N0 }, 56 bits
-	{ OP_DEC_I2, OP_DEC_D4, OP_DEC_I2, OP_DEC_N0 }, // 0x0b: { I2, D4, I2, N0 }, 48 bits
-
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_D2 }, // 0x0c: { I2, D2, I2, D2 }, 48 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2 }, // 0x0d: { I2, D2, I2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0 }, // 0x0e: { I2, D2, I4, N0 }, 33 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0 }, // 0x0f: { I2, I2, D4, N0 }, 48 bits
-
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2 }, // 0x10: { I2, I2, D2, I2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2 }, // 0x11: { I2, I2, I2, D2 }, 40 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2 }, // 0x12: { I2, I2, I2, I2 }, 32 bits
-	{ OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0 }, // 0x13: { I2, I2, I4, N0 }, 25 bits
-
-	{ OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0 }, // 0x14: { I4, D4, N0, N0 }, 41 bits
-	{ OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0 }, // 0x15: { I4, D2, I2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0 }, // 0x16: { I4, I2, D2, N0 }, 33 bits
-	{ OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0 }, // 0x17: { I4, I2, I2, N0 }, 25 bits
-
-	{ OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0 }, // 0x18: { I4, I4, N0, N0 }, 18 bits
-	{ OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0 }, // 0x19: { I8, N0, N0, N0 }, 8 bits
-};
-
 static inline uint64_t swap_be_to_native64(uint64_t value)
 {
 #ifdef __ENDIAN_LITTLE__
-	return (uint64_t)((value & (uint64_t)0x00000000000000ff) << 56) |
-	       (uint64_t)((value & (uint64_t)0x000000000000ff00) << 40) |
-	       (uint64_t)((value & (uint64_t)0x0000000000ff0000) << 24) |
-	       (uint64_t)((value & (uint64_t)0x00000000ff000000) << 8) |
-	       (uint64_t)((value & (uint64_t)0x000000ff00000000) >> 8) |
-	       (uint64_t)((value & (uint64_t)0x0000ff0000000000) >> 24) |
-	       (uint64_t)((value & (uint64_t)0x00ff000000000000) >> 40) |
-	       (uint64_t)((value & (uint64_t)0xff00000000000000) >> 56);
+	return as_ulong(as_uchar8(value).s76543210);
 #else
 	return value;
 #endif
@@ -117,14 +73,7 @@ static inline uint64_t swap_be_to_native64(uint64_t value)
 static inline uint64_t swap_native_to_be64(uint64_t value)
 {
 #ifdef __ENDIAN_LITTLE__
-	return (uint64_t)((value & (uint64_t)0x00000000000000ff) << 56) |
-	       (uint64_t)((value & (uint64_t)0x000000000000ff00) << 40) |
-	       (uint64_t)((value & (uint64_t)0x0000000000ff0000) << 24) |
-	       (uint64_t)((value & (uint64_t)0x00000000ff000000) << 8) |
-	       (uint64_t)((value & (uint64_t)0x000000ff00000000) >> 8) |
-	       (uint64_t)((value & (uint64_t)0x0000ff0000000000) >> 24) |
-	       (uint64_t)((value & (uint64_t)0x00ff000000000000) >> 40) |
-	       (uint64_t)((value & (uint64_t)0xff00000000000000) >> 56);
+	return as_ulong(as_uchar8(value).s76543210);
 #else
 	return value;
 #endif
@@ -133,8 +82,7 @@ static inline uint64_t swap_native_to_be64(uint64_t value)
 static inline uint16_t swap_be_to_native16(uint16_t value)
 {
 #ifdef __ENDIAN_LITTLE__
-	return (uint16_t)((value & (uint16_t)0x00ff) << 8) |
-	       (uint16_t)((value & (uint16_t)0xff00) >> 8);
+	return as_ushort(as_uchar2(value).s10);
 #else
 	return value;
 #endif
@@ -143,8 +91,7 @@ static inline uint16_t swap_be_to_native16(uint16_t value)
 static inline uint16_t swap_native_to_be16(uint16_t value)
 {
 #ifdef __ENDIAN_LITTLE__
-	return (uint16_t)((value & (uint16_t)0x00ff) << 8) |
-	       (uint16_t)((value & (uint16_t)0xff00) >> 8);
+	return as_ushort(as_uchar2(value).s10);
 #else
 	return value;
 #endif
@@ -152,8 +99,7 @@ static inline uint16_t swap_native_to_be16(uint16_t value)
 
 static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 {
-	// Avoid shift by 64 (only shifts of strictly less bits are allowed by the standard)
-	uint64_t value = (n > 0) ? (p->buffer >> (WSIZE - n)) : 0;
+	uint64_t value = p->buffer >> (WSIZE - n);
 	if (p->bits < n) {
 #ifdef ENABLE_ERROR_HANDLING
 	if ((p->in - p->istart + 1) * sizeof(uint64_t) > p->ilen) {
@@ -235,24 +181,34 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 	uint64_t output_word = 0;
 	uint32_t bits = 0;
 
-	for (int i = 0; i < 4; i++) {
-		uint64_t value;
-
-		uint32_t dec_template = dec_templates[op][i][0];
-		//printf("op is %x\n", dec_template & 0x7F);
-		uint32_t is_index = (dec_template >> 7);
-		uint32_t dst_size = dec_templates[op][i][1];
-
-		value = read_bits(p, dec_template & 0x7F);
+	// TODOXXX explain the patterns those formulas are based on
+	uint8_t opbits = 64 - ((op % 5) + 1) / 2 * 8 - ((op % 5) / 4) * 7
+			    - ((op / 5) + 1) / 2 * 8 - ((op / 5) / 4) * 7;
+	uint64_t params = read_bits(p, opbits);
 #ifdef ENABLE_ERROR_HANDLING
-		if (p->errorcode != 0)
-			return;
+	if (p->errorcode != 0)
+		return;
 #endif
 
+	for (int i = 0; i < 4; i++) {
+		// TODOXXX explain the patterns those formulas are based on
+		uint8_t opchunk = (i < 2) ? op / 5 : op % 5;
+		uint32_t is_index = (i & 1) * (opchunk & 1) + ((i & 1) ^ 1) * (opchunk >= 2);
+		uint32_t dst_size = 2 + (opchunk >= 4) * (1 - 2 * (i % 2)) * 2;
+		uint8_t num_bits = (i & 1) * (16 - (opchunk % 2) * 8 - (opchunk >= 4) * 16) +
+				   ((i & 1) ^ 1) * (16 - (opchunk / 2) * 8 + (opchunk >= 4) * 9);
+
+		// https://stackoverflow.com/a/28703383
+		uint64_t bitsmask = ((uint64_t)-(num_bits != 0)) &
+				    (((uint64_t)-1) >> (64 - num_bits));
+		uint64_t value = (params >> (opbits - num_bits)) & bitsmask;
+		opbits -= num_bits;
+
 		if (is_index) {
+			// TODOXXX explain how this relates to In_FIFO_SIZE constants
 			uint64_t offset = get_index(
 				p, dst_size, value,
-				fifo_sizes[dst_size >> 2]);
+				2048 - 1536 * ((dst_size >> 2) < 1));
 #ifdef ENABLE_ERROR_HANDLING
 			if (p->errorcode != 0)
 				return;
@@ -261,9 +217,7 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 			__global uint16_t *ostart16 =
 				(__global uint16_t *)p->ostart;
 			value = (((uint64_t)swap_be_to_native16(ostart16[offset])) << 48) |
-				(((uint64_t)swap_be_to_native16(ostart16[offset + 1])) << 32) |
-				(((uint64_t)swap_be_to_native16(ostart16[offset + 2])) << 16) |
-				(((uint64_t)swap_be_to_native16(ostart16[offset + 3])));
+				(((uint64_t)swap_be_to_native16(ostart16[offset + 1])) << 32);
 			value >>= (WSIZE - (dst_size << 3));
 		}
 		output_word |= value
@@ -347,6 +301,26 @@ static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLA
 			break;
 		case OP_END:
 			break;
+		case (OPS_MAX - 1): {
+			// The I8 opcode doesn't fit into the same patterns
+			// as the first 25 opcodes, so it's handled separately
+			uint64_t value = read_bits(&p, 8);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+#endif
+
+			uint64_t offset = get_index(
+				&p, 8, value, I8_FIFO_SIZE);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+			if ((p.out - p.ostart) * sizeof(uint64_t) + 8 > p.olen)
+				return -ENOSPC;
+#endif
+			*p.out++ = p.ostart[offset >> 3];
+		}
+		break;
 		default:
 			do_op(&p, op);
 #ifdef ENABLE_ERROR_HANDLING
