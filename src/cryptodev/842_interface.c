@@ -121,9 +121,10 @@ static int is_pointer_aligned(const void *ptr, uint16_t alignmask)
 	return ptr == aligned_ptr;
 }
 
-static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op, size_t numchunks,
-				 const uint8_t *in, size_t isize, const size_t *ilens,
-				 uint8_t *out, size_t osize, size_t *olens)
+static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op,
+				 size_t numchunks, int *rets,
+				 const uint8_t *in, size_t istride, const size_t *ilens,
+				 uint8_t *out, size_t ostride, size_t *olens)
 {
 	struct crypt_op cryp = { 0 };
 	__u32 ilens32[CRYPTODEV_COMP_MAX_CHUNKS],
@@ -139,12 +140,12 @@ static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op, size_t num
 		return -EINVAL;
 	}
 
-	if (isize > UINT32_MAX) {
-		fprintf(stderr, "isize too big\n");
+	if (numchunks != 0 && istride > UINT32_MAX / numchunks) {
+		fprintf(stderr, "istride too big\n");
 		return -EINVAL;
 	}
-	if (osize > UINT32_MAX) {
-		fprintf(stderr, "osize too big\n");
+	if (numchunks != 0 && ostride > UINT32_MAX / numchunks) {
+		fprintf(stderr, "ostride too big\n");
 		return -EINVAL;
 	}
 
@@ -154,7 +155,7 @@ static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op, size_t num
 	}
 
 	for (size_t i = 0; i < numchunks; i++) {
-		if (ilens[i] > UINT32_MAX) {
+		if (ilens[i] > (UINT32_MAX - 1) && ilens[i] != SIZE_MAX) {
 			fprintf(stderr, "ilens[%zu] too big\n", i);
 			return -EINVAL;
 		}
@@ -163,15 +164,15 @@ static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op, size_t num
 			return -EINVAL;
 		}
 
-		ilens32[i] = (__u32)ilens[i];
+		ilens32[i] = (__u32)(ilens[i] != SIZE_MAX ? ilens[i] : UINT32_MAX);
 		olens32[i] = (__u32)olens[i];
 	}
 
 	/* Encrypt data.in to data.encrypted */
 	cryp.ses = ctx->sess.ses;
 	cryp.op = op;
-	cryp.len = (__u32)isize;
-	cryp.dlen = (__u32)osize;
+	cryp.len = (__u32)(istride * numchunks);
+	cryp.dlen = (__u32)(ostride * numchunks);
 	cryp.src = (__u8 *)in;
 	cryp.dst = out;
 	cryp.numchunks = numchunks;
@@ -180,6 +181,7 @@ static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op, size_t num
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
 		int err = -errno;
 		// TODOXXX this is hacky, it should be a return per chunk instead of a single global ENOSPC return
+		// TODOXXX also remember to put in cryptodev the code to ignore chunks of input size SIZE_MAX
 		if (err != -ENOSPC) {
 			fprintf(stderr, "ioctl(CIOCCRYPT) failed (%d): %s\n",
 				errno, strerror(errno));
@@ -189,6 +191,7 @@ static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op, size_t num
 
 	for (size_t i = 0; i < numchunks; i++) {
 		olens[i] = olens32[i];
+		rets[i] = 0; // TODOXXX implement this in cryptodev
 	}
 
 	return 0;
@@ -198,7 +201,9 @@ static int c842_compress(struct cryptodev_ctx *ctx, __u16 op,
 			 const uint8_t *in, size_t ilen,
 			 uint8_t *out, size_t *olen)
 {
-	return c842_compress_chunked(ctx, op, 1, in, ilen, &ilen, out, *olen, olen);
+	int cret;
+	int ret = c842_compress_chunked(ctx, op, 1, &cret, in, ilen, &ilen, out, *olen, olen);
+	return (ret != 0) ? ret : cret;
 }
 
 // From the outside, we present an easy-to-use interface with only two
@@ -292,32 +297,32 @@ int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
 	return c842_compress(thread_ctx, COP_DECRYPT, in, ilen, out, olen);
 }
 
-int hw842_compress_chunked(size_t numchunks,
-			   const uint8_t *in, size_t isize, const size_t *ilens,
-			   uint8_t *out, size_t osize, size_t *olens)
+int hw842_compress_chunked(size_t numchunks, int *rets,
+			   const uint8_t *in, size_t istride, const size_t *ilens,
+			   uint8_t *out, size_t ostride, size_t *olens)
 {
 	struct cryptodev_ctx *thread_ctx;
 	int err = get_thread_cryptodev_ctx(&thread_ctx);
 	if (err)
 		return err;
 
-	return c842_compress_chunked(thread_ctx, COP_ENCRYPT, numchunks,
-				     in, isize, ilens,
-				     out, osize, olens);
+	return c842_compress_chunked(thread_ctx, COP_ENCRYPT, numchunks, rets,
+				     in, istride, ilens,
+				     out, ostride, olens);
 }
 
-int hw842_decompress_chunked(size_t numchunks,
-			     const uint8_t *in, size_t isize, const size_t *ilens,
-			     uint8_t *out, size_t osize, size_t *olens)
+int hw842_decompress_chunked(size_t numchunks, int *rets,
+			     const uint8_t *in, size_t istride, const size_t *ilens,
+			     uint8_t *out, size_t ostride, size_t *olens)
 {
 	struct cryptodev_ctx *thread_ctx;
 	int err = get_thread_cryptodev_ctx(&thread_ctx);
 	if (err)
 		return err;
 
-	return c842_compress_chunked(thread_ctx, COP_DECRYPT, numchunks,
-				     in, isize, ilens,
-				     out, osize, olens);
+	return c842_compress_chunked(thread_ctx, COP_DECRYPT, numchunks, rets,
+				     in, istride, ilens,
+				     out, ostride, olens);
 }
 
 const struct lib842_implementation *get_hw842_implementation() {

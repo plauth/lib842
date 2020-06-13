@@ -33,24 +33,24 @@ typedef int (*lib842_decompress_func)(const uint8_t *in, size_t ilen,
 // in succession, but may allow better use of the available resources
 // (note, however, that it does *not* involve multithreading)
 //
-// 'isize' and 'osize' are the total sizes of the input and output buffers, where
-// chunks are evenly spaced by (isize / numchunks) and (osize / numchunks) bytes
+// 'istride' and 'ostride' are the bytes between each chunk on the input and
+// output buffers (i.e. chunks are evenly spaced by (istride) and (ostride) bytes)
 typedef int (*lib842_compress_chunked_func)(
-	size_t numchunks,
-	const uint8_t *in, size_t isize, const size_t *ilens,
-	uint8_t *out, size_t osize, size_t *olens);
+	size_t numchunks, int *rets,
+	const uint8_t *in, size_t istride, const size_t *ilens,
+	uint8_t *out, size_t ostride, size_t *olens);
 
 // Decompresses sequences of bytes in multiple chunk mode
 // This is functionally equivalent to calling a lib842_decompress_func
 // in succession, but may allow better use of the available resources
 // (note, however, that it does *not* involve multithreading)
 //
-// 'isize' and 'osize' are the total sizes of the input and output buffers, where
-// chunks are evenly spaced by (isize / numchunks) and (osize / numchunks) bytes
+// 'istride' and 'ostride' are the bytes between each chunk on the input and
+// output buffers (i.e. chunks are evenly spaced by (istride) and (ostride) bytes)
 typedef int (*lib842_decompress_chunked_func)(
-	size_t numchunks,
-	const uint8_t *in, size_t isize, const size_t *ilens,
-	uint8_t *out, size_t osize, size_t *olens);
+	size_t numchunks, int *rets,
+	const uint8_t *in, size_t istride, const size_t *ilens,
+	uint8_t *out, size_t ostride, size_t *olens);
 
 struct lib842_implementation {
 	lib842_compress_func compress;

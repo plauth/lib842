@@ -82,6 +82,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// COMPRESSION
 	// -----------
 #if CHUNKS_PER_BATCH > 1
+	int chunk_rets[CHUNKS_PER_BATCH];
 	size_t input_chunk_sizes[CHUNKS_PER_BATCH];
 	for (size_t i = 0; i < CHUNKS_PER_BATCH; i++)
 		input_chunk_sizes[i] = CHUNK_SIZE;
@@ -99,9 +100,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			compressed_chunk_sizes[chunk_num + i] = CHUNK_SIZE * 2;
 #if CHUNKS_PER_BATCH > 1
 		int err = lib842impl.compress_chunked(
-			batch_chunks,
-			chunk_in, CHUNK_SIZE * batch_chunks, input_chunk_sizes,
-			chunk_out, CHUNK_SIZE * 2 * batch_chunks, &compressed_chunk_sizes[chunk_num]);
+			batch_chunks, chunk_rets,
+			chunk_in, CHUNK_SIZE, input_chunk_sizes,
+			chunk_out, CHUNK_SIZE * 2, &compressed_chunk_sizes[chunk_num]);
 #else
 		int err = lib842impl.compress(chunk_in, CHUNK_SIZE, chunk_out,
 					      &compressed_chunk_sizes[chunk_num]);
@@ -175,9 +176,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 			decompressed_chunk_sizes[chunk_num + i] = CHUNK_SIZE;
 #if CHUNKS_PER_BATCH > 1
 		int err = lib842impl.decompress_chunked(
-			batch_chunks,
-			chunk_out, CHUNK_SIZE * 2 * batch_chunks, &compressed_chunk_sizes[chunk_num],
-			chunk_decomp, CHUNK_SIZE * batch_chunks, &decompressed_chunk_sizes[chunk_num]);
+			batch_chunks, chunk_rets,
+			chunk_out, CHUNK_SIZE * 2, &compressed_chunk_sizes[chunk_num],
+			chunk_decomp, CHUNK_SIZE, &decompressed_chunk_sizes[chunk_num]);
 #else
 		int err = lib842impl.decompress(chunk_out,
 					        compressed_chunk_sizes[chunk_num],

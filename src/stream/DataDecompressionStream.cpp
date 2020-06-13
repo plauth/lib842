@@ -3,6 +3,7 @@
 #include <lib842/stream/decomp.h>
 
 #include <cassert>
+#include <climits>
 #include <algorithm>
 
 namespace lib842 {
@@ -208,40 +209,48 @@ void DataDecompressionStream::loop_decompress_thread(size_t thread_id) {
 
 bool DataDecompressionStream::handle_block(const Block &block,
 					   stats_per_thread_t &stats) const {
+	std::array<int, NUM_CHUNKS_PER_BLOCK> chunk_rets;
+	std::array<size_t, NUM_CHUNKS_PER_BLOCK> input_chunk_sizes, output_chunk_sizes;
+	output_chunk_sizes.fill(CHUNK_SIZE);
+
 	// TODOXXX use chunked mode
 	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
-		if (block.datas[i] == nullptr && block.sizes[i] == 0) {
+		if (block.sizes[i] == 0) {
 			// Chunk not present, nothing to do
 			// (This case happens when the application places uncompressed chunks directly
 			//  on the destination so they don't go through the DataDecompressionStream)
+			input_chunk_sizes[i] = SIZE_MAX;
 			continue;
 		}
 
 		auto destination = static_cast<uint8_t *>(_ptr) + block.offset + i * CHUNK_SIZE;
 
 		if (block.sizes[i] == CHUNK_SIZE) {
-			// Uncompressed (uncompressible) chunk, copy to the destination as-is
-			std::copy(block.datas[i], block.datas[i] + CHUNK_SIZE, destination);
+			// Uncompressed (uncompressible) chunk, copy from source to destination as-is
+			std::copy(block.get_chunk(i), block.get_chunk(i) + CHUNK_SIZE, destination);
+			input_chunk_sizes[i] = SIZE_MAX;
 			continue;
 		}
 
-		assert(block.sizes[i] > 0 &&
-		       block.sizes[i] <= COMPRESSIBLE_THRESHOLD);
+		assert(block.sizes[i] > 0 && block.sizes[i] <= COMPRESSIBLE_THRESHOLD);
+		input_chunk_sizes[i] = block.sizes[i];
+	}
 
-		size_t uncompressed_size = CHUNK_SIZE;
 #ifdef LIB842_STREAM_INDEPTH_TRACE
-		auto stat_decompress_start_time = std::chrono::steady_clock::now();
+	auto stat_decompress_start_time = std::chrono::steady_clock::now();
 #endif
-		int ret = _impl842.decompress(block.datas[i],
-					      block.sizes[i],
-					      destination, &uncompressed_size);
+	int ret = _impl842.decompress_chunked(NUM_CHUNKS_PER_BLOCK, chunk_rets.data(),
+		block.get_chunk_buffer(), block.chunk_padding, input_chunk_sizes.data(),
+		static_cast<uint8_t *>(_ptr) + block.offset, CHUNK_SIZE, output_chunk_sizes.data());
+	if (ret != 0)
+		return false;
 #ifdef LIB842_STREAM_INDEPTH_TRACE
-		stats.decompress_duration += std::chrono::steady_clock::now() - stat_decompress_start_time;
+	stats.decompress_duration += std::chrono::steady_clock::now() - stat_decompress_start_time;
 #endif
-		if (ret != 0)
-			return false;
 
-		assert(uncompressed_size == CHUNK_SIZE);
+	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
+		assert(chunk_rets[i] == 0);
+		assert(output_chunk_sizes[i] == CHUNK_SIZE);
 	}
 
 	return true;

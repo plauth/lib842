@@ -2,6 +2,7 @@
 
 #include <lib842/stream/comp.h>
 
+#include <array>
 #include <algorithm>
 #include <stdexcept>
 #include <climits>
@@ -228,43 +229,42 @@ void DataCompressionStream::loop_compress_thread(size_t thread_id) {
 
 
 Block DataCompressionStream::handle_block(size_t offset, stats_per_thread_t &stats) const {
-	Block block;
-	block.offset = offset;
-
-	// TODOXXX use chunked mode
-
 	// Use a padding of CHUNK_SIZE instead of COMPRESSIBLE_THRESHOLD to
 	// hopefully get better alignment for HW compression
 	// (CHUNK_SIZE is guaranteed to be a power of two)
 	static constexpr size_t CHUNK_PADDING = CHUNK_SIZE; // COMPRESSIBLE_THRESHOLD;
+
+	Block block;
+	block.source = static_cast<const uint8_t *>(_ptr) + offset;
+	block.chunk_padding = CHUNK_PADDING;
+	block.offset = offset;
+
 	uint8_t *chunk_buffer = block.allocate_buffer(
-		_impl842.preferred_alignment, CHUNK_PADDING * NUM_CHUNKS_PER_BLOCK);
+		_impl842.preferred_alignment, CHUNK_PADDING);
+	std::array<int, NUM_CHUNKS_PER_BLOCK> chunk_rets;
+	std::array<size_t, NUM_CHUNKS_PER_BLOCK> input_chunk_sizes, output_chunk_sizes;
+	input_chunk_sizes.fill(CHUNK_SIZE);
+	output_chunk_sizes.fill(CHUNK_PADDING);
+
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+	auto stat_compress_start_time = std::chrono::steady_clock::now();
+#endif
+	int ret = _impl842.compress_chunked(NUM_CHUNKS_PER_BLOCK, chunk_rets.data(),
+		static_cast<const uint8_t *>(_ptr) + offset, CHUNK_SIZE, input_chunk_sizes.data(),
+		chunk_buffer, CHUNK_PADDING, output_chunk_sizes.data());
+#ifdef LIB842_STREAM_INDEPTH_TRACE
+	stats.compress_duration += std::chrono::steady_clock::now() - stat_compress_start_time;
+#endif
+	if (ret != 0) {
+		block.offset = SIZE_MAX; // Indicates error to the user
+		block.release_buffer();
+		return block;
+	}
 
 	bool any_compressible = false;
 	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
-		auto source = static_cast<const uint8_t *>(_ptr) + offset + i * CHUNK_SIZE;
-		auto compressed_destination = chunk_buffer + i * CHUNK_PADDING;
-
-		// Compress chunk
-		size_t compressed_size = CHUNK_PADDING;
-
-#ifdef LIB842_STREAM_INDEPTH_TRACE
-		auto stat_compress_start_time = std::chrono::steady_clock::now();
-#endif
-		int ret = _impl842.compress(source, CHUNK_SIZE, compressed_destination, &compressed_size);
-#ifdef LIB842_STREAM_INDEPTH_TRACE
-		stats.compress_duration += std::chrono::steady_clock::now() - stat_compress_start_time;
-#endif
-		if (ret != 0 && ret != -ENOSPC) {
-			block.offset = SIZE_MAX; // Indicates error to the user
-			break;
-		}
-
-		// Push into the chunk queue
-		auto compressible = ret == 0 && compressed_size <= COMPRESSIBLE_THRESHOLD;
-
-		block.datas[i] = compressible ? compressed_destination : source;
-		block.sizes[i] = compressible ? compressed_size : CHUNK_SIZE;
+		auto compressible = chunk_rets[i] == 0 && output_chunk_sizes[i] <= COMPRESSIBLE_THRESHOLD;
+		block.sizes[i] = compressible ? output_chunk_sizes[i] : CHUNK_SIZE;
 		any_compressible |= compressible;
 	}
 
