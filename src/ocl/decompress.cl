@@ -181,7 +181,8 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 	uint64_t output_word = 0;
 	uint32_t bits = 0;
 
-	// TODOXXX explain the patterns those formulas are based on
+	// Calculate the number of bits for all 4 operations in the template
+	// This formula exploits the regularity/pattern in the templates (see below)
 	uint8_t opbits = 64 - ((op % 5) + 1) / 2 * 8 - ((op % 5) / 4) * 7
 			    - ((op / 5) + 1) / 2 * 8 - ((op / 5) / 4) * 7;
 	uint64_t params = read_bits(p, opbits);
@@ -191,7 +192,15 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 #endif
 
 	for (int i = 0; i < 4; i++) {
-		// TODOXXX explain the patterns those formulas are based on
+		// For templates 0 to 24 (inclusive), they follow a regular pattern
+		// each 5 templates. In particular, the operations which determine
+		// how the first four bytes of the output data are decoded depend on
+		// (op / 5), and analogously, those that determine the last four bytes
+		// are determined by (op % 5)
+		// This regularity makes it feasible to develop formulas to compute the
+		// this information efficiently enough to outperform table lookups
+		// Template 25 (index reference to 8 bytes) does not easily fit
+		// those patterns, so it is handled separately
 		uint8_t opchunk = (i < 2) ? op / 5 : op % 5;
 		uint32_t is_index = (i & 1) * (opchunk & 1) + ((i & 1) ^ 1) * (opchunk >= 2);
 		uint32_t dst_size = 2 + (opchunk >= 4) * (1 - 2 * (i % 2)) * 2;
@@ -205,10 +214,11 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 		opbits -= num_bits;
 
 		if (is_index) {
-			// TODOXXX explain how this relates to In_FIFO_SIZE constants
+			// fifo_size = 512 if dst_size = 2. = 2048 if dst_size = 4
+			// (See constants I2_FIFO_SIZE, I4_FIFO_SIZE)
+			uint64_t fifo_size = 2048 - 1536 * ((dst_size >> 2) < 1);
 			uint64_t offset = get_index(
-				p, dst_size, value,
-				2048 - 1536 * ((dst_size >> 2) < 1));
+				p, dst_size, value, fifo_size);
 #ifdef ENABLE_ERROR_HANDLING
 			if (p->errorcode != 0)
 				return;

@@ -213,7 +213,6 @@ bool DataDecompressionStream::handle_block(const Block &block,
 	std::array<size_t, NUM_CHUNKS_PER_BLOCK> input_chunk_sizes, output_chunk_sizes;
 	output_chunk_sizes.fill(CHUNK_SIZE);
 
-	// TODOXXX use chunked mode
 	for (size_t i = 0; i < NUM_CHUNKS_PER_BLOCK; i++) {
 		if (block.sizes[i] == 0) {
 			// Chunk not present, nothing to do
