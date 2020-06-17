@@ -326,7 +326,7 @@ const struct lib842_implementation *get_hw842_implementation() {
 		.decompress = hw842_decompress,
 		.compress_chunked = hw842_compress_chunked,
 		.decompress_chunked = hw842_decompress_chunked,
-		.required_alignment = 1,
+		.required_alignment = 0,
 		.preferred_alignment = 0
 	};
 	if (hw842_implementation.required_alignment == 0)
