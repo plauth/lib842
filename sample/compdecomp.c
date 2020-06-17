@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <limits.h>
+#include <errno.h>
 #include "compdecomp_driver.h"
 
 #if defined(USEAIX)
@@ -27,6 +29,8 @@
 //#define CHUNK_SIZE ((size_t)1024)
 #define CHUNK_SIZE ((size_t)4096)
 
+#define CHUNK_STRIDE (CHUNK_SIZE * 2)
+
 //#define CONDENSE
 
 bool compress_benchmark_core(const uint8_t *in, size_t ilen,
@@ -45,12 +49,12 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		return ret;
 	}
 
-	uint8_t *out = aligned_alloc(lib842impl.preferred_alignment, ilen * 2);
+	uint8_t *out = aligned_alloc(lib842impl.preferred_alignment, ilen / CHUNK_SIZE * CHUNK_STRIDE);
 	if (out == NULL) {
 		fprintf(stderr, "FAIL: out = aligned_alloc(...) failed!\n");
 		return ret;
 	}
-	memset(out, 0, ilen * 2);
+	memset(out, 0, ilen / CHUNK_SIZE * CHUNK_STRIDE);
 
 	uint8_t *decompressed = aligned_alloc(lib842impl.preferred_alignment, ilen);
 	if (decompressed == NULL) {
@@ -82,7 +86,6 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 	// COMPRESSION
 	// -----------
 #if CHUNKS_PER_BATCH > 1
-	int chunk_rets[CHUNKS_PER_BATCH];
 	size_t input_chunk_sizes[CHUNKS_PER_BATCH];
 	for (size_t i = 0; i < CHUNKS_PER_BATCH; i++)
 		input_chunk_sizes[i] = CHUNK_SIZE;
@@ -94,18 +97,28 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		size_t batch_chunks = num_chunks - chunk_num < CHUNKS_PER_BATCH
 			? num_chunks - chunk_num : CHUNKS_PER_BATCH;
 		const uint8_t *chunk_in = in + (CHUNK_SIZE * chunk_num);
-		uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
+		uint8_t *chunk_out = out + (CHUNK_STRIDE * chunk_num);
 
 		for (size_t i = 0; i < batch_chunks; i++)
-			compressed_chunk_sizes[chunk_num + i] = CHUNK_SIZE * 2;
+			compressed_chunk_sizes[chunk_num + i] = CHUNK_STRIDE;
 #if CHUNKS_PER_BATCH > 1
+		int chunk_rets[CHUNKS_PER_BATCH];
 		int err = lib842impl.compress_chunked(
 			batch_chunks, chunk_rets,
 			chunk_in, CHUNK_SIZE, input_chunk_sizes,
-			chunk_out, CHUNK_SIZE * 2, &compressed_chunk_sizes[chunk_num]);
+			chunk_out, CHUNK_STRIDE, &compressed_chunk_sizes[chunk_num]);
+		for (size_t c = 0; c < batch_chunks; c++) {
+			if (err == 0 && chunk_rets[c] == -ENOSPC) {
+				compressed_chunk_sizes[chunk_num + c] = SIZE_MAX;
+			}
+		}
 #else
 		int err = lib842impl.compress(chunk_in, CHUNK_SIZE, chunk_out,
 					      &compressed_chunk_sizes[chunk_num]);
+		if (err == -ENOSPC) {
+			compressed_chunk_sizes[chunk_num] = SIZE_MAX;
+			err = 0;
+		}
 #endif
 		if (err != 0) {
 			bool is_first_failure;
@@ -125,7 +138,9 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 	*olen = 0;
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++)
-		*olen += compressed_chunk_sizes[chunk_num];
+		*olen += compressed_chunk_sizes[chunk_num] != SIZE_MAX
+			? compressed_chunk_sizes[chunk_num]
+			: CHUNK_SIZE;
 
 	// ------------
 	// CONDENSATION
@@ -146,7 +161,7 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 
 #pragma omp parallel for
 	for (size_t chunk_num = 0; chunk_num < num_chunks; chunk_num++) {
-		uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
+		uint8_t *chunk_out = out + (CHUNK_STRIDE * chunk_num);
 		uint8_t *chunk_condensed =
 			out_condensed + compressed_chunk_positions[chunk_num];
 		memcpy(chunk_condensed, chunk_out,
@@ -168,21 +183,37 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 #ifdef CONDENSE
 		uint8_t *chunk_out = out_condensed + compressed_chunk_positions[chunk_num];
 #else
-		uint8_t *chunk_out = out + ((CHUNK_SIZE * 2) * chunk_num);
+		uint8_t *chunk_out = out + (CHUNK_STRIDE * chunk_num);
 #endif
 		uint8_t *chunk_decomp = decompressed + (CHUNK_SIZE * chunk_num);
 
 		for (size_t i = 0; i < batch_chunks; i++)
 			decompressed_chunk_sizes[chunk_num + i] = CHUNK_SIZE;
 #if CHUNKS_PER_BATCH > 1
+		int chunk_rets[CHUNKS_PER_BATCH];
 		int err = lib842impl.decompress_chunked(
 			batch_chunks, chunk_rets,
-			chunk_out, CHUNK_SIZE * 2, &compressed_chunk_sizes[chunk_num],
+			chunk_out, CHUNK_STRIDE, &compressed_chunk_sizes[chunk_num],
 			chunk_decomp, CHUNK_SIZE, &decompressed_chunk_sizes[chunk_num]);
+		for (size_t c = 0; c < batch_chunks; c++) {
+			if (compressed_chunk_sizes[chunk_num + c] == SIZE_MAX) {
+				memcpy(decompressed + (CHUNK_SIZE * (chunk_num + c)),
+				       in + (CHUNK_SIZE * (chunk_num + c)), CHUNK_SIZE);
+				decompressed_chunk_sizes[c + chunk_num] = CHUNK_SIZE;
+			}
+		}
 #else
-		int err = lib842impl.decompress(chunk_out,
-					        compressed_chunk_sizes[chunk_num],
-					        chunk_decomp, &decompressed_chunk_sizes[chunk_num]);
+		int err = 0;
+		if (compressed_chunk_sizes[chunk_num] != SIZE_MAX) {
+			lib842impl.decompress(
+				chunk_out, compressed_chunk_sizes[chunk_num],
+				chunk_decomp, &decompressed_chunk_sizes[chunk_num]);
+		} else {
+			memcpy(decompressed + CHUNK_SIZE * chunk_num,
+			       in + CHUNK_SIZE * chunk_num, CHUNK_SIZE);
+			decompressed_chunk_sizes[chunk_num] = CHUNK_SIZE;
+
+		}
 #endif
 
 		if (err != 0) {
