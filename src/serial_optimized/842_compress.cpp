@@ -577,6 +577,12 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 		return -EINVAL;
 	}
 
+	if (((uintptr_t)in % 8) != 0 || ((uintptr_t)out % 8) != 0) {
+		fprintf(stderr, "WARNING: Input or output pointers not 8-byte aligned"
+			        ", using non-optimized impl.\n");
+		return sw842_compress(in, ilen, out, olen);
+	}
+
 	auto *p = (struct sw842_param *)malloc(sizeof(struct sw842_param));
 
 	std::fill(std::begin(p->hashes), std::end(p->hashes), 0);
@@ -688,7 +694,7 @@ const struct lib842_implementation *get_optsw842_implementation() {
 		// and unaligned access to basic integer types aren't guaranteed to
 		// work by C/C++, even though they do (with terrible performance)
 		// in some platforms like x86_64
-		.required_alignment = sizeof(uint64_t),
+		.required_alignment = 1,
 		.preferred_alignment = sizeof(uint64_t)
 	};
 	return &optsw842_implementation;

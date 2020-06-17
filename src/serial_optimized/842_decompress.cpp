@@ -277,6 +277,12 @@ static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
 int optsw842_decompress(const uint8_t *in, size_t ilen,
 			uint8_t *out, size_t *olen)
 {
+	if (((uintptr_t)in % 8) != 0 || ((uintptr_t)out % 8) != 0) {
+		fprintf(stderr, "WARNING: Input or output pointers not 8-byte aligned"
+			        ", using non-optimized impl.\n");
+		return sw842_decompress(in, ilen, out, olen);
+	}
+
 	struct sw842_param_decomp p;
 	p.out = out;
 	p.ostart = out;
