@@ -256,6 +256,16 @@ static int get_thread_cryptodev_ctx(struct cryptodev_ctx **rctx)
 }
 
 static size_t hw842_get_required_alignment() {
+	// TODOXXX: The hardware-accelerated 842 driver will add a 'magic' header
+	//          upon compression if the buffer is not aligned to 128 bytes
+	//          This will make the 842 compressed bitstream incompatible
+	//          with the rest of the implementations (it is only compatible with
+	//          itself, i.e. with the hardware-accelerated 842 driver)
+	//          Should therefore required_alignment be at least 128?
+	//
+	//          For more information, look for 'DDE_BUFFER_ALIGN' and
+	//          'nx842_crypto_add_header' in the Linux kernel (as of v5.7)
+
 	struct cryptodev_ctx *thread_ctx;
 	int err = get_thread_cryptodev_ctx(&thread_ctx);
 	if (err) {
