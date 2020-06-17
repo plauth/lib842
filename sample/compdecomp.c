@@ -26,10 +26,10 @@
 #define CHUNKS_PER_BATCH 16
 
 //#define CHUNK_SIZE ((size_t)32768)
-//#define CHUNK_SIZE ((size_t)1024)
-#define CHUNK_SIZE ((size_t)4096)
+//#define CHUNK_SIZE ((size_t)4096)
+#define CHUNK_SIZE ((size_t)65536)
 
-#define CHUNK_STRIDE (CHUNK_SIZE * 2)
+#define CHUNK_STRIDE (CHUNK_SIZE)
 
 //#define CONDENSE
 
