@@ -610,7 +610,7 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 			 */
 			get_next_data(p);
 
-	#ifdef LIB842_CUDA_STRICT
+#ifdef LIB842_CUDA_STRICT
 			/* we don't care about endianness in last or next;
 			 * we're just comparing 8 bytes to another 8 bytes,
 			 * they're both the same endianness
@@ -634,9 +634,9 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 
 		repeat:
 			last = next;
-	#else
+#else
 			process_next(p);
-	#endif
+#endif
 			update_hashtables(p);
 			p->in += 8;
 			p->ilen -= 8;
@@ -654,11 +654,11 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 		 * same here so that sw842 decompression can be used for both
 		 * compressed data.
 		 */
-	#ifndef DISABLE_CRC
+#ifndef DISABLE_CRC
 		uint32_t crc = crc32_be(0, in, ilen);
 
 		stream_write_bits(p->stream, crc, CRC_BITS);
-	#endif
+#endif
 
 		stream_flush(p->stream);
 
