@@ -47,7 +47,7 @@ static int c842_ctx_init(struct cryptodev_ctx *ctx)
 	}
 
 	/* Set close-on-exec (not really needed here) */
-	if (fcntl(ctx->cfd, F_SETFD, 1) == -1) {
+	if (fcntl(ctx->cfd, F_SETFD, FD_CLOEXEC) == -1) {
 		err = -errno;
 		fprintf(stderr, "fcntl(F_SETFD) failed (%d): %s\n",
 			errno, strerror(errno));
