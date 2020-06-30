@@ -1,13 +1,13 @@
 #include "numa_spread.h"
 
 #include <lib842/stream/common.h>
+#include <cstdio>
 
 #ifdef LIB842_HAVE_NUMA
 
 #include <pthread.h>
 #include <numa.h>
 #include <sys/sysinfo.h>
-#include <cstdio>
 #ifdef LIB842_STREAM_INDEPTH_TRACE
 #include <string>
 #include <sstream>
