@@ -159,7 +159,13 @@ bool compress_benchmark_core(const uint8_t *in, size_t ilen,
 		return false;
 	}
 
-	return memcmp(in, decompressed, ilen) == 0;
+	if (memcmp(in, decompressed, ilen) != 0) {
+		fprintf(stderr,
+			"FAIL: Decompressed data differs from the original input data.\n");
+		return false;
+	}
+
+	return true;
 }
 
 bool simple_test_core(const uint8_t *in, size_t ilen,
