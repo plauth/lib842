@@ -115,7 +115,7 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 		p->lookAheadBuffer[2] = p->lookAheadBuffer[3];
 		p->lookAheadBuffer[3] = p->lookAheadBuffer[4];
 		p->lookAheadBuffer[4] = p->lookAheadBuffer[5];
-		p->lookAheadBuffer[5] = swap_be_to_native64(*p->in);
+		p->lookAheadBuffer[5] = ((p->in - p->istart + 6) * sizeof(uint64_t) < p->ilen) ? swap_be_to_native64(*(p->in + 6)) : 0;
 #else
 		p->buffer = swap_be_to_native64(*p->in);
 #endif
@@ -258,12 +258,12 @@ static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLA
 
 	p.buffer = 0;
 #ifdef USE_INPLACE_COMPRESSED_CHUNKS
-	p.lookAheadBuffer[0] = swap_be_to_native64(*p.in++);
-	p.lookAheadBuffer[1] = swap_be_to_native64(*p.in++);
-	p.lookAheadBuffer[2] = swap_be_to_native64(*p.in++);
-	p.lookAheadBuffer[3] = swap_be_to_native64(*p.in++);
-	p.lookAheadBuffer[4] = swap_be_to_native64(*p.in++);
-	p.lookAheadBuffer[5] = swap_be_to_native64(*p.in++);
+	p.lookAheadBuffer[0] = ((p.in - p.istart) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 0)) : 0;
+	p.lookAheadBuffer[1] = ((p.in - p.istart + 1) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 1)) : 0;
+	p.lookAheadBuffer[2] = ((p.in - p.istart + 2) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 2)) : 0;
+	p.lookAheadBuffer[3] = ((p.in - p.istart + 3) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 3)) : 0;
+	p.lookAheadBuffer[4] = ((p.in - p.istart + 4) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 4)) : 0;
+	p.lookAheadBuffer[5] = ((p.in - p.istart + 5) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 5)) : 0;
 #endif
 	p.bits = 0;
 
