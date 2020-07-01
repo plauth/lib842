@@ -27,6 +27,19 @@ __constant static const uint8_t LIB842_COMPRESSED_CHUNK_MARKER[] =
 #define RESTRICT_UNLESS_INPLACE
 #endif
 
+#ifdef USE_INPLACE_COMPRESSED_CHUNKS
+#define USE_LOOKAHEAD_BUFFER
+#else
+// TODOXXX: This isn't needed here and looks like a complete waste,
+//          but on Intel hardware, enabling this actually makes a HUGE
+//          positive difference on the execution time.
+//          Which makes no sense since it's theoretically speaking, this
+//          is not actually saving any memory reads
+//          Probably it's just that enabling this just triggers a different
+//          path in the compiler which actually works better for us...
+#define USE_LOOKAHEAD_BUFFER
+#endif
+
 #define ENABLE_ERROR_HANDLING
 
 struct sw842_param_decomp {
@@ -41,7 +54,7 @@ struct sw842_param_decomp {
 #endif
 	uint32_t bits;
 	uint64_t buffer;
-#ifdef USE_INPLACE_COMPRESSED_CHUNKS
+#ifdef USE_LOOKAHEAD_BUFFER
 	// TODOXXX: This amount of lookahead is insufficient, and can be overflowed
 	// on certain 'unfortunate' cases of input data.
 	// This causes this mode to be currently 'broken' for the general case
@@ -108,7 +121,7 @@ static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
 		return 0;
 	}
 #endif
-#ifdef USE_INPLACE_COMPRESSED_CHUNKS
+#ifdef USE_LOOKAHEAD_BUFFER
 		p->buffer = p->lookAheadBuffer[0];
 		p->lookAheadBuffer[0] = p->lookAheadBuffer[1];
 		p->lookAheadBuffer[1] = p->lookAheadBuffer[2];
@@ -257,7 +270,7 @@ static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLA
 #endif
 
 	p.buffer = 0;
-#ifdef USE_INPLACE_COMPRESSED_CHUNKS
+#ifdef USE_LOOKAHEAD_BUFFER
 	p.lookAheadBuffer[0] = ((p.in - p.istart) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 0)) : 0;
 	p.lookAheadBuffer[1] = ((p.in - p.istart + 1) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 1)) : 0;
 	p.lookAheadBuffer[2] = ((p.in - p.istart + 2) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 2)) : 0;
