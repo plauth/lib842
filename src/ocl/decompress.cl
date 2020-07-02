@@ -412,6 +412,14 @@ __kernel void decompress(__global const uint64_t *RESTRICT_UNLESS_INPLACE in,
 		return;
 	}
 
+	if (my_in[2] == 0) { // Means: Skip chunk - already in destination
+		if (olen)
+			olen[chunk_num] = CL842_CHUNK_SIZE;
+		if (returnValues)
+			returnValues[chunk_num] = 0;
+		return;
+	}
+
 	// Read compressed chunk size and skip to the beginning of the chunk
 	// (the end of the chunk matches the end of the input chunk buffer)
 	my_in += (CL842_CHUNK_SIZE - my_in[2]) / 8;
