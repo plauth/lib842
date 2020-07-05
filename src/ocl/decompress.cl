@@ -396,6 +396,8 @@ __kernel void decompress(__global const uint64_t *RESTRICT_UNLESS_INPLACE in,
 	__global uint64_t *my_out = out + (outOffset / 8) + ((CL842_CHUNK_SIZE / 8) * chunk_num);
 	__global const uint64_t *my_in = in + (inOffset / 8) + ((CL842_CHUNK_STRIDE / 8) * chunk_num);
 
+	size_t my_ilen = ilen != NULL ? ilen[chunk_num] : (size_t)-1;
+
 #if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
 	if (my_in[0] != ((__constant const uint64_t *)LIB842_COMPRESSED_CHUNK_MARKER)[0] ||
 	    my_in[1] != ((__constant const uint64_t *)LIB842_COMPRESSED_CHUNK_MARKER)[1]) {
@@ -422,10 +424,10 @@ __kernel void decompress(__global const uint64_t *RESTRICT_UNLESS_INPLACE in,
 
 	// Read compressed chunk size and skip to the beginning of the chunk
 	// (the end of the chunk matches the end of the input chunk buffer)
+	my_ilen = my_in[2]; // TODOXXX: Avoid all this marker and embeeded lengths
+			    // nonesense and just pass the lengths with ilen everywhere
 	my_in += (CL842_CHUNK_SIZE - my_in[2]) / 8;
 #endif
-
-	size_t my_ilen = ilen != NULL ? ilen[chunk_num] : (size_t)-1;
 	size_t my_olen = olen != NULL ? olen[chunk_num] : (size_t)-1;
 
 	int ret = decompress_core(my_in, my_ilen, my_out, &my_olen);
