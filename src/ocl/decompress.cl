@@ -172,6 +172,14 @@ static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
 
 #ifdef ENABLE_ERROR_HANDLING
 	if (offset + size > total) {
+		// TODOXXX: Commenting and uncommenting this printf has some
+		// weird performance effects on NVIDIA hardware, even on valid cases
+		// where this code path is never hit
+		// If commented: lib842 OCL benchmark results perform worse,
+		//               but dOpenCL performs MUCH better
+		// If not commented: lib842 OCL benchmarks perform better,
+		//                   but dOpenCL performs MUCH worse
+		// This is probably related to the compiler's optimizer...
 		//printf("index%x %lx points past end %lx\n", size,
 		//       (unsigned long)offset, (unsigned long)total);
 		p->errorcode = -EINVAL;
