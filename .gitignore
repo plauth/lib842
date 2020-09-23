@@ -1,14 +1,6 @@
-*.dSYM
-cpu_serial/842_test
-cpu_serial/842_test.dSYM
-obj/
-bin/
-test/simple_test
-vec.out
-a.out
-*.ptx
+build
 
-ocl_test
-ocl_test.dSYM
-bitstream
-mask
+# CLion
+.idea
+cmake-build-debug
+cmake-build-release

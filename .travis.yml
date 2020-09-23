@@ -1,0 +1,54 @@
+---
+language: cpp
+matrix:
+  include:
+    # Ubuntu 18.04 + gcc
+    - os: linux
+      dist: bionic
+      compiler: gcc
+    # Ubuntu 18.04 + clang
+    - os: linux
+      dist: bionic
+      compiler: clang
+    # Ubuntu 16.04 + gcc
+    - os: linux
+      dist: xenial
+      compiler: gcc
+    # Ubuntu 16.04 + clang
+    - os: linux
+      dist: xenial
+      compiler: clang
+before_install:
+  - |
+    # For cryptodev-linux
+    sudo apt-get -y install "linux-headers-$(uname -r)"
+
+    # For lib842
+    sudo apt-get -y install libnuma-dev opencl-headers ocl-icd-opencl-dev
+    # Rely on POCL to provide a generic OpenCL implementation that can run the tests
+    # Unfortunately however,it is not available on Ubuntu 16.04, only on Ubuntu 18.04
+    if [[ "$(lsb_release -rs)" == "18.04" ]]; then
+      sudo apt-get -y install pocl-opencl-icd
+    fi
+script:
+  - |
+    # Build cryptodev-linux dependency (for using the kernel's 842 support)
+    git clone https://github.com/joanbm/cryptodev-linux
+    cd cryptodev-linux
+    make -j"$(nproc)"
+    sudo make install
+    sudo depmod -a
+    sudo modprobe cryptodev
+    cd ..
+
+    # Build lib842
+    mkdir build && cd build
+    cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j"$(nproc)"
+
+    # Run tests
+    if [[ "$(lsb_release -rs)" == "18.04" ]]; then
+      ctest
+    else
+      ctest -E '.*_cl.*'
+    fi

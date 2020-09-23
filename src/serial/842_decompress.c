@@ -17,6 +17,25 @@
  */
 
 #include "842-internal.h"
+#include "kerneldeps.h"
+#include "../common/crc32.h"
+#include "../common/endianness.h"
+#include <lib842/sw.h>
+
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#include <limits.h>
+#include <errno.h>
+
+struct sw842_param_decomp {
+	const uint8_t *in;
+	uint8_t bit;
+	uint64_t ilen;
+	uint8_t *out;
+	const uint8_t *ostart;
+	uint64_t olen;
+};
 
 /* rolling fifo sizes */
 #define I2_FIFO_SIZE	(2 * (1 << I2_BITS))
@@ -52,12 +71,10 @@ static uint8_t decomp_ops[OPS_MAX][4] = {
 	{ I8, N0, N0, N0 }
 };
 
-
-
 #define beN_to_cpu(d, s)					\
-	((s) == 2 ? swap_endianness16(get_unaligned16((__be16 *)d)) :	\
-	 (s) == 4 ? swap_endianness32(get_unaligned32((__be32 *)d)) :	\
-	 (s) == 8 ? swap_endianness64(get_unaligned64((__be64 *)d)) :	\
+	((s) == 2 ? swap_be_to_native16(get_unaligned16((const __be16 *)d)) :	\
+	 (s) == 4 ? swap_be_to_native32(get_unaligned32((const __be32 *)d)) :	\
+	 (s) == 8 ? swap_be_to_native64(get_unaligned64((const __be64 *)d)) :	\
 	 0)
 
 static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n);
@@ -84,7 +101,8 @@ static int __split_next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t 
 
 static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n)
 {
-	uint8_t *in = p->in, b = p->bit, bits = b + n;
+	const uint8_t *in = p->in;
+	uint8_t b = p->bit, bits = b + n;
 
 	if (n > 64) {
 		fprintf(stderr, "next_bits invalid n %u\n", n);
@@ -107,11 +125,11 @@ static int next_bits(struct sw842_param_decomp *p, uint64_t *d, uint8_t n)
 	if (bits <= 8)
 		*d = *in >> (8 - bits);
 	else if (bits <= 16)
-		*d = swap_endianness16(get_unaligned16((__be16 *)in)) >> (16 - bits);
+		*d = swap_be_to_native16(get_unaligned16((const __be16 *)in)) >> (16 - bits);
 	else if (bits <= 32)
-		*d = swap_endianness32(get_unaligned32((__be32 *)in)) >> (32 - bits);
+		*d = swap_be_to_native32(get_unaligned32((const __be32 *)in)) >> (32 - bits);
 	else
-		*d = swap_endianness64(get_unaligned64((__be64 *)in)) >> (64 - bits);
+		*d = swap_be_to_native64(get_unaligned64((const __be64 *)in)) >> (64 - bits);
 
 	*d &= GENMASK_ULL(n - 1, 0);
 
@@ -140,13 +158,13 @@ static int do_data(struct sw842_param_decomp *p, uint8_t n)
 
 	switch (n) {
 	case 2:
-		put_unaligned_le16(swap_endianness16(v), (__be16 *)p->out);
+		put_unaligned_le16(swap_native_to_be16(v), (__be16 *)p->out);
 		break;
 	case 4:
-		put_unaligned_le32(swap_endianness32(v), (__be32 *)p->out);
+		put_unaligned_le32(swap_native_to_be32(v), (__be32 *)p->out);
 		break;
 	case 8:
-		put_unaligned_le64(swap_endianness64(v), (__be64 *)p->out);
+		put_unaligned_le64(swap_native_to_be64(v), (__be64 *)p->out);
 		break;
 	default:
 		return -EINVAL;
@@ -187,20 +205,23 @@ static int __do_index(struct sw842_param_decomp *p, uint8_t size, uint8_t bits, 
 
 	if (offset + size > total) {
 		fprintf(stderr, "index%x %lx points past end %lx\n", size,
-			 (unsigned long)offset, (unsigned long)total);
+			(unsigned long)offset, (unsigned long)total);
 		return -EINVAL;
 	}
 
 	if (size != 2 && size != 4 && size != 8)
 		printf("__do_index invalid size %x\n", size);
-	#ifdef DEBUG
-	else	
+#ifdef DEBUG
+	else
 		printf("index%x to %lx off %lx adjoff %lx tot %lx data %lx\n",
-			 size, (unsigned long)index,
-			 (unsigned long)(index * size), (unsigned long)offset,
-			 (unsigned long)total,
-			 (unsigned long)beN_to_cpu(&p->ostart[offset], size));
-	#endif
+		       size, (unsigned long)index,
+		       (unsigned long)(index * size), (unsigned long)offset,
+		       (unsigned long)total,
+		       (unsigned long)beN_to_cpu(&p->ostart[offset], size));
+#endif
+
+	if (size > p->olen)
+		return -ENOSPC;
 
 	memcpy(p->out, &p->ostart[offset], size);
 	p->out += size;
@@ -233,9 +254,9 @@ static int do_op(struct sw842_param_decomp *p, uint8_t o)
 	for (i = 0; i < 4; i++) {
 		uint8_t op = decomp_ops[o][i];
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		printf("op is %x\n", op);
-		#endif
+#endif
 
 		switch (op & OP_ACTION) {
 		case OP_ACTION_DATA:
@@ -281,7 +302,7 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 	uint64_t op, rep, tmp, bytes, total;
 	uint64_t crc;
 
-	p.in = (uint8_t *)in;
+	p.in = in;
 	p.bit = 0;
 	p.ilen = ilen;
 	p.out = out;
@@ -297,9 +318,9 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 		if (ret)
 			return ret;
 
-		#ifdef DEBUG
+#ifdef DEBUG
 		printf("template is %lx\n", (unsigned long)op);
-		#endif
+#endif
 
 		switch (op) {
 		case OP_REPEAT:
@@ -340,6 +361,9 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 			if (!bytes || bytes > SHORT_DATA_BITS_MAX)
 				return -EINVAL;
 
+			if (bytes > p.olen)
+				return -ENOSPC;
+
 			while (bytes-- > 0) {
 				ret = next_bits(&p, &tmp, 8);
 				if (ret)
@@ -366,14 +390,14 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 	 * next bit after End of stream template.
 	 */
 	ret = next_bits(&p, &crc, CRC_BITS);
-	
+
 	if (ret)
 		return ret;
 
 	/*
 	 * Validate CRC saved in compressed data.
 	 */
-	if (crc != (uint64_t) crc32_be(0, out, total - p.olen)) {
+	if (crc != (uint64_t)crc32_be(0, out, total - p.olen)) {
 		fprintf(stderr, "CRC mismatch for decompression\n");
 		return -EINVAL;
 	}
@@ -385,5 +409,3 @@ int sw842_decompress(const uint8_t *in, size_t ilen,
 
 	return 0;
 }
-
-

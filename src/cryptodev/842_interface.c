@@ -3,9 +3,29 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 #include <fcntl.h>
+#ifndef __STDC_NO_THREADS__
+#include <threads.h>
+#else
+// Even though all systems we are currently targetting support threads,
+// implementations such as glibc didn't support for C11 threads until recently
+// But since C11 threads are almost a clone of pthreads, we can easily fall
+// back to those if C11 threads are not supported but pthreads is
+#include <pthread.h>
+#define ONCE_FLAG_INIT PTHREAD_ONCE_INIT
+#define once_flag pthread_once_t
+#define call_once pthread_once
+#define tss_t pthread_key_t
+#define tss_create pthread_key_create
+#define thrd_success 0
+#define tss_set pthread_setspecific
+#define tss_get pthread_getspecific
+#endif
 #include <sys/ioctl.h>
 #include <crypto/cryptodev.h>
+#include <lib842/hw.h>
+#include <unistd.h>
 
 struct cryptodev_ctx {
 	int cfd;
@@ -13,196 +33,308 @@ struct cryptodev_ctx {
 	uint16_t alignmask;
 };
 
-int c842_ctx_init(struct cryptodev_ctx* ctx, int cfd)
+static int c842_ctx_init(struct cryptodev_ctx *ctx)
 {
-#ifdef CIOCGSESSINFO
-	struct session_info_op siop;
-#endif
+	int err;
 
-	memset(ctx, 0, sizeof(*ctx));
-	ctx->cfd = cfd;
+	/* Open the crypto device */
+	ctx->cfd = open("/dev/crypto", O_RDWR, 0);
+	if (ctx->cfd < 0) {
+		err = -errno;
+		fprintf(stderr, "open(/dev/crypto) failed (%d): %s\n",
+			errno, strerror(errno));
+		goto return_error;
+	}
 
+	/* Set close-on-exec (not really needed here) */
+	if (fcntl(ctx->cfd, F_SETFD, FD_CLOEXEC) == -1) {
+		err = -errno;
+		fprintf(stderr, "fcntl(F_SETFD) failed (%d): %s\n",
+			errno, strerror(errno));
+		goto cleanup_file;
+	}
+
+	memset(&ctx->sess, 0, sizeof(ctx->sess));
 	ctx->sess.compr = CRYPTO_842;
 
 	if (ioctl(ctx->cfd, CIOCGSESSION, &ctx->sess)) {
-		fprintf(stderr, "ioctl(CIOCGSESSION)\n");
-		return -1;
+		err = -errno;
+		fprintf(stderr, "ioctl(CIOCGSESSION) failed (%d): %s\n",
+			errno, strerror(errno));
+		goto cleanup_file;
 	}
 
 #ifdef CIOCGSESSINFO
+	struct session_info_op siop = { 0 };
 	siop.ses = ctx->sess.ses;
 	if (ioctl(ctx->cfd, CIOCGSESSINFO, &siop)) {
-		fprintf(stderr, "ioctl(CIOCGSESSINFO)\n");
-		return -1;
+		err = -errno;
+		fprintf(stderr, "ioctl(CIOCGSESSINFO) failed (%d): %s\n",
+			errno, strerror(errno));
+		goto cleanup_file_and_session;
 	}
-	#ifdef DEBUG
-	printf("Got %s with driver %s\n",
-			siop.compr_info.cra_name, siop.compr_info.cra_driver_name);
+#ifdef DEBUG
+	printf("Got %s with driver %s\n", siop.compr_info.cra_name,
+	       siop.compr_info.cra_driver_name);
 	if (!(siop.flags & SIOP_FLAG_KERNEL_DRIVER_ONLY)) {
 		printf("Note: This is not an accelerated compressor\n");
 	}
-	#endif
+#endif
 	ctx->alignmask = siop.alignmask;
 #endif
+
 	return 0;
+
+cleanup_file_and_session:
+	ioctl(ctx->cfd, CIOCFSESSION, &ctx->sess.ses);
+cleanup_file:
+	close(ctx->cfd);
+return_error:
+	return err;
 }
 
-void c842_ctx_deinit(struct cryptodev_ctx* ctx) 
+static int c842_ctx_deinit(struct cryptodev_ctx *ctx)
 {
+	int err = 0;
+
 	if (ioctl(ctx->cfd, CIOCFSESSION, &ctx->sess.ses)) {
-		fprintf(stderr, "ioctl(CIOCFSESSION)\n");
-		exit(-1);
+		err = -errno;
+		fprintf(stderr, "ioctl(CIOCFSESSION) failed (%d): %s\n",
+			errno, strerror(errno));
 	}
+
+	/* Close the original descriptor */
+	if (close(ctx->cfd)) {
+		if (err == 0)
+			err = -errno;
+		fprintf(stderr, "close(cfd) failed (%d): %s\n",
+			errno, strerror(errno));
+	}
+
+	return err;
 }
 
-int c842_compress(struct cryptodev_ctx* ctx, const void* input, unsigned int ilen, void* output, unsigned int *olen)
+static int is_pointer_aligned(const void *ptr, uint16_t alignmask)
 {
-	struct crypt_op cryp;
-	void* p;
-	
-	/* check input and output alignment */
-	if (ctx->alignmask) {
-		p = (void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);
-		if (input != p) {
-			fprintf(stderr, "input is not aligned\n");
-			return -1;
-		}
+	const void *aligned_ptr =
+		(const void *)(((unsigned long)ptr + alignmask) & ~alignmask);
+	return ptr == aligned_ptr;
+}
 
-		p = (void*)(((unsigned long)output + ctx->alignmask) & ~ctx->alignmask);
-		if (output != p) {
-			fprintf(stderr, "output is not aligned\n");
-			return -1;
-		}
+static int c842_compress_chunked(struct cryptodev_ctx *ctx, __u16 op,
+				 size_t numchunks, int *rets,
+				 const uint8_t *in, size_t istride, const size_t *ilens,
+				 uint8_t *out, size_t ostride, size_t *olens)
+{
+	struct crypt_op cryp = { 0 };
+	__u32 ilens32[CRYPTODEV_COMP_MAX_CHUNKS],
+	      olens32[CRYPTODEV_COMP_MAX_CHUNKS];
+
+	/* check input and output alignment */
+	if (ctx->alignmask && !is_pointer_aligned(in, ctx->alignmask)) {
+		fprintf(stderr, "in is not aligned\n");
+		return -EINVAL;
+	}
+	if (ctx->alignmask && !is_pointer_aligned(out, ctx->alignmask)) {
+		fprintf(stderr, "out is not aligned\n");
+		return -EINVAL;
 	}
 
-	memset(&cryp, 0, sizeof(cryp));
+	if (numchunks != 0 && istride > UINT32_MAX / numchunks) {
+		fprintf(stderr, "istride too big\n");
+		return -EINVAL;
+	}
+	if (numchunks != 0 && ostride > UINT32_MAX / numchunks) {
+		fprintf(stderr, "ostride too big\n");
+		return -EINVAL;
+	}
+
+	if (numchunks > CRYPTODEV_COMP_MAX_CHUNKS) {
+		fprintf(stderr, "numchunks too big\n");
+		return -EINVAL;
+	}
+
+	for (size_t i = 0; i < numchunks; i++) {
+		if (ilens[i] > (UINT32_MAX - 1) && ilens[i] != SIZE_MAX) {
+			fprintf(stderr, "ilens[%zu] too big\n", i);
+			return -EINVAL;
+		}
+		if (olens[i] > UINT32_MAX) {
+			fprintf(stderr, "olens[%zu] too big\n", i);
+			return -EINVAL;
+		}
+
+		ilens32[i] = (__u32)(ilens[i] != SIZE_MAX ? ilens[i] : UINT32_MAX);
+		olens32[i] = (__u32)olens[i];
+	}
 
 	/* Encrypt data.in to data.encrypted */
 	cryp.ses = ctx->sess.ses;
-	cryp.len = ilen;
-	cryp.dlen = *olen;
-	cryp.src = (__u8*)input;
-	cryp.dst = (__u8*)output;
-	cryp.op = COP_ENCRYPT;
+	cryp.op = op;
+	cryp.len = (__u32)(istride * numchunks);
+	cryp.dlen = (__u32)(ostride * numchunks);
+	cryp.src = (__u8 *)in;
+	cryp.dst = out;
+	cryp.numchunks = numchunks;
+	cryp.chunklens = ilens32;
+	cryp.chunkdlens = olens32;
+	cryp.chunkrets = rets;
 	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
-		fprintf(stderr, "ioctl(CIOCCRYPT)\n");
-		return -1;
+		int err = -errno;
+		fprintf(stderr, "ioctl(CIOCCRYPT) failed (%d): %s\n",
+			errno, strerror(errno));
+		return err;
 	}
 
-	*olen = cryp.dlen;
+	for (size_t i = 0; i < numchunks; i++)
+		olens[i] = olens32[i];
 
 	return 0;
 }
 
-int c842_decompress(struct cryptodev_ctx* ctx, const void* input, unsigned int ilen, void* output, unsigned int *olen)
+static int c842_compress(struct cryptodev_ctx *ctx, __u16 op,
+			 const uint8_t *in, size_t ilen,
+			 uint8_t *out, size_t *olen)
 {
-	struct crypt_op cryp;
-	void* p;
-	
-	/* check input and output alignment */
-	if (ctx->alignmask) {
-		p = (void*)(((unsigned long)input + ctx->alignmask) & ~ctx->alignmask);
-		if (input != p) {
-			fprintf(stderr, "input is not aligned\n");
-			return -1;
-		}
+	int cret;
+	int ret = c842_compress_chunked(ctx, op, 1, &cret, in, ilen, &ilen, out, *olen, olen);
+	return (ret != 0) ? ret : cret;
+}
 
-		p = (void*)(((unsigned long)output + ctx->alignmask) & ~ctx->alignmask);
-		if (output != p) {
-			fprintf(stderr, "output is not aligned\n");
-			return -1;
-		}
+// From the outside, we present an easy-to-use interface with only two
+// functions (compress and decompress). For performance, we create just a
+// cryptodev context per thread, which is stored in a thread-local variable
+static tss_t thread_ctx_key;
+static int thread_ctx_key_err;
+static once_flag thread_ctx_key_once = ONCE_FLAG_INIT;
+
+static void destroy_thread_ctx(void *ctx)
+{
+	// We can't do anything with errors here, so ignore them
+	(void)c842_ctx_deinit((struct cryptodev_ctx *)ctx);
+	free(ctx);
+}
+
+static void create_thread_ctx_key()
+{
+	if (tss_create(&thread_ctx_key, destroy_thread_ctx) != thrd_success)
+		thread_ctx_key_err = -ENOMEM;
+
+	thread_ctx_key_err = 0;
+}
+
+static int get_thread_cryptodev_ctx(struct cryptodev_ctx **rctx)
+{
+	call_once(&thread_ctx_key_once, create_thread_ctx_key);
+	if (thread_ctx_key_err)
+		return thread_ctx_key_err;
+
+	struct cryptodev_ctx *ctx = tss_get(thread_ctx_key);
+	if (ctx != NULL) { // Context already created for this thread
+		*rctx = ctx;
+		return 0;
 	}
 
-	memset(&cryp, 0, sizeof(cryp));
+	ctx = malloc(sizeof(struct cryptodev_ctx));
+	if (ctx == NULL)
+		return -ENOMEM;
 
-	/* Encrypt data.in to data.encrypted */
-	cryp.ses = ctx->sess.ses;
-	cryp.len = ilen;
-	cryp.dlen = *olen;
-	cryp.src = (__u8*)input;
-	cryp.dst = (__u8*)output;
-	cryp.op = COP_DECRYPT;
-	if (ioctl(ctx->cfd, CIOCCRYPT, &cryp)) {
-		fprintf(stderr, "ioctl(CIOCCRYPT)\n");
-		return -1;
+	int err = c842_ctx_init(ctx);
+	if (err) {
+		free(ctx);
+		return err;
 	}
 
-	*olen = cryp.dlen;
+	if (tss_set(thread_ctx_key, ctx) != thrd_success) {
+		c842_ctx_deinit(ctx);
+		free(ctx);
+		return -ENOMEM;
+	}
 
+	*rctx = ctx;
 	return 0;
 }
 
-int hw842_compress(const uint8_t *in, unsigned int ilen, uint8_t *out, unsigned int *olen) {
-	int cfd = -1;
-	int err = 0;
-	struct cryptodev_ctx ctx;
-
-	/* Open the crypto device */
-	cfd = open("/dev/crypto", O_RDWR, 0);
-	if (cfd < 0) {
-		fprintf(stderr, "open(/dev/crypto)\n");
-		exit(-1);
+static size_t hw842_get_required_alignment() {
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
+	if (err) {
+		// Maximum alignment (note alignmask is a uint16_t)
+		// It will likely fail again later anyway
+		return 0x10000;
 	}
 
-	/* Set close-on-exec (not really needed here) */
-	if (fcntl(cfd, F_SETFD, 1) == -1) {
-		fprintf(stderr, "fcntl(F_SETFD)\n");
-		exit(-1);
-	}
-
-	err = c842_ctx_init(&ctx, cfd);
-	if(err)
-		exit(-1);
-
-	err = c842_compress(&ctx, in, ilen, out, olen);
-	if(err)
-		exit(-1);
-
-	c842_ctx_deinit(&ctx);
-
-	/* Close the original descriptor */
-	if (close(cfd)) {
-		fprintf(stderr, "close(cfd)\n");
-		return 1;
-	}
-
-	return 0;
+	return thread_ctx->alignmask + 1;
 }
 
-int hw842_decompress(const uint8_t *in, unsigned int ilen, uint8_t *out, unsigned int *olen) {
-	int cfd = -1;
-	int err = 0;
-	struct cryptodev_ctx ctx;
+int hw842_available() {
+	// TODO: A self-test trying to decompress a known bitstream would be better here
+	return access("/dev/crypto", F_OK) == 0;
+}
 
-	/* Open the crypto device */
-	cfd = open("/dev/crypto", O_RDWR, 0);
-	if (cfd < 0) {
-		fprintf(stderr, "open(/dev/crypto)\n");
-		exit(-1);
-	}
+int hw842_compress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
+{
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
+	if (err)
+		return err;
 
-	/* Set close-on-exec (not really needed here) */
-	if (fcntl(cfd, F_SETFD, 1) == -1) {
-		fprintf(stderr, "fcntl(F_SETFD)\n");
-		exit(-1);
-	}
+	return c842_compress(thread_ctx, COP_ENCRYPT, in, ilen, out, olen);
+}
 
-	err = c842_ctx_init(&ctx, cfd);
-	if(err)
-		exit(-1);
+int hw842_decompress(const uint8_t *in, size_t ilen, uint8_t *out, size_t *olen)
+{
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
+	if (err)
+		return err;
 
-	err = c842_decompress(&ctx, in, ilen, out, olen);
-	if(err)
-		exit(-1);
+	return c842_compress(thread_ctx, COP_DECRYPT, in, ilen, out, olen);
+}
 
-	c842_ctx_deinit(&ctx);
+int hw842_compress_chunked(size_t numchunks, int *rets,
+			   const uint8_t *in, size_t istride, const size_t *ilens,
+			   uint8_t *out, size_t ostride, size_t *olens)
+{
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
+	if (err)
+		return err;
 
-	/* Close the original descriptor */
-	if (close(cfd)) {
-		fprintf(stderr, "close(cfd)\n");
-		return 1;
-	}
+	return c842_compress_chunked(thread_ctx, COP_ENCRYPT, numchunks, rets,
+				     in, istride, ilens,
+				     out, ostride, olens);
+}
 
-	return 0;
+int hw842_decompress_chunked(size_t numchunks, int *rets,
+			     const uint8_t *in, size_t istride, const size_t *ilens,
+			     uint8_t *out, size_t ostride, size_t *olens)
+{
+	struct cryptodev_ctx *thread_ctx;
+	int err = get_thread_cryptodev_ctx(&thread_ctx);
+	if (err)
+		return err;
+
+	return c842_compress_chunked(thread_ctx, COP_DECRYPT, numchunks, rets,
+				     in, istride, ilens,
+				     out, ostride, olens);
+}
+
+const struct lib842_implementation *get_hw842_implementation() {
+	static struct lib842_implementation hw842_implementation = {
+		.compress = hw842_compress,
+		.decompress = hw842_decompress,
+		.compress_chunked = hw842_compress_chunked,
+		.decompress_chunked = hw842_decompress_chunked,
+		.required_alignment = 0,
+		.preferred_alignment = 0
+	};
+	if (hw842_implementation.required_alignment == 0)
+		hw842_implementation.required_alignment = hw842_get_required_alignment();
+	// The cryptodev implementation can work better (do zero copy)
+	// if the buffers are page-aligned
+	if (hw842_implementation.preferred_alignment == 0)
+		hw842_implementation.preferred_alignment = sysconf(_SC_PAGESIZE);
+
+	return &hw842_implementation;
 }

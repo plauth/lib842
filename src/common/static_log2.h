@@ -1,4 +1,4 @@
-/* 
+/*
  * Computes the floored log2 of a given value at compile-time.
  * The result is rounded down to the next base-2 boundary.
  *
@@ -12,7 +12,7 @@
  * #include static_log2.h
  * char myarray[STATIC_LOG2_VALUE]; // sizeof(myarray) == 3
  *
- * #define STATIC_LOG2_ARG 1234 
+ * #define STATIC_LOG2_ARG 1234
  * #include static_log2.h
  * char myarray[STATIC_LOG2_VALUE]; // sizeof(myarray) == 10
  *
@@ -31,10 +31,10 @@
 #define STATIC_LOG2_VALUE 30
 
 #elif STATIC_LOG2_ARG & (1 << 29)
-#define STATIC_LOG2_VALUE 29 
+#define STATIC_LOG2_VALUE 29
 
 #elif STATIC_LOG2_ARG & (1 << 28)
-#define STATIC_LOG2_VALUE 28 
+#define STATIC_LOG2_VALUE 28
 
 #elif STATIC_LOG2_ARG & (1 << 27)
 #define STATIC_LOG2_VALUE 27
@@ -118,7 +118,7 @@
 #define STATIC_LOG2_VALUE 0
 
 #else
-#define STATIC_LOG2_VALUE -1 
+#define STATIC_LOG2_VALUE -1
 #endif
 
 /* allow multiple inclusion of this header. */

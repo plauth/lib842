@@ -1,0 +1,11 @@
+.test842.ko.cmd
+.test842.mod.cmd
+.test842.mod.o.cmd
+.test842.o.cmd
+Module.symvers
+modules.order
+test842.ko
+test842.mod
+test842.mod.c
+test842.mod.o
+test842.o

@@ -1,286 +1,446 @@
-//R"=====(
+// NB: When we build the program, we prepend the 842 definitions,
+//     i.e. we kind of do the equivalent to this include:
+// #include "../common/842.h"
 
-typedef uchar   uint8_t;
-typedef ushort  uint16_t;
-typedef short   int16_t;
-typedef uint    uint32_t;
-typedef ulong   uint64_t; 
+typedef uchar uint8_t;
+typedef ushort uint16_t;
+typedef short int16_t;
+typedef uint uint32_t;
+typedef ulong uint64_t;
 
-/* special templates */
-#define OP_REPEAT   (0x1B)
-#define OP_ZEROS    (0x1C)
-#define OP_END      (0x1E)
+// Define NULL, since it is not required by the OpenCL C 1.2 standard
+// Most common vendor implementations define it anyway (Intel, NVIDIA),
+// but pocl adheres strictly to the standard and doesn't
+// See also: https://github.com/pocl/pocl/issues/831
+#ifndef NULL
+#define NULL 0L
+#endif
 
-/* additional bits of each op param */
-#define OP_BITS     (5)
-#define REPEAT_BITS (6)
-#define I2_BITS     (8)
-#define I4_BITS     (9)
-#define I8_BITS     (8)
-#define D2_BITS     (16)
-#define D4_BITS     (32)
-#define D8_BITS     (64)
-#define CRC_BITS    (32)
-#define N0_BITS     (0)
+#if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
+__constant static const uint8_t LIB842_COMPRESSED_CHUNK_MARKER[] =
+	LIB842_COMPRESSED_CHUNK_MARKER_DEF; // Defined at build time
+#endif
 
-#define REPEAT_BITS_MAX     (0x3f)
+#ifndef USE_INPLACE_COMPRESSED_CHUNKS
+#define RESTRICT_UNLESS_INPLACE restrict
+#else
+#define RESTRICT_UNLESS_INPLACE
+#endif
 
-/* Arbitrary values used to indicate action */
-#define OP_ACTION   (0x70)
-#define OP_ACTION_INDEX (0x10)
-#define OP_ACTION_DATA  (0x20)
-#define OP_ACTION_NOOP  (0x40)
-#define OP_AMOUNT   (0x0f)
-#define OP_AMOUNT_0 (0x00)
-#define OP_AMOUNT_2 (0x02)
-#define OP_AMOUNT_4 (0x04)
-#define OP_AMOUNT_8 (0x08)
+#ifdef USE_INPLACE_COMPRESSED_CHUNKS
+#define USE_LOOKAHEAD_BUFFER
+#else
+// TODOXXX: This isn't needed here and looks like a complete waste,
+//          but on Intel hardware, enabling this actually makes a HUGE
+//          positive difference on the execution time.
+//          Which makes no sense since it's theoretically speaking, this
+//          is not actually saving any memory reads
+//          Probably it's just that enabling this just triggers a different
+//          path in the compiler which actually works better for us...
+#define USE_LOOKAHEAD_BUFFER
+#endif
 
-#define D2      (OP_ACTION_DATA  | OP_AMOUNT_2)
-#define D4      (OP_ACTION_DATA  | OP_AMOUNT_4)
-#define D8      (OP_ACTION_DATA  | OP_AMOUNT_8)
-#define I2      (OP_ACTION_INDEX | OP_AMOUNT_2)
-#define I4      (OP_ACTION_INDEX | OP_AMOUNT_4)
-#define I8      (OP_ACTION_INDEX | OP_AMOUNT_8)
-#define N0      (OP_ACTION_NOOP  | OP_AMOUNT_0)
-
-#define DICT16_BITS     (10)
-#define DICT32_BITS     (11)
-#define DICT64_BITS     (10)
-
-#define I2N (13)
-#define I4N (53)
-#define I8N (149)
-
-//1st value: position of payload in dataAndIndices
-//2nd value: number of bits 
-#define D20_OP  {0,  D2_BITS}
-#define D21_OP  {1,  D2_BITS}
-#define D22_OP  {2,  D2_BITS}
-#define D23_OP  {3,  D2_BITS}
-#define D40_OP  {4,  D4_BITS}
-#define D41_OP  {5,  D4_BITS}
-#define D80_OP  {6,  D8_BITS}
-#define I20_OP  {7,  I2_BITS}
-#define I21_OP  {8,  I2_BITS}
-#define I22_OP  {9,  I2_BITS}
-#define I23_OP  {10, I2_BITS}
-#define I40_OP  {11, I4_BITS}
-#define I41_OP  {12, I4_BITS}
-#define I80_OP  {13, I8_BITS}
-#define D4S_OP  {14, D4_BITS}
-#define N0_OP   {15, 0}
-
-#define OP_DEC_NOOP  (0x00)
-#define OP_DEC_DATA  (0x00)
-#define OP_DEC_INDEX (0x80)
-
-#define OP_DEC_N0   {(N0_BITS | OP_DEC_NOOP),  0}
-#define OP_DEC_D2   {(D2_BITS | OP_DEC_DATA),  2}
-#define OP_DEC_D4   {(D4_BITS | OP_DEC_DATA),  4}
-#define OP_DEC_D8   {(D8_BITS | OP_DEC_DATA),  8}
-#define OP_DEC_I2   {(I2_BITS | OP_DEC_INDEX), 2}
-#define OP_DEC_I4   {(I4_BITS | OP_DEC_INDEX), 4}
-#define OP_DEC_I8   {(I8_BITS | OP_DEC_INDEX), 8}
+#define ENABLE_ERROR_HANDLING
 
 struct sw842_param_decomp {
-    __global uint64_t *out;
-    __global const uint64_t* ostart;
-    __global uint64_t *in;
-    uint32_t bits;
-    uint64_t buffer;
+	__global uint64_t *out;
+	__global const uint64_t *ostart;
+	__global const uint64_t *in;
+#ifdef ENABLE_ERROR_HANDLING
+	__global const uint64_t *istart;
+	size_t ilen;
+	size_t olen;
+	int errorcode;
+#endif
+	uint32_t bits;
+	uint64_t buffer;
+#ifdef USE_LOOKAHEAD_BUFFER
+	// TODOXXX: This amount of lookahead is insufficient, and can be overflowed
+	// on certain 'unfortunate' cases of input data.
+	// This causes this mode to be currently 'broken' for the general case
+	// See the notes in the comments on cl.h for more details
+	uint64_t lookAheadBuffer[6];
+#endif
 };
 
 /* number of bits in a buffered word */
 #define WSIZE 64 //sizeof(uint64_t)
 
 /* rolling fifo sizes */
-#define I2_FIFO_SIZE    (2 * (1 << I2_BITS))
-#define I4_FIFO_SIZE    (4 * (1 << I4_BITS))
-#define I8_FIFO_SIZE    (8 * (1 << I8_BITS))
+#define I2_FIFO_SIZE (2 * (1 << I2_BITS))
+#define I4_FIFO_SIZE (4 * (1 << I4_BITS))
+#define I8_FIFO_SIZE (8 * (1 << I8_BITS))
 
 #define __round_mask(x, y) ((y)-1)
 #define round_down(x, y) ((x) & ~__round_mask(x, y))
 
-__constant uint16_t fifo_sizes[3] = {
-    I2_FIFO_SIZE,
-    I4_FIFO_SIZE,
-    I8_FIFO_SIZE
-};
-
-
-__constant uint64_t masks[3] = {
-    0x000000000000FFFF,
-    0x00000000FFFFFFFF,
-    0xFFFFFFFFFFFFFFFF
-};
-__constant uint8_t dec_templates[26][4][2] = { // params size in bits
-    {OP_DEC_D8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x00: { D8, N0, N0, N0 }, 64 bits
-    {OP_DEC_D4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x01: { D4, D2, I2, N0 }, 56 bits
-    {OP_DEC_D4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0}, // 0x02: { D4, I2, D2, N0 }, 56 bits
-    {OP_DEC_D4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0}, // 0x03: { D4, I2, I2, N0 }, 48 bits
-
-    {OP_DEC_D4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0}, // 0x04: { D4, I4, N0, N0 }, 41 bits
-    {OP_DEC_D2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0}, // 0x05: { D2, I2, D4, N0 }, 56 bits
-    {OP_DEC_D2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2}, // 0x06: { D2, I2, D2, I2 }, 48 bits
-    {OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2}, // 0x07: { D2, I2, I2, D2 }, 48 bits
-
-    {OP_DEC_D2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2}, // 0x08: { D2, I2, I2, I2 }, 40 bits
-    {OP_DEC_D2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0}, // 0x09: { D2, I2, I4, N0 }, 33 bits
-    {OP_DEC_I2, OP_DEC_D2, OP_DEC_D4, OP_DEC_N0}, // 0x0a: { I2, D2, D4, N0 }, 56 bits
-    {OP_DEC_I2, OP_DEC_D4, OP_DEC_I2, OP_DEC_N0}, // 0x0b: { I2, D4, I2, N0 }, 48 bits
-
-    {OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_D2}, // 0x0c: { I2, D2, I2, D2 }, 48 bits
-    {OP_DEC_I2, OP_DEC_D2, OP_DEC_I2, OP_DEC_I2}, // 0x0d: { I2, D2, I2, I2 }, 40 bits
-    {OP_DEC_I2, OP_DEC_D2, OP_DEC_I4, OP_DEC_N0}, // 0x0e: { I2, D2, I4, N0 }, 33 bits
-    {OP_DEC_I2, OP_DEC_I2, OP_DEC_D4, OP_DEC_N0}, // 0x0f: { I2, I2, D4, N0 }, 48 bits
-
-    {OP_DEC_I2, OP_DEC_I2, OP_DEC_D2, OP_DEC_I2}, // 0x10: { I2, I2, D2, I2 }, 40 bits
-    {OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_D2}, // 0x11: { I2, I2, I2, D2 }, 40 bits
-    {OP_DEC_I2, OP_DEC_I2, OP_DEC_I2, OP_DEC_I2}, // 0x12: { I2, I2, I2, I2 }, 32 bits
-    {OP_DEC_I2, OP_DEC_I2, OP_DEC_I4, OP_DEC_N0}, // 0x13: { I2, I2, I4, N0 }, 25 bits
-
-    {OP_DEC_I4, OP_DEC_D4, OP_DEC_N0, OP_DEC_N0}, // 0x14: { I4, D4, N0, N0 }, 41 bits
-    {OP_DEC_I4, OP_DEC_D2, OP_DEC_I2, OP_DEC_N0}, // 0x15: { I4, D2, I2, N0 }, 33 bits
-    {OP_DEC_I4, OP_DEC_I2, OP_DEC_D2, OP_DEC_N0}, // 0x16: { I4, I2, D2, N0 }, 33 bits
-    {OP_DEC_I4, OP_DEC_I2, OP_DEC_I2, OP_DEC_N0}, // 0x17: { I4, I2, I2, N0 }, 25 bits
-
-
-    {OP_DEC_I4, OP_DEC_I4, OP_DEC_N0, OP_DEC_N0}, // 0x18: { I4, I4, N0, N0 }, 18 bits
-    {OP_DEC_I8, OP_DEC_N0, OP_DEC_N0, OP_DEC_N0}, // 0x19: { I8, N0, N0, N0 }, 8 bits
-};
-
-inline uint64_t bswap(uint64_t value) {
-    return
-    (uint64_t)((value & (uint64_t)0x00000000000000ff) << 56) |
-    (uint64_t)((value & (uint64_t)0x000000000000ff00) << 40) |
-    (uint64_t)((value & (uint64_t)0x0000000000ff0000) << 24) |
-    (uint64_t)((value & (uint64_t)0x00000000ff000000) <<  8) |
-    (uint64_t)((value & (uint64_t)0x000000ff00000000) >>  8) |
-    (uint64_t)((value & (uint64_t)0x0000ff0000000000) >> 24) |
-    (uint64_t)((value & (uint64_t)0x00ff000000000000) >> 40) |
-    (uint64_t)((value & (uint64_t)0xff00000000000000) >> 56);
-}
-
-inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
+static inline uint64_t swap_be_to_native64(uint64_t value)
 {
-  uint64_t value = p->buffer >> (WSIZE - n);
-  if (n == 0)
-    value = 0;
-
-  if (p->bits < n) {
-    p->buffer = bswap(*p->in);
-    p->in++;
-    value |= p->buffer >> (WSIZE - (n - p->bits));
-    p->buffer <<= n - p->bits;
-    p->bits += WSIZE - n;
-    p->buffer *= (p->bits > 0);
-  }  else {
-    p->bits -= n;
-    p->buffer <<= n;
-  }
-
-  return value;
+#ifdef __ENDIAN_LITTLE__
+	return as_ulong(as_uchar8(value).s76543210);
+#else
+	return value;
+#endif
 }
 
-inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size, uint64_t index, uint64_t fsize)
+static inline uint64_t swap_native_to_be64(uint64_t value)
 {
-    uint64_t offset;
-    uint64_t total = round_down(((__global uint8_t*)p->out) - ((__global const uint8_t *)p->ostart), 8);
-
-    offset = index * size;
-
-    /* a ring buffer of fsize is used; correct the offset */
-    if (total > fsize) {
-        /* this is where the current fifo is */
-        uint64_t section = round_down(total, fsize);
-        /* the current pos in the fifo */
-        uint64_t pos = total - section;
-
-        /* if the offset is past/at the pos, we need to
-         * go back to the last fifo section
-         */
-        if (offset >= pos)
-            section -= fsize;
-
-        offset += section;
-    }
-
-    return offset;
+#ifdef __ENDIAN_LITTLE__
+	return as_ulong(as_uchar8(value).s76543210);
+#else
+	return value;
+#endif
 }
 
-__kernel void decompress(__global uint64_t *in, __global uint64_t *out)
+static inline uint16_t swap_be_to_native16(uint16_t value)
 {
-    unsigned int chunk_num = get_group_id(0) * get_local_size(0) + get_local_id(0);
-
-    struct sw842_param_decomp p;
-    p.ostart = p.out = out + ((CHUNK_SIZE / 8) * chunk_num);
-    p.in = (in + ((CHUNK_SIZE / 8 * 2) * chunk_num));
-
-
-    p.buffer = 0;
-    p.bits = 0;
-
-    uint64_t op;
-
-    uint64_t output_word;
-    uint32_t bits;
-    
-    do {
-        op = read_bits(&p, OP_BITS);
-        output_word = 0;
-        bits = 0;
-
-        switch (op) {
-            case OP_REPEAT:
-                op = read_bits(&p, REPEAT_BITS);
-                // copy op + 1 
-                op++;
-
-                while (op-- > 0) {
-                    *p.out = *(p.out -1);
-                    p.out++;
-                }
-                break;
-            case OP_ZEROS:
-                *p.out = 0;
-                p.out++;
-                break;
-            case OP_END:
-                break;
-            default:
-                for(int i = 0; i < 4; i++) {
-                    uint64_t value;
-
-                    uint32_t dec_template = dec_templates[op][i][0];
-                    //printf("op is %x\n", dec_template & 0x7F);
-                    uint32_t is_index = (dec_template >> 7);
-                    uint32_t dst_size = dec_templates[op][i][1];
-
-                    value = read_bits(&p, dec_template & 0x7F);
-
-                    if(is_index) {
-                        uint64_t offset = get_index(&p, dst_size, value, fifo_sizes[dst_size >> 2]);
-                        offset >>= 1;
-                        __global uint16_t * ostart16 = (__global uint16_t *) p.ostart;
-                        value = 
-                            (((uint64_t) ostart16[offset    ])) |
-                            (((uint64_t) ostart16[offset + 1]) << 16) |
-                            (((uint64_t) ostart16[offset + 2]) << 32) |
-                            (((uint64_t) ostart16[offset + 3]) << 48);
-                        value &= masks[dst_size >> 2];
-                        value <<= (WSIZE - (dst_size << 3));
-                        value = bswap(value);
-                    }
-                    output_word |= value << (64 - (dst_size<<3) - bits);
-                    bits += dst_size<<3;
-                }
-                *p.out++ = bswap(output_word);
-
-        }
-    } while (op != OP_END);
-
-
-    return;
+#ifdef __ENDIAN_LITTLE__
+	return as_ushort(as_uchar2(value).s10);
+#else
+	return value;
+#endif
 }
-//)====="
+
+static inline uint16_t swap_native_to_be16(uint16_t value)
+{
+#ifdef __ENDIAN_LITTLE__
+	return as_ushort(as_uchar2(value).s10);
+#else
+	return value;
+#endif
+}
+
+static inline uint64_t read_bits(struct sw842_param_decomp *p, uint32_t n)
+{
+	uint64_t value = p->buffer >> (WSIZE - n);
+	if (p->bits < n) {
+#ifdef ENABLE_ERROR_HANDLING
+	if ((p->in - p->istart + 1) * sizeof(uint64_t) > p->ilen) {
+		if (p->errorcode == 0)
+			p->errorcode = -EINVAL;
+		return 0;
+	}
+#endif
+#ifdef USE_LOOKAHEAD_BUFFER
+		p->buffer = p->lookAheadBuffer[0];
+		p->lookAheadBuffer[0] = p->lookAheadBuffer[1];
+		p->lookAheadBuffer[1] = p->lookAheadBuffer[2];
+		p->lookAheadBuffer[2] = p->lookAheadBuffer[3];
+		p->lookAheadBuffer[3] = p->lookAheadBuffer[4];
+		p->lookAheadBuffer[4] = p->lookAheadBuffer[5];
+		p->lookAheadBuffer[5] = ((p->in - p->istart + 6) * sizeof(uint64_t) < p->ilen) ? swap_be_to_native64(*(p->in + 6)) : 0;
+#else
+		p->buffer = swap_be_to_native64(*p->in);
+#endif
+		p->in++;
+		value |= p->buffer >> (WSIZE - (n - p->bits));
+		// Avoid shift by 64 (only shifts of strictly less bits are allowed by the standard)
+		p->buffer = ((p->buffer << (n - p->bits - 1)) << 1);
+		p->bits += WSIZE - n;
+		p->buffer *= (p->bits > 0);
+	} else {
+		p->bits -= n;
+		p->buffer <<= n;
+	}
+
+	return value;
+}
+
+static inline uint64_t get_index(struct sw842_param_decomp *p, uint8_t size,
+				 uint64_t index, uint64_t fsize)
+{
+	uint64_t offset;
+	uint64_t total = (p->out - p->ostart) * sizeof(uint64_t);
+
+	offset = index * size;
+
+	/* a ring buffer of fsize is used; correct the offset */
+	if (total > fsize) {
+		/* this is where the current fifo is */
+		uint64_t section = round_down(total, fsize);
+		/* the current pos in the fifo */
+		uint64_t pos = total - section;
+
+		/* if the offset is past/at the pos, we need to
+		 * go back to the last fifo section
+		 */
+		if (offset >= pos)
+			section -= fsize;
+
+		offset += section;
+	}
+
+#ifdef ENABLE_ERROR_HANDLING
+	if (offset + size > total) {
+		// TODOXXX: Commenting and uncommenting this printf has some
+		// weird performance effects on NVIDIA hardware, even on valid cases
+		// where this code path is never hit
+		// If commented: lib842 OCL benchmark results perform worse,
+		//               but dOpenCL performs MUCH better
+		// If not commented: lib842 OCL benchmarks perform better,
+		//                   but dOpenCL performs MUCH worse
+		// This is probably related to the compiler's optimizer...
+		//printf("index%x %lx points past end %lx\n", size,
+		//       (unsigned long)offset, (unsigned long)total);
+		p->errorcode = -EINVAL;
+		return 0;
+	}
+#endif
+
+	return offset;
+}
+
+static inline void do_op(struct sw842_param_decomp *p, uint8_t op)
+{
+#ifdef ENABLE_ERROR_HANDLING
+	if (op >= OPS_MAX) {
+		p->errorcode = -EINVAL;
+		return;
+	}
+#endif
+
+	uint64_t output_word = 0;
+	uint32_t bits = 0;
+
+	// Calculate the number of bits for all 4 operations in the template
+	// This formula exploits the regularity/pattern in the templates (see below)
+	uint8_t opbits = 64 - ((op % 5) + 1) / 2 * 8 - ((op % 5) / 4) * 7
+			    - ((op / 5) + 1) / 2 * 8 - ((op / 5) / 4) * 7;
+	uint64_t params = read_bits(p, opbits);
+#ifdef ENABLE_ERROR_HANDLING
+	if (p->errorcode != 0)
+		return;
+#endif
+
+	for (int i = 0; i < 4; i++) {
+		// For templates 0 to 24 (inclusive), they follow a regular pattern
+		// each 5 templates. In particular, the operations which determine
+		// how the first four bytes of the output data are decoded depend on
+		// (op / 5), and analogously, those that determine the last four bytes
+		// are determined by (op % 5)
+		// This regularity makes it feasible to develop formulas to compute the
+		// this information efficiently enough to outperform table lookups
+		// Template 25 (index reference to 8 bytes) does not easily fit
+		// those patterns, so it is handled separately
+		uint8_t opchunk = (i < 2) ? op / 5 : op % 5;
+		uint32_t is_index = (i & 1) * (opchunk & 1) + ((i & 1) ^ 1) * (opchunk >= 2);
+		uint32_t dst_size = 2 + (opchunk >= 4) * (1 - 2 * (i % 2)) * 2;
+		uint8_t num_bits = (i & 1) * (16 - (opchunk % 2) * 8 - (opchunk >= 4) * 16) +
+				   ((i & 1) ^ 1) * (16 - (opchunk / 2) * 8 + (opchunk >= 4) * 9);
+
+		// https://stackoverflow.com/a/28703383
+		uint64_t bitsmask = ((uint64_t)-(num_bits != 0)) &
+				    (((uint64_t)-1) >> (64 - num_bits));
+		uint64_t value = (params >> (opbits - num_bits)) & bitsmask;
+		opbits -= num_bits;
+
+		if (is_index) {
+			// fifo_size = 512 if dst_size = 2. = 2048 if dst_size = 4
+			// (See constants I2_FIFO_SIZE, I4_FIFO_SIZE)
+			uint64_t fifo_size = 2048 - 1536 * ((dst_size >> 2) < 1);
+			uint64_t offset = get_index(
+				p, dst_size, value, fifo_size);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p->errorcode != 0)
+				return;
+#endif
+			offset >>= 1;
+			__global uint16_t *ostart16 =
+				(__global uint16_t *)p->ostart;
+			value = (((uint64_t)swap_be_to_native16(ostart16[offset])) << 48) |
+				(((uint64_t)swap_be_to_native16(ostart16[offset + 1])) << 32);
+			value >>= (WSIZE - (dst_size << 3));
+		}
+		output_word |= value
+			       << (64 - (dst_size << 3) - bits);
+		bits += dst_size << 3;
+	}
+#ifdef ENABLE_ERROR_HANDLING
+	if ((p->out - p->ostart) * sizeof(uint64_t) + 8 > p->olen) {
+		p->errorcode = -ENOSPC;
+		return;
+	}
+#endif
+	*p->out++ = swap_native_to_be64(output_word);
+}
+
+static inline int decompress_core(__global const uint64_t *RESTRICT_UNLESS_INPLACE in, size_t ilen,
+				  __global uint64_t *RESTRICT_UNLESS_INPLACE out, size_t *olen)
+{
+	struct sw842_param_decomp p;
+	p.ostart = p.out = out;
+	p.in = in;
+#ifdef ENABLE_ERROR_HANDLING
+	p.istart = p.in;
+	p.ilen = ilen;
+	p.olen = *olen;
+	p.errorcode = 0;
+#endif
+
+	p.buffer = 0;
+#ifdef USE_LOOKAHEAD_BUFFER
+	p.lookAheadBuffer[0] = ((p.in - p.istart) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 0)) : 0;
+	p.lookAheadBuffer[1] = ((p.in - p.istart + 1) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 1)) : 0;
+	p.lookAheadBuffer[2] = ((p.in - p.istart + 2) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 2)) : 0;
+	p.lookAheadBuffer[3] = ((p.in - p.istart + 3) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 3)) : 0;
+	p.lookAheadBuffer[4] = ((p.in - p.istart + 4) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 4)) : 0;
+	p.lookAheadBuffer[5] = ((p.in - p.istart + 5) * sizeof(uint64_t) < p.ilen) ? swap_be_to_native64(*(p.in + 5)) : 0;
+#endif
+	p.bits = 0;
+
+	*olen = 0;
+
+	uint64_t op;
+
+	do {
+		op = read_bits(&p, OP_BITS);
+#ifdef ENABLE_ERROR_HANDLING
+		if (p.errorcode != 0)
+			return p.errorcode;
+#endif
+
+		switch (op) {
+		case OP_REPEAT:
+			op = read_bits(&p, REPEAT_BITS);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+
+			if (p.out == out) /* no previous bytes */
+				return -EINVAL;
+#endif
+			// copy op + 1
+			op++;
+
+#ifdef ENABLE_ERROR_HANDLING
+			if ((p.out - p.ostart) * sizeof(uint64_t) + op * 8 > p.olen)
+				return -ENOSPC;
+#endif
+
+			while (op-- > 0) {
+				*p.out = *(p.out - 1);
+				p.out++;
+			}
+			break;
+		case OP_ZEROS:
+#ifdef ENABLE_ERROR_HANDLING
+			if ((p.out - p.ostart) * sizeof(uint64_t) + 8 > p.olen)
+				return -ENOSPC;
+#endif
+			*p.out = 0;
+			p.out++;
+			break;
+		case OP_END:
+			break;
+		case (OPS_MAX - 1): {
+			// The I8 opcode doesn't fit into the same patterns
+			// as the first 25 opcodes, so it's handled separately
+			uint64_t value = read_bits(&p, 8);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+#endif
+
+			uint64_t offset = get_index(
+				&p, 8, value, I8_FIFO_SIZE);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+			if ((p.out - p.ostart) * sizeof(uint64_t) + 8 > p.olen)
+				return -ENOSPC;
+#endif
+			*p.out++ = p.ostart[offset >> 3];
+		}
+		break;
+		default:
+			do_op(&p, op);
+#ifdef ENABLE_ERROR_HANDLING
+			if (p.errorcode != 0)
+				return p.errorcode;
+#endif
+		}
+	} while (op != OP_END);
+
+	/*
+	 * crc(0:31) is saved in compressed data starting with the
+	 * next bit after End of stream template.
+	 */
+#ifndef DISABLE_CRC
+	op = read_bits(&p, CRC_BITS);
+#ifdef ENABLE_ERROR_HANDLING
+	if (p.errorcode != 0)
+		return p.errorcode;
+#endif
+
+	/*
+	 * Validate CRC saved in compressed data.
+	 */
+	// FIXME: Implement CRC32 for OpenCL
+	//if (crc != (uint64_t)crc32_be(0, p.ostart, (p.out - p.ostart) * sizeof(uint64_t))) {
+	if (false) {
+		return -EINVAL;
+	}
+#endif
+
+	*olen = (p.out - p.ostart) * sizeof(uint64_t);
+
+	return 0;
+}
+
+__kernel void decompress(__global const uint64_t *RESTRICT_UNLESS_INPLACE in,
+			 ulong inOffset, __global const ulong *ilen,
+			 __global uint64_t *RESTRICT_UNLESS_INPLACE out,
+			 ulong outOffset, __global ulong *olen,
+			 ulong numChunks, __global const ulong *chunkShuffleMap,
+			 __global int *returnValues)
+{
+	size_t chunk_num = get_global_id(0);
+	if (chunk_num >= numChunks)
+		return;
+
+	if (chunkShuffleMap != NULL)
+		chunk_num = chunkShuffleMap[chunk_num];
+
+	__global uint64_t *my_out = out + (outOffset / 8) + ((CL842_CHUNK_SIZE / 8) * chunk_num);
+	__global const uint64_t *my_in = in + (inOffset / 8) + ((CL842_CHUNK_STRIDE / 8) * chunk_num);
+
+	size_t my_ilen = ilen != NULL ? ilen[chunk_num] : (size_t)-1;
+
+#if defined(USE_MAYBE_COMPRESSED_CHUNKS) || defined(USE_INPLACE_COMPRESSED_CHUNKS)
+	if (my_in[0] != ((__constant const uint64_t *)LIB842_COMPRESSED_CHUNK_MARKER)[0] ||
+	    my_in[1] != ((__constant const uint64_t *)LIB842_COMPRESSED_CHUNK_MARKER)[1]) {
+#ifdef USE_MAYBE_COMPRESSED_CHUNKS
+		// Copy uncompressed chunk from temporary input buffer to output buffer
+		for (size_t i = 0; i < CL842_CHUNK_SIZE / 8; i++) {
+			my_out[i] = my_in[i];
+		}
+#endif
+		if (olen)
+			olen[chunk_num] = CL842_CHUNK_SIZE;
+		if (returnValues)
+			returnValues[chunk_num] = 0;
+		return;
+	}
+
+	if (my_in[2] == 0) { // Means: Skip chunk - already in destination
+		if (olen)
+			olen[chunk_num] = CL842_CHUNK_SIZE;
+		if (returnValues)
+			returnValues[chunk_num] = 0;
+		return;
+	}
+
+	// Read compressed chunk size and skip to the beginning of the chunk
+	// (the end of the chunk matches the end of the input chunk buffer)
+	my_ilen = my_in[2]; // TODOXXX: Avoid all this marker and embeeded lengths
+			    // nonesense and just pass the lengths with ilen everywhere
+	my_in += (CL842_CHUNK_SIZE - my_in[2]) / 8;
+#endif
+	size_t my_olen = olen != NULL ? olen[chunk_num] : (size_t)-1;
+
+	int ret = decompress_core(my_in, my_ilen, my_out, &my_olen);
+	if (olen)
+		olen[chunk_num] = my_olen;
+	if (returnValues)
+		returnValues[chunk_num] = ret;
+}
