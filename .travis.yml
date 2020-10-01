@@ -42,6 +42,16 @@ matrix:
       os: linux
       dist: focal
       compiler: clang
+    # Ubuntu 18.04 + gcc on ppc64le
+    - arch: ppc64le
+      os: linux
+      dist: bionic
+      compiler: gcc
+    # Ubuntu 18.04 + clang on ppc64le
+    - arch: ppc64le
+      os: linux
+      dist: bionic
+      compiler: clang
     # Ubuntu 16.04 + gcc on ppc64le
     - arch: ppc64le
       os: linux
@@ -55,7 +65,9 @@ matrix:
 before_install:
   - |
     # For cryptodev-linux
-    sudo apt-get -y install "linux-headers-$(uname -r)"
+    if ! ( [[ "$(uname -p)" == "ppc64le" ]] && ( [[ "$(lsb_release -rs)" == "18.04" ]]  || [[ "$(lsb_release -rs)" == "20.04" ]] ) ); then
+      sudo apt-get -y install "linux-headers-$(uname -r)"
+    fi
 
     # For lib842
     sudo apt-get -y install libnuma-dev opencl-headers ocl-icd-opencl-dev
@@ -67,13 +79,15 @@ before_install:
 script:
   - |
     # Build cryptodev-linux dependency (for using the kernel's 842 support)
-    git clone https://github.com/plauth/cryptodev-linux
-    cd cryptodev-linux
-    make -j"$(nproc)"
-    sudo make install
-    sudo depmod -a
-    sudo modprobe cryptodev
-    cd ..
+    if ! ( [[ "$(uname -p)" == "ppc64le" ]] && ( [[ "$(lsb_release -rs)" == "18.04" ]]  || [[ "$(lsb_release -rs)" == "20.04" ]] ) ); then
+      git clone https://github.com/plauth/cryptodev-linux
+      cd cryptodev-linux
+      make -j"$(nproc)"
+      sudo make install
+      sudo depmod -a
+      sudo modprobe cryptodev
+      cd ..
+    fi
 
     # Build lib842
     mkdir build && cd build
