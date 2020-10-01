@@ -2,42 +2,52 @@
 language: cpp
 matrix:
   include:
-    # Ubuntu 18.04 + gcc
+    # Ubuntu 20.04 + gcc on amd64
+    - arch: amd64
+      os: linux
+      dist: focal
+      compiler: gcc
+    # Ubuntu 20.04 + clang on amd64
+    - arch: amd64
+      os: linux
+      dist: focal
+      compiler: clang
+    # Ubuntu 18.04 + gcc on amd64
     - arch: amd64
       os: linux
       dist: bionic
       compiler: gcc
-    # Ubuntu 18.04 + clang
+    # Ubuntu 18.04 + clang on amd64
     - arch: amd64
       os: linux
       dist: bionic
       compiler: clang
-    # Ubuntu 16.04 + gcc
+    # Ubuntu 16.04 + gcc on amd64
     - arch: amd64
       os: linux
       dist: xenial
       compiler: gcc
-    # Ubuntu 16.04 + clang
+    # Ubuntu 16.04 + clang on amd64
     - arch: amd64
       os: linux
       dist: xenial
       compiler: clang
-    # Ubuntu 18.04 + gcc
+    # Ubuntu 20.04 + gcc on ppc64le
     - arch: ppc64le
       os: linux
-      dist: bionic
+      dist: focal
       compiler: gcc
-    # Ubuntu 18.04 + clang
+    # Ubuntu 20.04 + clang on ppc64le
     - arch: ppc64le
       os: linux
-      dist: bionic
+      dist: focal
       compiler: clang
-    # Ubuntu 16.04 + gcc
+    # Ubuntu 16.04 + gcc on ppc64le
     - arch: ppc64le
       os: linux
       dist: xenial
       compiler: gcc
-    # Ubuntu 16.04 + clang
+    # Ubuntu 16.04 + clang on ppc64le
     - arch: ppc64le
       os: linux
       dist: xenial
@@ -51,7 +61,7 @@ before_install:
     sudo apt-get -y install libnuma-dev opencl-headers ocl-icd-opencl-dev
     # Rely on POCL to provide a generic OpenCL implementation that can run the tests
     # Unfortunately however,it is not available on Ubuntu 16.04, only on Ubuntu 18.04
-    if [[ "$(lsb_release -rs)" == "18.04" ]]; then
+    if [ "$(lsb_release -rs)" == "18.04" ] || [ "$(lsb_release -rs)" == "20.04" ]; then
       sudo apt-get -y install pocl-opencl-icd
     fi
 script:
@@ -71,7 +81,7 @@ script:
     make -j"$(nproc)"
 
     # Run tests
-    if [[ "$(lsb_release -rs)" == "18.04" ]]; then
+    if [ "$(lsb_release -rs)" == "18.04" ] || [ "$(lsb_release -rs)" == "20.04" ]; then
       ctest
     else
       ctest -E '.*_cl.*'
