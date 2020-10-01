@@ -3,19 +3,31 @@ language: cpp
 matrix:
   include:
     # Ubuntu 18.04 + gcc
-    - os: linux
+    - arch:
+        - amd64
+        - ppc64le
+      os: linux
       dist: bionic
       compiler: gcc
     # Ubuntu 18.04 + clang
-    - os: linux
+    - arch:
+        - amd64
+        - ppc64le
+      os: linux
       dist: bionic
       compiler: clang
     # Ubuntu 16.04 + gcc
-    - os: linux
+    - arch:
+        - amd64
+        - ppc64le
+      os: linux
       dist: xenial
       compiler: gcc
     # Ubuntu 16.04 + clang
-    - os: linux
+    - arch:
+      - amd64
+      - ppc64le
+      os: linux
       dist: xenial
       compiler: clang
 before_install:
@@ -33,7 +45,7 @@ before_install:
 script:
   - |
     # Build cryptodev-linux dependency (for using the kernel's 842 support)
-    git clone https://github.com/joanbm/cryptodev-linux
+    git clone https://github.com/plauth/cryptodev-linux
     cd cryptodev-linux
     make -j"$(nproc)"
     sudo make install
