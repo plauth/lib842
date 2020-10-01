@@ -1,6 +1,6 @@
 # lib842
 
-[![Build Status](https://travis-ci.org/joanbm/lib842.svg?branch=master)](https://travis-ci.org/joanbm/lib842)
+[![Build Status](https://travis-ci.org/plauth/lib842.svg?branch=master)](https://travis-ci.org/plauth/lib842)
 
 **lib842** provides efficient, accelerated implementation of the 842 compression algorithm available from userspace. 842 is a compression algorithm by IBM, similar to LZ77, designed for very fast compression and decompression. Thus, it is suitable for cases such as compressed RAM (zram) or I/O link compression.
 
@@ -32,7 +32,7 @@ CMake is required in order to execute the build process.
 
 The *simple serial* and *optimized serial* implementations can be built and used on any machine with a modern C/C++ compiler. However, *OpenMP* is needed in order to enable parallel (multithreaded) compression on the CPU.
 
-The *cryptodev* implementation requires building, installing and loading our [modified cryptodev kernel module with compression support](https://github.com/joanbm/cryptodev-linux). On IBM POWER7+ hardware, the dedicated hardware compressor will be automatically used. Otherwise, the Linux kernel will fall back to a non-accelerated implementation.
+The *cryptodev* implementation requires building, installing and loading our [modified cryptodev kernel module with compression support](https://github.com/plauth/cryptodev-linux). On IBM POWER7+ hardware, the dedicated hardware compressor will be automatically used. Otherwise, the Linux kernel will fall back to a non-accelerated implementation.
 
 The *OpenCL* and *CUDA* implementations require a working OpenCL or CUDA environment respectively.
 
