@@ -72,8 +72,9 @@ before_install:
     # For lib842
     sudo apt-get -y install libnuma-dev opencl-headers ocl-icd-opencl-dev
     # Rely on POCL to provide a generic OpenCL implementation that can run the tests
-    # Unfortunately however,it is not available on Ubuntu 16.04, only on Ubuntu 18.04
-    if [ "$(lsb_release -rs)" == "18.04" ] || [ "$(lsb_release -rs)" == "20.04" ]; then
+    # Unfortunately however, it is not available on Ubuntu 16.04, only on Ubuntu 18.04/20.04
+    # It is also not available on ppc64le
+    if ( ! [[ "$(uname -p)" == "ppc64le" ]] ) && ( [[ "$(lsb_release -rs)" == "18.04" ]] || [[ "$(lsb_release -rs)" == "20.04" ]] ); then
       sudo apt-get -y install pocl-opencl-icd
     fi
 script:
@@ -95,7 +96,7 @@ script:
     make -j"$(nproc)"
 
     # Run tests
-    if [ "$(lsb_release -rs)" == "18.04" ] || [ "$(lsb_release -rs)" == "20.04" ]; then
+    if ( ! [[ "$(uname -p)" == "ppc64le" ]] ) && ( [[ "$(lsb_release -rs)" == "18.04" ]] || [[ "$(lsb_release -rs)" == "20.04" ]] ); then
       ctest
     else
       ctest -E '.*_cl.*'
