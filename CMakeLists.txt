@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.9)
 
 project(lib842)
 
@@ -38,18 +38,6 @@ find_package(CUDA)
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 find_package(Threads REQUIRED)
 find_package(OpenMP)
-# Fix for CMake < 3.9: https://web.archive.org/web/20190817053313/https://cliutils.gitlab.io/modern-cmake/chapters/packages/OpenMP.html
-if(NOT TARGET OpenMP::OpenMP_C)
-    add_library(OpenMP::OpenMP_C IMPORTED INTERFACE)
-    set_property(TARGET OpenMP::OpenMP_C PROPERTY INTERFACE_COMPILE_OPTIONS ${OpenMP_C_FLAGS})
-    set_property(TARGET OpenMP::OpenMP_C PROPERTY INTERFACE_LINK_LIBRARIES ${OpenMP_C_FLAGS} Threads::Threads)
-endif()
-if(NOT TARGET OpenMP::OpenMP_CXX)
-    add_library(OpenMP::OpenMP_CXX IMPORTED INTERFACE)
-    set_property(TARGET OpenMP::OpenMP_CXX PROPERTY INTERFACE_COMPILE_OPTIONS ${OpenMP_CXX_FLAGS})
-    set_property(TARGET OpenMP::OpenMP_CXX PROPERTY INTERFACE_LINK_LIBRARIES ${OpenMP_CXX_FLAGS} Threads::Threads)
-endif()
-
 find_package(NUMA)
 
 ###########
@@ -139,14 +127,14 @@ endif()
 if(STANDALONE_BUILD)
     add_executable(test_serial sample/compdecomp.c sample/compdecomp_driver.c)
     target_link_libraries(test_serial 842)
-    if (OpenMP_FOUND)
+    if (OpenMP_C_FOUND)
         target_link_libraries(test_serial OpenMP::OpenMP_C)
     endif()
 
     add_executable(test_serial_optimized sample/compdecomp.c sample/compdecomp_driver.c)
     target_compile_definitions(test_serial_optimized PRIVATE "USEOPTSW")
     target_link_libraries(test_serial_optimized 842)
-    if (OpenMP_FOUND)
+    if (OpenMP_C_FOUND)
         target_link_libraries(test_serial_optimized OpenMP::OpenMP_C)
     endif()
 
@@ -158,7 +146,7 @@ if(STANDALONE_BUILD)
         add_executable(test_cryptodev sample/compdecomp.c sample/compdecomp_driver.c)
         target_compile_definitions(test_cryptodev PRIVATE "USEHW")
         target_link_libraries(test_cryptodev 842)
-        if (OpenMP_FOUND)
+        if (OpenMP_C_FOUND)
             target_link_libraries(test_cryptodev OpenMP::OpenMP_C)
         endif()
 
@@ -171,7 +159,7 @@ if(STANDALONE_BUILD)
         add_executable(test_aix_standalone sample/compdecomp.c sample/compdecomp_driver.c)
         target_compile_definitions(test_aix_standalone PRIVATE "USEAIX")
         target_link_libraries(test_aix_standalone 842)
-        if (OpenMP_FOUND)
+        if (OpenMP_C_FOUND)
             target_link_libraries(test_aix_standalone OpenMP::OpenMP_C)
         endif()
     endif()
@@ -180,7 +168,7 @@ if(STANDALONE_BUILD)
         # Hacky to mix OpenMP with CUDA (using FindCUDA)
         # Should get cleaner with CMake 3.10+ and CUDA as a first-class language
         set(OpenMP_CUDA_FLAGS "")
-        if (OpenMP_FOUND)
+        if (OpenMP_CXX_FOUND)
             foreach (FLAG ${OpenMP_CXX_FLAGS})
                 set(OpenMP_CUDA_FLAGS "${OpenMP_CUDA_FLAGS}--compiler-options;${FLAG};")
             endforeach()
@@ -198,7 +186,7 @@ if(STANDALONE_BUILD)
                                                     CL_HPP_MINIMUM_OPENCL_VERSION=120
                                                     CL_HPP_TARGET_OPENCL_VERSION=120
                                                     CL_HPP_ENABLE_EXCEPTIONS)
-        if (OpenMP_FOUND)
+        if (OpenMP_CXX_FOUND)
             target_link_libraries(test_ocl OpenMP::OpenMP_CXX)
         endif()
 
@@ -210,7 +198,7 @@ if(STANDALONE_BUILD)
                                                             CL_HPP_MINIMUM_OPENCL_VERSION=120
                                                             CL_HPP_TARGET_OPENCL_VERSION=120
                                                             CL_HPP_ENABLE_EXCEPTIONS)
-        if (OpenMP_FOUND)
+        if (OpenMP_CXX_FOUND)
             target_link_libraries(test_ocl_inplace OpenMP::OpenMP_CXX)
         endif()
 
@@ -222,7 +210,7 @@ if(STANDALONE_BUILD)
                                                           CL_HPP_MINIMUM_OPENCL_VERSION=120
                                                           CL_HPP_TARGET_OPENCL_VERSION=120
                                                           CL_HPP_ENABLE_EXCEPTIONS)
-        if (OpenMP_FOUND)
+        if (OpenMP_CXX_FOUND)
             target_link_libraries(test_ocl_maybe OpenMP::OpenMP_CXX)
         endif()
     endif()
