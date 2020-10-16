@@ -605,6 +605,9 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 
 		*olen = 0;
 
+		if(ilen == 0)
+			goto add_end_template;
+
 		/* make initial 'last' different so we don't match the first time */
 		last = ~read64(p->in);
 
@@ -651,6 +654,7 @@ int optsw842_compress(const uint8_t *in, size_t ilen,
 		if (repeat_count)
 			add_repeat_template(p, repeat_count);
 
+add_end_template:
 		add_end_template(p);
 
 		/*
