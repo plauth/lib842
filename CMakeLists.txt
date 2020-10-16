@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.1)
 
 project(lib842)
 
@@ -11,7 +11,7 @@ endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Avoid 'ignoring attributes on template argument' spam because of types such as std::vector<cl_int>
@@ -38,8 +38,19 @@ find_package(CUDA)
 set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 find_package(Threads REQUIRED)
 find_package(OpenMP)
+# Fix for CMake < 3.9: https://web.archive.org/web/20190817053313/https://cliutils.gitlab.io/modern-cmake/chapters/packages/OpenMP.html
+if(NOT TARGET OpenMP::OpenMP_C)
+    add_library(OpenMP::OpenMP_C IMPORTED INTERFACE)
+    set_property(TARGET OpenMP::OpenMP_C PROPERTY INTERFACE_COMPILE_OPTIONS ${OpenMP_C_FLAGS})
+    set_property(TARGET OpenMP::OpenMP_C PROPERTY INTERFACE_LINK_LIBRARIES ${OpenMP_C_FLAGS} Threads::Threads)
+endif()
+if(NOT TARGET OpenMP::OpenMP_CXX)
+    add_library(OpenMP::OpenMP_CXX IMPORTED INTERFACE)
+    set_property(TARGET OpenMP::OpenMP_CXX PROPERTY INTERFACE_COMPILE_OPTIONS ${OpenMP_CXX_FLAGS})
+    set_property(TARGET OpenMP::OpenMP_CXX PROPERTY INTERFACE_LINK_LIBRARIES ${OpenMP_CXX_FLAGS} Threads::Threads)
+endif()
+
 find_package(NUMA)
-#find_package(PGASUS)
 
 ###########
 # LIBRARY #
@@ -104,12 +115,6 @@ if (CUDA_FOUND)
 else ()
     add_library(842 STATIC ${SRCFILES})
 endif()
-
-
-if(OpenMP_CXX_FOUND)
-    target_link_libraries(842 OpenMP::OpenMP_CXX)
-endif()
-
 set_property(TARGET 842 PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_include_directories(842 PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include")
 if (OpenCL_FOUND)
@@ -128,31 +133,20 @@ if(CRYPTODEV_LINUX_COMP_FOUND)
     target_link_libraries(842 Threads::Threads)
 endif()
 
-#if(PGASUS_FOUND AND NUMA_FOUND)
-#    message(STATUS "Found PGASUS: \"${PGASUS_LIBRARIES}\"")
-#
-#    target_include_directories(842 PRIVATE ${PGASUS_INCLUDE_DIRS})
-#
-#    target_link_libraries(842 ${PGASUS_LIBRARIES})
-#    
-#    target_compile_definitions(842 PRIVATE "LIB842_HAVE_PGASUS")
-#    set(LIB842_HAVE_PGASUS ON)
-#endif()
-
 ###########
 # SAMPLES #
 ###########
 if(STANDALONE_BUILD)
     add_executable(test_serial sample/compdecomp.c sample/compdecomp_driver.c)
     target_link_libraries(test_serial 842)
-    if (OpenMP_C_FOUND)
+    if (OpenMP_FOUND)
         target_link_libraries(test_serial OpenMP::OpenMP_C)
     endif()
 
     add_executable(test_serial_optimized sample/compdecomp.c sample/compdecomp_driver.c)
     target_compile_definitions(test_serial_optimized PRIVATE "USEOPTSW")
     target_link_libraries(test_serial_optimized 842)
-    if (OpenMP_C_FOUND)
+    if (OpenMP_FOUND)
         target_link_libraries(test_serial_optimized OpenMP::OpenMP_C)
     endif()
 
@@ -164,7 +158,7 @@ if(STANDALONE_BUILD)
         add_executable(test_cryptodev sample/compdecomp.c sample/compdecomp_driver.c)
         target_compile_definitions(test_cryptodev PRIVATE "USEHW")
         target_link_libraries(test_cryptodev 842)
-        if (OpenMP_C_FOUND)
+        if (OpenMP_FOUND)
             target_link_libraries(test_cryptodev OpenMP::OpenMP_C)
         endif()
 
@@ -177,7 +171,7 @@ if(STANDALONE_BUILD)
         add_executable(test_aix_standalone sample/compdecomp.c sample/compdecomp_driver.c)
         target_compile_definitions(test_aix_standalone PRIVATE "USEAIX")
         target_link_libraries(test_aix_standalone 842)
-        if (OpenMP_C_FOUND)
+        if (OpenMP_FOUND)
             target_link_libraries(test_aix_standalone OpenMP::OpenMP_C)
         endif()
     endif()
@@ -186,7 +180,7 @@ if(STANDALONE_BUILD)
         # Hacky to mix OpenMP with CUDA (using FindCUDA)
         # Should get cleaner with CMake 3.10+ and CUDA as a first-class language
         set(OpenMP_CUDA_FLAGS "")
-        if (OpenMP_C_FOUND)
+        if (OpenMP_FOUND)
             foreach (FLAG ${OpenMP_CXX_FLAGS})
                 set(OpenMP_CUDA_FLAGS "${OpenMP_CUDA_FLAGS}--compiler-options;${FLAG};")
             endforeach()
@@ -204,7 +198,7 @@ if(STANDALONE_BUILD)
                                                     CL_HPP_MINIMUM_OPENCL_VERSION=120
                                                     CL_HPP_TARGET_OPENCL_VERSION=120
                                                     CL_HPP_ENABLE_EXCEPTIONS)
-        if (OpenMP_CXX_FOUND)
+        if (OpenMP_FOUND)
             target_link_libraries(test_ocl OpenMP::OpenMP_CXX)
         endif()
 
@@ -216,7 +210,7 @@ if(STANDALONE_BUILD)
                                                             CL_HPP_MINIMUM_OPENCL_VERSION=120
                                                             CL_HPP_TARGET_OPENCL_VERSION=120
                                                             CL_HPP_ENABLE_EXCEPTIONS)
-        if (OpenMP_CXX_FOUND)
+        if (OpenMP_FOUND)
             target_link_libraries(test_ocl_inplace OpenMP::OpenMP_CXX)
         endif()
 
@@ -228,7 +222,7 @@ if(STANDALONE_BUILD)
                                                           CL_HPP_MINIMUM_OPENCL_VERSION=120
                                                           CL_HPP_TARGET_OPENCL_VERSION=120
                                                           CL_HPP_ENABLE_EXCEPTIONS)
-        if (OpenMP_CXX_FOUND)
+        if (OpenMP_FOUND)
             target_link_libraries(test_ocl_maybe OpenMP::OpenMP_CXX)
         endif()
     endif()
@@ -271,41 +265,27 @@ if(STANDALONE_BUILD AND BUILD_TESTING)
         foreach(PATTERN ${PATTERNS})
             foreach (IMPLD ${IMPLS_DECOMPRESS})
                 add_test(test_compress_pattern_${IMPL}_${IMPLD}_${PATTERN} test_compress_pattern ${IMPL} ${IMPLD} ${PATTERN})
-#               set_property(TEST test_compress_pattern_${IMPL}_${IMPLD}_${PATTERN} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
             endforeach()
             add_test(test_compress_pattern_unaligned_${IMPL}_${PATTERN} test_compress_pattern_unaligned ${IMPL} ${PATTERN})
-#           set_property(TEST test_compress_pattern_unaligned_${IMPL}_${PATTERN} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
             add_test(test_compress_pattern_halfsmall_${IMPL}_${PATTERN} test_compress_pattern_halfsmall ${IMPL} ${PATTERN})
-#           set_property(TEST test_compress_pattern_halfsmall_${IMPL}_${PATTERN} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
             add_test(test_compress_pattern_barelysmall_${IMPL}_${PATTERN} test_compress_pattern_barelysmall ${IMPL} ${PATTERN})
-#           set_property(TEST test_compress_pattern_barelysmall_${IMPL}_${PATTERN} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
         endforeach()
         add_test(test_compress_diffuse_${IMPL} test_compress_diffuse ${IMPL})
-#       set_property(TEST test_compress_diffuse_${IMPL} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
         add_test(test_compress_notmultipleof8_${IMPL} test_compress_notmultipleof8 ${IMPL})
-#       set_property(TEST test_compress_notmultipleof8_${IMPL} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
     endforeach()
 
     foreach (IMPL ${IMPLS_DECOMPRESS})
         foreach(PATTERN ${PATTERNS})
             add_test(test_decompress_pattern_${IMPL}_${PATTERN} test_decompress_pattern ${IMPL} ${PATTERN})
-#           set_property(TEST test_decompress_pattern_${IMPL}_${PATTERN} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
             add_test(test_decompress_pattern_unaligned_${IMPL}_${PATTERN} test_decompress_pattern_unaligned ${IMPL} ${PATTERN})
-#           set_property(TEST test_decompress_pattern_unaligned_${IMPL}_${PATTERN} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
             if (NOT ("${PATTERN}" STREQUAL "empty"))
                 add_test(test_decompress_pattern_halfsmall_${IMPL}_${PATTERN} test_decompress_pattern_halfsmall ${IMPL} ${PATTERN})
-#               set_property(TEST test_decompress_pattern_halfsmall_${IMPL}_${PATTERN} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
                 add_test(test_decompress_pattern_barelysmall_${IMPL}_${PATTERN} test_decompress_pattern_barelysmall ${IMPL} ${PATTERN})
-#               set_property(TEST test_decompress_pattern_barelysmall_${IMPL}_${PATTERN} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
             endif()
         endforeach()
         add_test(test_decompress_invalid_simple_${IMPL} test_decompress_invalid_simple ${IMPL})
- #      set_property(TEST test_decompress_invalid_simple_${IMPL} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
         add_test(test_decompress_invalid_generator_${IMPL} test_decompress_invalid_generator ${IMPL})
- #      set_property(TEST test_decompress_invalid_generator_${IMPL} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
         add_test(test_decompress_crcerror_${IMPL} test_decompress_crcerror ${IMPL})
- #      set_property(TEST test_decompress_crcerror_${IMPL} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
         add_test(test_decompress_boundscheck_${IMPL} test_decompress_boundscheck ${IMPL})
- #      set_property(TEST test_decompress_boundscheck_${IMPL} PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${PGASUS_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
     endforeach()
 endif()
