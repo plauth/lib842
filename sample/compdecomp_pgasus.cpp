@@ -1,6 +1,7 @@
 #include <sys/sysinfo.h>
-#include <sys/time.h>
+#include <chrono>
 #include <cstdlib>
+#include <iomanip>
 #include <cstdio>
 #include <iostream>
 #include <fstream>
@@ -30,15 +31,6 @@ static inline size_t getPaddedInputBufferLength(size_t input)
     size_t chunk_size_times_node_count = CHUNK_SIZE * ((size_t) get_nprocs());
     return ((input + chunk_size_times_node_count - 1) / chunk_size_times_node_count) * chunk_size_times_node_count;
 }
-
-long long timestamp()
-{
-	struct timeval te;
-	gettimeofday(&te, NULL);
-	long long ms = te.tv_sec * 1000LL + te.tv_usec / 1000;
-	return ms;
-}
-
 
 int main(int argc, const char *argv[])
 {
@@ -100,15 +92,13 @@ int main(int argc, const char *argv[])
     size_t chunks_per_cpu = chunks_per_node / cpus_per_node;
 
     
-    std::atomic_size_t threads_init(0);
+    std::atomic_size_t threadCount(0);
 
 	// startup worker threads
 	numa::wait(numa::forEachThread(numa::NodeList::logicalNodesWithCPUs(), [&](){
-        numa::Node currentNode = numa::Node::curr();
-        size_t localThreadId = threads_init.fetch_add(1) % cpus_per_node;
-        //printf("[Init] Hello from node %d, thread %2zu\n", currentNode.logicalId(), localThreadId);
+        threadCount++;
 	}, 0));
-    //std::cout << "Initialized " << threads_init << " worker threads" << std::endl;
+    std::cout << "Initialized " << threadCount << " worker threads" << std::endl;
 
     for (numa::Node node : numa::NodeList::logicalNodesWithCPUs()) 
     {
@@ -151,16 +141,13 @@ int main(int argc, const char *argv[])
         decompressThreadIds[node.logicalId()] = 0;
 
         file.read((char*) input_buffers[node.logicalId()], node_input_buffer_length);
-        //std::cout << "Reading " << file.gcount() << " on node " << node.logicalId() << "." << std::endl;
-        //printf("Hello from Node %d/%d (phsical/logical)!\n", node.physicalId(), node.logicalId());
     }
 
     std::cout << "CPUs per node: " << cpus_per_node << std::endl;
     std::cout << "Chunks per Node: " << chunks_per_node << std::endl;
     std::cout << "Chunks per CPU: " << chunks_per_cpu << std::endl;
 
-    long long timestart_comp = timestamp();
-
+    auto tCompStart = std::chrono::high_resolution_clock::now();
     numa::wait(numa::forEachThread(numa::NodeList::logicalNodesWithCPUs(), [&](){
         numa::Node currentNode = numa::Node::curr();
         size_t localThreadId = compressThreadIds[currentNode.logicalId()].fetch_add(1);
@@ -182,17 +169,11 @@ int main(int argc, const char *argv[])
                 return ret;
 		    }
         }
+        return 0;
 	}, 0));
-    long long timeend_comp  = timestamp() - timestart_comp;
+    auto tCompEnd = std::chrono::high_resolution_clock::now();
 
-    /*
-    for (numa::Node node : numa::NodeList::logicalNodesWithCPUs()) 
-    {
-        std::cout << "Node " << node.logicalId() << " used " << compressThreadIds[node.logicalId()] << " worker threads for compression." << std::endl;
-    }
-    */
-
-    long long timestart_decomp = timestamp();
+    auto tDecompStart = std::chrono::high_resolution_clock::now();
     numa::wait(numa::forEachThread(numa::NodeList::logicalNodesWithCPUs(), [&](){
         numa::Node currentNode = numa::Node::curr();
         size_t localThreadId = decompressThreadIds[currentNode.logicalId()].fetch_add(1);
@@ -215,38 +196,25 @@ int main(int argc, const char *argv[])
                 return ret;
 		    }
         }
-        //printf("Decompression: Hello from NUMA node %d, CPU %3d / %3d (local / global)! This thread processed %zu chunks (from chunk %5zu through %5zu.\n", currentNode.logicalId(), currentNode.indexOfCpuid(currentNode.currCpuid()), currentNode.currCpuid(), chunksProcessed, chunkStartGlobal, chunkEndGlobal);
+        return 0;
 	}, 0));    
-    long long timeend_decomp  = timestamp() - timestart_decomp;
+    auto tDecompEnd = std::chrono::high_resolution_clock::now();
 
-    /*
+    std::chrono::duration<double> tComp = tCompEnd - tCompStart;
+    std::chrono::duration<double> tDecomp = tDecompEnd - tDecompStart;
+    std::cout << std::fixed;
+    std::cout << std::setprecision(6);
+    std::cout << "Compression performance: " <<  std::chrono::duration_cast<std::chrono::milliseconds>(tComp).count() << " ms / " << (total_input_buffer_length / 1024 / 1024) / tComp.count() << " MiB/s" << std::endl;
+    std::cout << "Decompression performance: " <<  std::chrono::duration_cast<std::chrono::milliseconds>(tDecomp).count() << " ms / " << (total_input_buffer_length / 1024 / 1024) / tDecomp.count() << " MiB/s" << std::endl;
+
     for (numa::Node node : numa::NodeList::logicalNodesWithCPUs()) 
     {
-        std::cout << "Node " << node.logicalId() << " used " << decompressThreadIds[node.logicalId()] << " worker threads for decompression." << std::endl;
-    }
-    */   
-
-    for (numa::Node node : numa::NodeList::logicalNodesWithCPUs()) 
-    {
-        if (memcmp(input_buffers[node.logicalId()], decompressed_buffers[node.logicalId()], node_input_buffer_length) != 0)
+        if (memcmp(input_buffers[node.logicalId()], decompressed_buffers[node.logicalId()], node_input_buffer_length) != 0) {
             std::cerr << "FAIL: Decompressed data differs from the original input data on node " << node.logicalId() << "." << std::endl;
+            exit(-47);
+        }
     }
-
-
-
-
-
-    /*
-    // query node location of memory address
-    int status = -1;
-    int ret_code;
-    ret_code = move_pages(0, 1, &tmp_input_buffer, NULL, &status, 0);
-    printf("Memory at %p is at %d node (retcode %d)\n", tmp_input_buffer, status, ret_code);
-    */
-    printf("Compression performance: %lld ms / %f MiB/s\n",
-            timeend_comp, (total_input_buffer_length / 1024 / 1024) / ((float)timeend_comp / 1000));
-    printf("Decompression performance: %lld ms / %f MiB/s\n",
-        timeend_decomp, (total_input_buffer_length / 1024 / 1024) / ((float)timeend_decomp / 1000));
+    std::cout << "Compression- and decompression was successful!" << std::endl;
 }
 
 

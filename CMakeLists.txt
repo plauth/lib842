@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.10)
 
 project(lib842)
 
@@ -11,7 +11,7 @@ endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Avoid 'ignoring attributes on template argument' spam because of types such as std::vector<cl_int>
@@ -39,6 +39,7 @@ set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
 find_package(Threads REQUIRED)
 find_package(OpenMP)
 find_package(NUMA)
+find_package(PGASUS)
 
 ###########
 # LIBRARY #
@@ -103,6 +104,7 @@ if (CUDA_FOUND)
 else ()
     add_library(842 STATIC ${SRCFILES})
 endif()
+
 set_property(TARGET 842 PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_include_directories(842 PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}/include")
 if (OpenCL_FOUND)
@@ -141,6 +143,14 @@ if(STANDALONE_BUILD)
     add_executable(test_serial_optimized_streams sample/compdecomp_streams.cpp sample/compdecomp_driver.c)
     target_compile_definitions(test_serial_optimized_streams PRIVATE "USEOPTSW")
     target_link_libraries(test_serial_optimized_streams 842 Threads::Threads)
+
+    if(PGASUS_FOUND AND NUMA_FOUND)
+        message(STATUS "Found PGASUS: \"${PGASUS_LIBRARIES}\"")
+
+        add_executable(test_serial_optimized_pgasus sample/compdecomp_pgasus.cpp)
+        target_link_libraries(test_serial_optimized_pgasus 842 ${PGASUS_LIBRARIES})
+        target_include_directories(test_serial_optimized_pgasus PRIVATE ${PGASUS_INCLUDE_DIRS})
+    endif()
 
     if (CRYPTODEV_LINUX_COMP_FOUND)
         add_executable(test_cryptodev sample/compdecomp.c sample/compdecomp_driver.c)
