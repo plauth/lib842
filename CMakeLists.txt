@@ -150,6 +150,12 @@ if(STANDALONE_BUILD)
         add_executable(test_serial_optimized_pgasus sample/compdecomp_pgasus.cpp)
         target_link_libraries(test_serial_optimized_pgasus 842 ${PGASUS_LIBRARIES})
         target_include_directories(test_serial_optimized_pgasus PRIVATE ${PGASUS_INCLUDE_DIRS})
+
+        if (OpenMP_CXX_FOUND)
+            add_executable(test_serial_optimized_pgasus_omp sample/compdecomp_pgasus_omp.cpp)
+            target_link_libraries(test_serial_optimized_pgasus_omp 842 ${PGASUS_LIBRARIES} OpenMP::OpenMP_CXX)
+            target_include_directories(test_serial_optimized_pgasus_omp PRIVATE ${PGASUS_INCLUDE_DIRS})
+        endif()
     endif()
 
     if (CRYPTODEV_LINUX_COMP_FOUND)
