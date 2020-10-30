@@ -41,6 +41,18 @@ find_package(OpenMP)
 find_package(NUMA)
 find_package(PGASUS)
 
+if (CMAKE_SYSTEM_PROCESSOR STREQUAL "ppc64le")
+    add_compile_options(
+        -maltivec 
+        -mabi=altivec 
+        -mvsx
+    )
+else()
+    add_compile_options(
+        -march=native
+    )
+endif()
+
 ###########
 # LIBRARY #
 ###########
