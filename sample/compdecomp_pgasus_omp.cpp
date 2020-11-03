@@ -22,7 +22,15 @@
 
 static inline uint64_t next_pow2(uint64_t x) 
 {
-	return x == 1 ? 1 : 1<<(64-__builtin_clzl(x-1));
+    x--;
+    x |= x>>1;
+    x |= x>>2;
+    x |= x>>4;
+    x |= x>>8;
+    x |= x>>16;
+    x |= x>>32;
+    x++;
+    return x;
 }
 
 static inline size_t getPaddedInputBufferLength(size_t input) 
